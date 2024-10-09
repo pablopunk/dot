@@ -7,7 +7,6 @@ $ brew install pablopunk/formulae/nos
 $ cd /path/to/dotfiles
 $ tree
 
-# Start of Selection
 profiles/
 ├── work.lua
 ├── personal.lua
@@ -24,7 +23,6 @@ modules/
     │   └── init.lua
     └── personal/
         └── init.lua
-# End of Selection
 
 $ nos # link all dotfiles and install dependencies
 $ nos neovim # only neovim module
