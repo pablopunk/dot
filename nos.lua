@@ -1,6 +1,6 @@
 #!/usr/bin/env lua
 
-local version = "0.0.3"
+local version = "0.0.4"
 
 -- Parse command-line arguments
 local function parse_args()
@@ -30,7 +30,7 @@ local function parse_args()
     force_mode = force_mode,
     purge_mode = purge_mode,
     unlink_mode = unlink_mode,
-    args = args
+    args = args,
   }
 end
 
@@ -69,10 +69,10 @@ local installed_brew_packages = {}
 -- Execute an OS command and return exit code and output
 local function execute(cmd)
   local handle = io.popen(cmd .. " ; echo $?")
-  local result = handle:read("*a")
+  local result = handle:read "*a"
   handle:close()
   local lines = {}
-  for line in result:gmatch("[^\r\n]+") do
+  for line in result:gmatch "[^\r\n]+" do
     table.insert(lines, line)
   end
   local exit_code = tonumber(lines[#lines])
@@ -83,7 +83,7 @@ end
 -- Expand '~' to the user's home directory in the given path
 local function expand_path(path)
   if path:sub(1, 1) == "~" then
-    return os.getenv("HOME") .. path:sub(2)
+    return os.getenv "HOME" .. path:sub(2)
   else
     return path
   end
@@ -93,24 +93,23 @@ end
 local function is_dir(path)
   local cmd = string.format('test -d "%s" 2>/dev/null && echo "true" || echo "false"', path)
   local exit_code, output = execute(cmd)
-  return output:match("true") ~= nil
+  return output:match "true" ~= nil
 end
 
 local function is_file(path)
   local cmd = string.format('test -f "%s" 2>/dev/null && echo "true" || echo "false"', path)
   local exit_code, output = execute(cmd)
-  return output:match("true") ~= nil
+  return output:match "true" ~= nil
 end
 
 local function is_symlink(path)
   local cmd = string.format('test -L "%s" 2>/dev/null && echo "true" || echo "false"', path)
   local exit_code, output = execute(cmd)
-  return output:match("true") ~= nil
+  return output:match "true" ~= nil
 end
 
 local function get_file_size(path)
-  local cmd = is_dir(path)
-    and string.format('du -sk "%s" 2>/dev/null | cut -f1', path)
+  local cmd = is_dir(path) and string.format('du -sk "%s" 2>/dev/null | cut -f1', path)
     or string.format('wc -c < "%s" 2>/dev/null', path)
   local exit_code, output = execute(cmd)
   local size = tonumber(output) or 0
@@ -140,10 +139,11 @@ local function is_symlink_correct(source, output)
   if exit_code == 0 then
     local source_info = get_file_info(source)
     local target_info = get_file_info(link_target)
-    return source_info and target_info and
-      source_info.is_file == target_info.is_file and
-      source_info.is_dir == target_info.is_dir and
-      source_info.size == target_info.size
+    return source_info
+      and target_info
+      and source_info.is_file == target_info.is_file
+      and source_info.is_dir == target_info.is_dir
+      and source_info.size == target_info.size
   end
   return false
 end
@@ -153,15 +153,15 @@ local function get_installed_brew_packages()
   local function add_packages(cmd)
     local exit_code, output = execute(cmd)
     if exit_code == 0 then
-      for package in output:gmatch("[^\r\n]+") do
+      for package in output:gmatch "[^\r\n]+" do
         installed_brew_packages[package] = true
       end
     else
       print(colors.red .. "Warning: Failed to get list of installed brew packages" .. colors.reset)
     end
   end
-  add_packages("brew list --formula")
-  add_packages("brew list --cask")
+  add_packages "brew list --formula"
+  add_packages "brew list --cask"
 end
 
 local function is_brew_package_installed(package_name)
@@ -171,7 +171,7 @@ end
 
 -- File operation functions
 local function ensure_parent_directory(path)
-  local parent = path:match("(.+)/[^/]*$")
+  local parent = path:match "(.+)/[^/]*$"
   if parent then
     local cmd = string.format('mkdir -p "%s"', parent)
     local exit_code, _ = execute(cmd)
@@ -232,7 +232,7 @@ local function get_direct_child_modules()
   local cmd = string.format('find "%s" -maxdepth 1 -type d', modules_dir)
   local exit_code, output = execute(cmd)
   if exit_code == 0 then
-    for dir in output:gmatch("[^\n]+") do
+    for dir in output:gmatch "[^\n]+" do
       if dir ~= modules_dir then
         local module_name = dir:match("^" .. modules_dir .. "/(.+)$")
         if module_name and is_file(dir .. "/init.lua") then
@@ -312,7 +312,7 @@ local function handle_config_symlink(config, module_dir, options)
     return
   end
 
-  local source = os.getenv("PWD") .. "/" .. module_dir:gsub("^./", "") .. "/" .. config.config.source:gsub("^./", "")
+  local source = os.getenv "PWD" .. "/" .. module_dir:gsub("^./", "") .. "/" .. config.config.source:gsub("^./", "")
   local output = expand_path(config.config.output)
   local attr = get_file_info(output)
 
@@ -426,12 +426,12 @@ local function process_module(module_name, options)
     end
   end
 
-  print("") -- Add a blank line between modules
+  print "" -- Add a blank line between modules
 end
 
 -- Process a single tool or profile
 local function process_tool(tool_name, options)
-  local profile_path = os.getenv("PWD") .. "/profiles/" .. tool_name .. ".lua"
+  local profile_path = os.getenv "PWD" .. "/profiles/" .. tool_name .. ".lua"
 
   if is_file(profile_path) then
     -- Load and process the profile
@@ -503,3 +503,4 @@ local function main()
 end
 
 main()
+
