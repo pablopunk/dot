@@ -278,25 +278,100 @@ local function find_init_files(dir, processed_dirs)
   return init_files
 end
 
+-- New function to get all direct child modules
+local function get_direct_child_modules()
+  local modules = {}
+  local modules_dir = "modules"
+  for entry in lfs.dir(modules_dir) do
+    if entry ~= "." and entry ~= ".." then
+      local full_path = modules_dir .. "/" .. entry
+      local attr = lfs.attributes(full_path)
+      if attr.mode == "directory" then
+        local init_file = full_path .. "/init.lua"
+        if lfs.attributes(init_file) then
+          table.insert(modules, entry)
+        end
+      end
+    end
+  end
+  return modules
+end
+
+-- Modified function to process a single tool
+local function process_tool(tool_name)
+  local profile_path = "profiles/" .. tool_name .. ".lua"
+  local profile_attr = lfs.attributes(profile_path)
+
+  if profile_attr and profile_attr.mode == "file" then
+    -- Load and process the profile
+    local profile_func, load_err = loadfile(profile_path)
+    if not profile_func then
+      print(colors.red .. "Error loading profile: " .. load_err .. colors.reset)
+      return
+    end
+
+    local success, profile = pcall(profile_func)
+    if not success or not profile or not profile.modules then
+      print(colors.red .. "Error executing profile or invalid profile structure" .. colors.reset)
+      return
+    end
+
+    local modules_to_process = {}
+    for _, module_name in ipairs(profile.modules) do
+      if module_name == "*" then
+        local direct_children = get_direct_child_modules()
+        for _, child in ipairs(direct_children) do
+          if not modules_to_process[child] then
+            table.insert(modules_to_process, child)
+            modules_to_process[child] = true
+          end
+        end
+      else
+        if not modules_to_process[module_name] then
+          table.insert(modules_to_process, module_name)
+          modules_to_process[module_name] = true
+        end
+      end
+    end
+
+    for _, module_name in ipairs(modules_to_process) do
+      process_module(module_name)
+    end
+  else
+    -- Process the single tool module
+    local module_path = "modules/" .. tool_name .. "/init.lua"
+    if lfs.attributes(module_path) then
+      process_module(tool_name)
+    else
+      print(colors.red .. "Module not found: " .. tool_name .. colors.reset)
+    end
+  end
+end
+
 -- Main function to iterate over modules and process them
 local function main()
   get_installed_brew_packages()
 
-  local modules_dir = "modules"
-  if not lfs.attributes(modules_dir) then
-    print("  " .. colors.red .. "✗ modules directory not found" .. colors.reset)
-    return
-  end
+  local tool_name = arg[1]
+  if tool_name then
+    process_tool(tool_name)
+  else
+    local modules_dir = "modules"
+    if not lfs.attributes(modules_dir) then
+      print("  " .. colors.red .. "✗ modules directory not found" .. colors.reset)
+      return
+    end
 
-  local init_files = find_init_files(modules_dir)
-  if #init_files == 0 then
-    print("  " .. colors.red .. "✗ no modules found" .. colors.reset)
-    return
-  end
+    local init_files = find_init_files(modules_dir)
+    if #init_files == 0 then
+      print("  " .. colors.red .. "✗ no modules found" .. colors.reset)
+      return
+    end
 
-  for _, module_dir in ipairs(init_files) do
-    local module_name = module_dir:gsub("^" .. modules_dir .. "/", "")
-    process_module(module_name)
+    for _, module_dir in ipairs(init_files) do
+      local module_name = module_dir:gsub("^" .. modules_dir .. "/", "")
+      process_module(module_name)
+    end
   end
 end
 
