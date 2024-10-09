@@ -324,7 +324,7 @@ end
 
 -- Modified function to process a single tool
 local function process_tool(tool_name)
-  local profile_path = "profiles/" .. tool_name .. ".lua"
+  local profile_path = os.getenv "PWD" .. "/profiles/" .. tool_name .. ".lua"
   local profile_attr = get_file_attributes(profile_path)
 
   if profile_attr and profile_attr.mode:sub(1, 1) == "-" then -- Check if it's a regular file
