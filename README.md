@@ -11,9 +11,12 @@
 - [Installation](#installation)
 - [Quick Start](#quick-start)
 - [Usage](#usage)
-  - [init.lua](#initlua)
+  - [`init.lua`](#initlua)
   - [Recursive](#recursive)
   - [Profiles](#profiles)
+  - [Force Mode `-f`](#force-mode--f)
+  - [Unlinking Configs `--unlink`](#unlinking-configs---unlink)
+  - [Purging Modules `--purge`](#purging-modules---purge)
 - [To do](#to-do)
 
 ## Installation
@@ -45,9 +48,9 @@ modules/
     └── personal/
         └── init.lua
 
-$ nos # link all dotfiles and install dependencies
-$ nos neovim # only neovim module
-$ nos work # only my work profile
+$ nos          # Link all dotfiles and install dependencies
+$ nos neovim   # Only process the 'neovim' module
+$ nos work     # Only process the 'work' profile
 ```
 
 ## Usage
@@ -59,14 +62,15 @@ Each module under the `modules/` folder needs to have at least an `init.lua`. If
 Example for neovim:
 
 ```lua
+-- modules/neovim/init.lua
 return {
   brew = {
     { name = "neovim", options = "--HEAD" },
     "ripgrep"
   },
   config = {
-    source = "./config", -- this is our config i.e dotfiles/modules/neovim/config
-    output = "~/.config/nvim", -- this is where the config will be linked to
+    source = "./config",       -- Our config directory within the module
+    output = "~/.config/nvim", -- Where the config will be linked to
   }
 }
 ```
@@ -77,7 +81,7 @@ The config will be linked to the home folder with a soft link. In this case:
 ~/.config/nvim → ~/dotfiles/modules/neovim/config
 ```
 
-As you can see you can declare dependencies as [homebrew](https://brew.sh) packages, which makes it possible to also use `nos` to install GUI apps (homebrew casks). You can create a module without any config, to use it as an installer for your apps:
+As you can see, you can declare dependencies as [Homebrew](https://brew.sh) packages, which makes it possible to also use `nos` to install GUI apps (Homebrew casks). You can create a module without any config to use it as an installer for your apps:
 
 ```lua
 -- modules/apps/init.lua
@@ -88,7 +92,7 @@ return {
 
 ### Recursive
 
-In the example above, let's say we want to separate our apps into "work" and "personal". We could either create 2 modules on the root folder, or create a nested folder for each:
+In the example above, let's say we want to separate our apps into "work" and "personal". We could either create 2 modules on the root folder or create a nested folder for each:
 
 ```lua
 -- modules/apps/work/init.lua
@@ -106,9 +110,9 @@ return {
 
 ### Profiles
 
-If you have several machines, you might not wanna install all tools on every computer. That's why `nos` allows **profiles**.
+If you have several machines, you might not want to install all tools on every computer. That's why `nos` allows **profiles**.
 
-Let's created a new "work" profile:
+Let's create a new "work" profile:
 
 ```lua
 -- profiles/work.lua
@@ -120,17 +124,16 @@ return {
 }
 ```
 
-In this example, using the directories we created in the [recursive section](#recursive) running `nos work` will:
+In this example, using the directories we created in the [Recursive](#recursive) section, running `nos work` will:
 
-* `apps/work`: install only our work apps under `modules/apps/work/init.lua`
-* `*`: install everything else under `modules/*`, except nested directories (so it won't install `apps/work`)
+- `apps/work`: Install only our work apps under `modules/apps/work/init.lua`.
+- `*`: Install everything else under `modules/*`, except nested directories (so it won't install `apps/work`).
 
-> NOTE 1: once `nos` detects an init.lua, it will stop going through the subdirectories inside that folder.
+> **Note 1**: Once `nos` detects an `init.lua`, it will stop going through the subdirectories inside that folder.
 
-> NOTE 2: you probably don't want to name a profile the same as a module (i.e profile/neovim <> modules/neovim)
-> since running `nos neovim` will default to the profile
+> **Note 2**: You probably don't want to name a profile the same as a module (e.g., `profiles/neovim` vs. `modules/neovim`) since running `nos neovim` will default to the profile.
 
-### `-f` to force
+### Force Mode `-f`
 
 By default, `nos` won't touch your existing dotfiles if the destination already exists. If you still want to replace them, you can use the `-f` flag:
 
@@ -138,21 +141,82 @@ By default, `nos` won't touch your existing dotfiles if the destination already 
 $ nos -f neovim
 ```
 
-> NOTE: It won't remove the existing config, just move it to a new path: `<path-to-config>.before-nos`
+> **Note**: It won't remove the existing config but will move it to a new path: `<path-to-config>.before-nos`.
+
+### Unlinking Configs `--unlink`
+
+If you want to remove the symlinks created by `nos` for a specific module but keep your configuration, you can use the `--unlink` option:
+
+```bash
+$ nos --unlink neovim
+```
+
+This command will:
+
+- Remove the symlink at the destination specified in `config.output`.
+- Copy the config source from `config.source` to the output location.
+
+This is useful if you want to maintain your configuration files without `nos` managing them anymore.
+
+### Purging Modules `--purge`
+
+To completely remove a module, including uninstalling its dependencies and removing its configuration, use the `--purge` option:
+
+```bash
+$ nos --purge neovim
+```
+
+This command will:
+
+- Uninstall the Homebrew dependencies listed in the module's `init.lua`.
+- Remove the symlink or config file/directory specified in `config.output`.
+- Run any `post_purge` hooks if defined in the module.
+
+> **Warning**: `--purge` will uninstall packages from your system and remove configuration files. Use with caution.
+
+### Summary of Command-Line Options
+
+- **Install Modules**: Install dependencies and link configurations.
+
+  ```bash
+  $ nos             # Install all modules
+  $ nos neovim      # Install only the 'neovim' module
+  $ nos work        # Install only the 'work' profile
+  ```
+
+- **Force Mode**: Replace existing configurations, backing them up to `<config>.before-nos`.
+
+  ```bash
+  $ nos -f          # Force install all modules
+  $ nos -f neovim   # Force install the 'neovim' module
+  ```
+
+- **Unlink Configs**: Remove symlinks but keep the config files in their destination.
+
+  ```bash
+  $ nos --unlink neovim
+  ```
+
+- **Purge Modules**: Uninstall dependencies and remove configurations.
+
+  ```bash
+  $ nos --purge neovim
+  ```
 
 ## To do
 
-- [x] `nos` will install deps and link files.
-- [x] Support brew dependencies.
-- [x] `nos -f` will remove the existing configs if they exist (moves config to `*.before-nos`)
-- [x] Allows post_install hooks in bash
-- [x] Allows to install only one thing `nos neovim`
-- [x] Allow multiple setups in one repo. Sort of like "hosts" in nix. `nos m1air` reads `profiles/m1air.lua` which includes whatever it wants from `modules/`
-- [x] Package and distribute `nos` through _brew_
-- [ ] Add screenshots to this repo
-- [ ] Support more ways of adding dependencies (wget binaries?)
-- [ ] Unlinking dotfiles. Something like `nos --unlink` should remove all links and copy all files to its destinations (to maintain config).
-- [ ] `nos --purge`. Same as `--unlink` but without copying the files. Just leave the computer "configless".
-- [ ] mac defaults support, just like nix-darwin
-- [ ] profiles syntax could be improved. For example `{ "*", "apps/work" }` should still be recursive except in "apps/"
-
+- [x] `nos` will install dependencies and link files.
+- [x] Support Homebrew dependencies.
+- [x] `nos -f` will remove the existing configs if they exist (moves config to `*.before-nos`).
+- [x] Allow post-install hooks in bash.
+- [x] Allow installing only one module with `nos neovim`.
+- [x] Allow multiple setups in one repo. Similar to "hosts" in Nix, `nos work` reads `profiles/work.lua` which includes whatever it wants from `modules/`.
+- [x] Package and distribute `nos` through Homebrew.
+- [x] Add `--unlink` option to remove symlinks and copy configs to output.
+- [x] Add `--purge` option to uninstall dependencies and remove configurations.
+- [ ] Add screenshots to this repo.
+- [ ] Support more ways of adding dependencies (e.g., wget binaries).
+- [ ] Unlinking dotfiles without copying. An option like `nos --unlink --no-copy` could be added.
+- [ ] `nos --purge-all` to purge all modules at once.
+- [ ] Support Mac defaults, similar to `nix-darwin`.
+- [ ] Improve profiles syntax. For example, `{ "*", "apps/work" }` should still be recursive except in "apps/".
