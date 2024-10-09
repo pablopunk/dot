@@ -3,14 +3,19 @@
 -- Parse command-line arguments
 local force_mode = false
 local version = "0.0.3"
+local args = {}
 
-for i, arg in ipairs(arg) do
-  if arg == "-f" then
+local i = 1
+while i <= #arg do
+  if arg[i] == "-f" then
     force_mode = true
-  elseif arg == "--version" then
+  elseif arg[i] == "--version" then
     print("nos version " .. version)
     os.exit(0)
+  else
+    table.insert(args, arg[i])
   end
+  i = i + 1
 end
 
 -- ANSI color codes
@@ -47,7 +52,7 @@ local installed_brew_packages = {}
 
 -- Execute an os command and return exit code
 local function execute(cmd)
-  local handle = io.popen(cmd .. " 2>&1; echo $?")
+  local handle = io.popen(cmd .. " ; echo $?")
   local result = handle:read "*a"
   handle:close()
   local lines = {}
@@ -91,10 +96,13 @@ local function get_file_info(path)
   -- Get file size (works for both files and directories on Linux and macOS)
   local cmd
   if info.is_dir then
-    cmd = string.format('du -sk "%s" | cut -f1 2>/dev/null', path)
-  else
+    cmd = string.format('du -sk "%s" 2>/dev/null | cut -f1', path)
+  elseif info.is_file then
     cmd = string.format('wc -c < "%s" 2>/dev/null', path)
+  else
+    return nil
   end
+
   local exit_code, output = execute(cmd)
   info.size = tonumber(output) or 0
 
@@ -382,11 +390,10 @@ local function process_tool(tool_name)
   end
 end
 
--- Main function to iterate over modules and process them
 local function main()
   get_installed_brew_packages()
 
-  local tool_name = arg[1]
+  local tool_name = args[1]
   if tool_name then
     process_tool(tool_name)
   else
