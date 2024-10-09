@@ -25,7 +25,7 @@ local colors = {
 }
 
 -- Unified print function
-local function print_message(message_type, message, module_name)
+local function print_message(message_type, message)
   local color, symbol
   if message_type == "success" then
     color, symbol = colors.green, "✓"
@@ -176,13 +176,13 @@ local function process_module(module_name)
   -- Load the init.lua file
   local config_func, load_err = loadfile(init_file)
   if not config_func then
-    print_message("error", "Error loading configuration: " .. load_err, module_name)
+    print_message("error", "Error loading configuration: " .. load_err)
     return
   end
 
   local success, config = pcall(config_func)
   if not success or not config then
-    print_message("error", "Error executing configuration: " .. tostring(config), module_name)
+    print_message("error", "Error executing configuration: " .. tostring(config))
     return
   end
 
@@ -207,17 +207,17 @@ local function process_module(module_name)
         local cmd = "brew install " .. package_name .. " " .. install_options
         local exit_code, output = execute(cmd)
         if exit_code ~= 0 then
-          print_message("error", "dependencies → could not install `" .. package_name .. "`: " .. output, module_name)
+          print_message("error", "dependencies → could not install `" .. package_name .. "`: " .. output)
         else
-          print_message("success", "dependencies → installed `" .. package_name .. "`", module_name)
+          print_message("success", "dependencies → installed `" .. package_name .. "`")
           installed_brew_packages[package_name] = true
         end
       else
-        print_message("success", "dependencies → `" .. package_name .. "` already installed", module_name)
+        print_message("success", "dependencies → `" .. package_name .. "` already installed")
       end
     end
     if all_deps_installed then
-      print_message("success", "all dependencies installed", module_name)
+      print_message("success", "all dependencies installed")
     end
   end
 
@@ -226,20 +226,20 @@ local function process_module(module_name)
     local source = os.getenv "PWD" .. "/" .. module_dir:gsub("^./", "") .. "/" .. config.config.source:gsub("^./", "")
     local output = expand_path(config.config.output)
     if is_symlink_correct(source, output) then
-      print_message("success", "config → symlink correct", module_name)
+      print_message("success", "config → symlink correct")
     else
       local attr = get_file_attributes(output)
       if attr then
         if force_mode then
           local success, result = create_backup(output)
           if success then
-            print_message("warning", "config → existing config backed up to " .. result, module_name)
+            print_message("warning", "config → existing config backed up to " .. result)
           else
-            print_message("error", "config → " .. result, module_name)
+            print_message("error", "config → " .. result)
             return
           end
         else
-          print_message("error", "config → file already exists at " .. output .. ". Use -f to force.", module_name)
+          print_message("error", "config → file already exists at " .. output .. ". Use -f to force.")
           return
         end
       end
@@ -247,28 +247,28 @@ local function process_module(module_name)
       -- Ensure parent directory exists
       local success, err = ensure_parent_directory(output)
       if not success then
-        print_message("error", "config → " .. err, module_name)
+        print_message("error", "config → " .. err)
         return
       end
 
       local cmd = string.format('ln -s%s "%s" "%s"', force_mode and "f" or "", source, output)
       local exit_code, error_output = execute(cmd)
       if exit_code ~= 0 then
-        print_message("error", "config → failed to create symlink: " .. error_output, module_name)
+        print_message("error", "config → failed to create symlink: " .. error_output)
       else
-        print_message("success", "config → symlink created", module_name)
+        print_message("success", "config → symlink created")
       end
     end
   end
 
   -- Run post_install hook if dependencies were installed
   if dependencies_installed and config.post_install then
-    print_message("info", "Running post-install hook", module_name)
+    print_message("info", "Running post-install hook")
     local exit_code, output = execute(config.post_install)
     if exit_code ~= 0 then
-      print_message("error", "post-install → failed: " .. output, module_name)
+      print_message("error", "post-install → failed: " .. output)
     else
-      print_message("success", "post-install → completed successfully", module_name)
+      print_message("success", "post-install → completed successfully")
     end
   end
 
