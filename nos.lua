@@ -2,7 +2,7 @@
 
 -- Parse command-line arguments
 local force_mode = false
-local version = "0.0.2"
+local version = "0.0.3"
 
 for i, arg in ipairs(arg) do
   if arg == "-f" then
