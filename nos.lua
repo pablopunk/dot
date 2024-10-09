@@ -70,14 +70,14 @@ end
 
 -- Simple function to check if a path is a directory
 local function is_dir(path)
-  local cmd = string.format('test -d "%s" && echo "true" || echo "false"', path)
+  local cmd = string.format('test -d "%s" 2>/dev/null && echo "true" || echo "false"', path)
   local exit_code, output = execute(cmd)
   return output:match "true" ~= nil
 end
 
 -- Simple function to check if a path is a file
 local function is_file(path)
-  local cmd = string.format('test -f "%s" && echo "true" || echo "false"', path)
+  local cmd = string.format('test -f "%s" 2>/dev/null && echo "true" || echo "false"', path)
   local exit_code, output = execute(cmd)
   return output:match "true" ~= nil
 end
@@ -91,9 +91,9 @@ local function get_file_info(path)
   -- Get file size (works for both files and directories on Linux and macOS)
   local cmd
   if info.is_dir then
-    cmd = string.format('du -sk "%s" | cut -f1', path)
+    cmd = string.format('du -sk "%s" | cut -f1 2>/dev/null', path)
   else
-    cmd = string.format('wc -c < "%s"', path)
+    cmd = string.format('wc -c < "%s" 2>/dev/null', path)
   end
   local exit_code, output = execute(cmd)
   info.size = tonumber(output) or 0
