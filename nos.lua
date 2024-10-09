@@ -13,8 +13,6 @@ for i, arg in ipairs(arg) do
   end
 end
 
-local lfs = require "lfs" -- LuaFileSystem for directory traversal
-
 -- ANSI color codes
 local colors = {
   reset = "\27[0m",
@@ -51,14 +49,45 @@ local function expand_path(path)
   end
 end
 
+-- Custom functions to replace lfs functionality
+local function is_dir(path)
+  local ok, _ = os.rename(path, path)
+  return ok
+end
+
+local function is_file(path)
+  local f = io.open(path, "r")
+  if f then
+    f:close()
+    return true
+  end
+  return false
+end
+
+local function get_file_attributes(path)
+  local cmd = string.format('stat -f "%%d %%i %%Sp %%z %%m" "%s" 2>/dev/null', path)
+  local exit_code, output = execute(cmd)
+  if exit_code == 0 then
+    local dev, ino, mode, size, mtime = output:match "(%d+) (%d+) (%S+) (%d+) (%d+)"
+    return {
+      dev = tonumber(dev),
+      ino = tonumber(ino),
+      mode = mode,
+      size = tonumber(size),
+      mtime = tonumber(mtime),
+    }
+  end
+  return nil
+end
+
 -- Checks if the symlink at 'output' points to 'source'
 local function is_symlink_correct(source, output)
-  local attr = lfs.symlinkattributes(output)
-  if attr and attr.mode == "link" then
-    local target = lfs.symlinkattributes(output, "target")
-    return lfs.attributes(target)
-      and lfs.attributes(source)
-      and lfs.attributes(target).ino == lfs.attributes(source).ino
+  local cmd = string.format('readlink "%s"', output)
+  local exit_code, link_target = execute(cmd)
+  if exit_code == 0 then
+    local source_attr = get_file_attributes(source)
+    local target_attr = get_file_attributes(link_target)
+    return source_attr and target_attr and source_attr.ino == target_attr.ino
   end
   return false
 end
@@ -85,7 +114,6 @@ end
 
 -- Checks if a Homebrew package is already installed
 local function is_brew_package_installed(package_name)
-  -- package_name might be neovim or /foo/bar/neovim so we need to only include the last part
   local package_name = package_name:gsub("^.*/", "")
   return installed_brew_packages[package_name] == true
 end
@@ -94,9 +122,10 @@ end
 local function ensure_parent_directory(path)
   local parent = path:match "(.+)/[^/]*$"
   if parent then
-    local success, err = lfs.mkdir(parent)
-    if not success and not lfs.attributes(parent) then
-      return false, "Failed to create parent directory: " .. (err or "unknown error")
+    local cmd = string.format('mkdir -p "%s"', parent)
+    local exit_code, _ = execute(cmd)
+    if exit_code ~= 0 then
+      return false, "Failed to create parent directory"
     end
   end
   return true
@@ -106,7 +135,7 @@ end
 local function create_backup(path)
   local backup_path = path .. ".before-nos"
   local i = 1
-  while lfs.attributes(backup_path) do
+  while is_file(backup_path) or is_dir(backup_path) do
     backup_path = path .. ".before-nos." .. i
     i = i + 1
   end
@@ -183,12 +212,12 @@ local function process_module(module_name)
 
   -- Check symlink configuration
   if config.config then
-    local source = lfs.currentdir() .. "/" .. module_dir:gsub("^./", "") .. "/" .. config.config.source:gsub("^./", "")
+    local source = os.getenv "PWD" .. "/" .. module_dir:gsub("^./", "") .. "/" .. config.config.source:gsub("^./", "")
     local output = expand_path(config.config.output)
     if is_symlink_correct(source, output) then
       print("  " .. colors.green .. "✓ config → symlink correct" .. colors.reset)
     else
-      local attr = lfs.attributes(output)
+      local attr = get_file_attributes(output)
       if attr then
         if force_mode then
           local success, result = create_backup(output)
@@ -242,39 +271,31 @@ local function process_module(module_name)
   print "" -- Add a blank line between modules
 end
 
+local function table_string_find(table, item)
+  for _, v in ipairs(table) do
+    if v == item then
+      return true
+    end
+  end
+  return false
+end
+
 -- Recursively search for init.lua files
-local function find_init_files(dir, processed_dirs)
-  processed_dirs = processed_dirs or {}
+local function find_init_files(dir)
   local init_files = {}
-  local current_dir_processed = false
-
-  for entry in lfs.dir(dir) do
-    if entry ~= "." and entry ~= ".." then
-      local full_path = dir .. "/" .. entry
-      local attr = lfs.attributes(full_path)
-      if attr.mode == "directory" then
-        -- Check if this directory or any parent has been processed
-        local should_process = true
-        for processed_dir in pairs(processed_dirs) do
-          if full_path:find(processed_dir, 1, true) == 1 then
-            should_process = false
-            break
-          end
-        end
-
-        if should_process then
-          for _, subfile in ipairs(find_init_files(full_path, processed_dirs)) do
-            table.insert(init_files, subfile)
-          end
-        end
-      elseif entry == "init.lua" and not current_dir_processed then
+  local cmd = string.format('find "%s" -type f -name "init.lua"', dir)
+  local exit_code, output = execute(cmd)
+  if exit_code == 0 then
+    for file in output:gmatch "[^\n]+" do
+      local dir = file:match "(.+)/init%.lua"
+      local parent_dir = dir:match "(.+)/[^/]*$"
+      local parent_in_array = table_string_find(init_files, parent_dir)
+      if dir and not parent_in_array then
         table.insert(init_files, dir)
-        processed_dirs[dir] = true
-        current_dir_processed = true
-        break -- Stop processing this directory
       end
     end
   end
+
   return init_files
 end
 
@@ -282,14 +303,14 @@ end
 local function get_direct_child_modules()
   local modules = {}
   local modules_dir = "modules"
-  for entry in lfs.dir(modules_dir) do
-    if entry ~= "." and entry ~= ".." then
-      local full_path = modules_dir .. "/" .. entry
-      local attr = lfs.attributes(full_path)
-      if attr.mode == "directory" then
-        local init_file = full_path .. "/init.lua"
-        if lfs.attributes(init_file) then
-          table.insert(modules, entry)
+  local cmd = string.format('find "%s" -maxdepth 1 -type d', modules_dir)
+  local exit_code, output = execute(cmd)
+  if exit_code == 0 then
+    for dir in output:gmatch "[^\n]+" do
+      if dir ~= modules_dir then
+        local module_name = dir:match("^" .. modules_dir .. "/(.+)$")
+        if module_name and is_file(dir .. "/init.lua") then
+          table.insert(modules, module_name)
         end
       end
     end
@@ -300,9 +321,9 @@ end
 -- Modified function to process a single tool
 local function process_tool(tool_name)
   local profile_path = "profiles/" .. tool_name .. ".lua"
-  local profile_attr = lfs.attributes(profile_path)
+  local profile_attr = get_file_attributes(profile_path)
 
-  if profile_attr and profile_attr.mode == "file" then
+  if profile_attr and profile_attr.mode:sub(1, 1) == "-" then -- Check if it's a regular file
     -- Load and process the profile
     local profile_func, load_err = loadfile(profile_path)
     if not profile_func then
@@ -340,7 +361,7 @@ local function process_tool(tool_name)
   else
     -- Process the single tool module
     local module_path = "modules/" .. tool_name .. "/init.lua"
-    if lfs.attributes(module_path) then
+    if is_file(module_path) then
       process_module(tool_name)
     else
       print(colors.red .. "Module not found: " .. tool_name .. colors.reset)
@@ -357,7 +378,7 @@ local function main()
     process_tool(tool_name)
   else
     local modules_dir = "modules"
-    if not lfs.attributes(modules_dir) then
+    if not is_dir(modules_dir) then
       print("  " .. colors.red .. "✗ modules directory not found" .. colors.reset)
       return
     end
