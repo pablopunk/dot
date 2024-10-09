@@ -1,4 +1,6 @@
-# dotfiles
+# `nos`
+
+> Manage your dotfiles and their dependencies automagically
 
 - [x] `nos` will install deps and link files.
 - [x] Support brew dependencies.
