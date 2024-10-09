@@ -9,14 +9,77 @@ $ tree
 
 modules/
 ├─ neovim/
-│  ├─ init.lua # this is an entrypoint for nos, not the neovim config
+│  ├─ init.lua
 │  ├─ config/
 ├─ zsh/
-   ├─ init.lua
-   ├─ zshrc
+│  ├─ init.lua
+│  ├─ zshrc
+├─ apps/
+   ├─ work/
+   │  ├─ init.lua
+   ├─ personal/
+      ├─ init.lua
 
 $ nos
 ```
+
+## Usage
+
+Each module under the `modules/` folder needs to have at least an `init.lua`. If not, it will be ignored.
+
+### `init.lua`
+
+Example for neovim:
+
+```lua
+return {
+  brew = {
+    { name = "neovim", options = "--HEAD" },
+    "ripgrep"
+  },
+  config = {
+    source = "./config", -- this is our config i.e dotfiles/modules/neovim/config
+    output = "~/.config/nvim", -- this is where the config will be linked to
+  }
+}
+```
+
+The config will be linked to the home folder with a soft link. In this case:
+
+```bash
+~/.config/nvim → ~/dotfiles/modules/neovim/config
+```
+
+As you can see you can declare dependencies as [homebrew](https://brew.sh) packages, which makes it possible to also use `nos` to install GUI apps (homebrew casks). You can create a module without any config, to use it as an installer for your apps:
+
+```lua
+-- modules/apps/init.lua
+return {
+  brew = { "whatsapp", "spotify", "slack", "vscode" }
+}
+```
+
+### Recursive
+
+In the example above, let's say we want to separate our apps into "work" and "personal". We could either create 2 modules on the root folder, or create a nested folder for each:
+
+```lua
+-- modules/apps/work/init.lua
+return {
+  brew = { "slack", "vscode" }
+}
+```
+
+```lua
+-- modules/apps/personal/init.lua
+return {
+  brew = { "whatsapp", "spotify" }
+}
+```
+
+> NOTE: once `nos` detects an init.lua, it will stop going through the subdirectories inside that folder.
+
+## To do
 
 - [x] `nos` will install deps and link files.
 - [x] Support brew dependencies.
@@ -24,7 +87,7 @@ $ nos
 - [x] Allows post_install hooks in bash
 - [ ] Allows to install only one thing `nos neovim`
 - [ ] Allow multiple setups in one repo. Sort of like "hosts" in nix. `nos m1air` reads `profiles/m1air.lua` which includes whatever it wants from `modules/`
-- [ ] Package and distribute `nos` through _brew_
+- [x] Package and distribute `nos` through _brew_
 - [ ] Support more ways of adding dependencies (wget binaries?)
 - [ ] Unlinking dotfiles. Something like `nos unlink` should remove all links and copy all files to its destinations (to maintain config).
 - [ ] `nos purge`. Same as `unlink` but without copying the files. Just leave the computer "configless".
