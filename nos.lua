@@ -24,6 +24,25 @@ local colors = {
   magenta = "\27[35m",
 }
 
+-- Unified print function
+local function print_message(message_type, message, module_name)
+  local color, symbol
+  if message_type == "success" then
+    color, symbol = colors.green, "✓"
+  elseif message_type == "error" then
+    color, symbol = colors.red, "✗"
+  elseif message_type == "warning" then
+    color, symbol = colors.yellow, "!"
+  elseif message_type == "info" then
+    color, symbol = colors.blue, "•"
+  else
+    color, symbol = colors.reset, "-"
+  end
+
+  local prefix = "  "
+  print(prefix .. color .. symbol .. " " .. message .. colors.reset)
+end
+
 local installed_brew_packages = {}
 
 -- Execute an os command and return exit code
@@ -149,21 +168,21 @@ end
 
 -- Processes each module by installing dependencies and creating symlinks
 local function process_module(module_name)
+  print(colors.bold .. colors.blue .. "[" .. module_name .. "]" .. colors.reset)
+
   local module_dir = "modules/" .. module_name
   local init_file = module_dir .. "/init.lua"
-
-  print(colors.bold .. colors.blue .. "• " .. module_name .. colors.reset)
 
   -- Load the init.lua file
   local config_func, load_err = loadfile(init_file)
   if not config_func then
-    print("  " .. colors.red .. "✗ Error loading configuration: " .. load_err .. colors.reset)
+    print_message("error", "Error loading configuration: " .. load_err, module_name)
     return
   end
 
   local success, config = pcall(config_func)
   if not success or not config then
-    print("  " .. colors.red .. "✗ Error executing configuration: " .. tostring(config) .. colors.reset)
+    print_message("error", "Error executing configuration: " .. tostring(config), module_name)
     return
   end
 
@@ -188,25 +207,17 @@ local function process_module(module_name)
         local cmd = "brew install " .. package_name .. " " .. install_options
         local exit_code, output = execute(cmd)
         if exit_code ~= 0 then
-          print(
-            "  "
-              .. colors.red
-              .. "✗ dependencies → could not install `"
-              .. package_name
-              .. "`: "
-              .. output
-              .. colors.reset
-          )
+          print_message("error", "dependencies → could not install `" .. package_name .. "`: " .. output, module_name)
         else
-          print("  " .. colors.green .. "✓ dependencies → installed `" .. package_name .. "`" .. colors.reset)
-          installed_brew_packages[package_name] = true -- Add newly installed package to the list
+          print_message("success", "dependencies → installed `" .. package_name .. "`", module_name)
+          installed_brew_packages[package_name] = true
         end
       else
-        print("  " .. colors.green .. "✓ dependencies → `" .. package_name .. "` already installed" .. colors.reset)
+        print_message("success", "dependencies → `" .. package_name .. "` already installed", module_name)
       end
     end
     if all_deps_installed then
-      print("  " .. colors.green .. "✓ all dependencies installed" .. colors.reset)
+      print_message("success", "all dependencies installed", module_name)
     end
   end
 
@@ -215,27 +226,20 @@ local function process_module(module_name)
     local source = os.getenv "PWD" .. "/" .. module_dir:gsub("^./", "") .. "/" .. config.config.source:gsub("^./", "")
     local output = expand_path(config.config.output)
     if is_symlink_correct(source, output) then
-      print("  " .. colors.green .. "✓ config → symlink correct" .. colors.reset)
+      print_message("success", "config → symlink correct", module_name)
     else
       local attr = get_file_attributes(output)
       if attr then
         if force_mode then
           local success, result = create_backup(output)
           if success then
-            print("  " .. colors.yellow .. "! config → existing config backed up to " .. result .. colors.reset)
+            print_message("warning", "config → existing config backed up to " .. result, module_name)
           else
-            print("  " .. colors.red .. "✗ config → " .. result .. colors.reset)
+            print_message("error", "config → " .. result, module_name)
             return
           end
         else
-          print(
-            "  "
-              .. colors.red
-              .. "✗ config → file already exists at "
-              .. output
-              .. ". Use -f to force."
-              .. colors.reset
-          )
+          print_message("error", "config → file already exists at " .. output .. ". Use -f to force.", module_name)
           return
         end
       end
@@ -243,28 +247,28 @@ local function process_module(module_name)
       -- Ensure parent directory exists
       local success, err = ensure_parent_directory(output)
       if not success then
-        print("  " .. colors.red .. "✗ config → " .. err .. colors.reset)
+        print_message("error", "config → " .. err, module_name)
         return
       end
 
       local cmd = string.format('ln -s%s "%s" "%s"', force_mode and "f" or "", source, output)
       local exit_code, error_output = execute(cmd)
       if exit_code ~= 0 then
-        print("  " .. colors.red .. "✗ config → failed to create symlink: " .. error_output .. colors.reset)
+        print_message("error", "config → failed to create symlink: " .. error_output, module_name)
       else
-        print("  " .. colors.green .. "✓ config → symlink created" .. colors.reset)
+        print_message("success", "config → symlink created", module_name)
       end
     end
   end
 
   -- Run post_install hook if dependencies were installed
   if dependencies_installed and config.post_install then
-    print("  " .. colors.yellow .. "• Running post-install hook" .. colors.reset)
+    print_message("info", "Running post-install hook", module_name)
     local exit_code, output = execute(config.post_install)
     if exit_code ~= 0 then
-      print("  " .. colors.red .. "✗ post-install → failed: " .. output .. colors.reset)
+      print_message("error", "post-install → failed: " .. output, module_name)
     else
-      print("  " .. colors.green .. "✓ post-install → completed successfully" .. colors.reset)
+      print_message("success", "post-install → completed successfully", module_name)
     end
   end
 
@@ -379,13 +383,13 @@ local function main()
   else
     local modules_dir = "modules"
     if not is_dir(modules_dir) then
-      print("  " .. colors.red .. "✗ modules directory not found" .. colors.reset)
+      print_message("error", "modules directory not found")
       return
     end
 
     local init_files = find_init_files(modules_dir)
     if #init_files == 0 then
-      print("  " .. colors.red .. "✗ no modules found" .. colors.reset)
+      print_message("error", "no modules found")
       return
     end
 
