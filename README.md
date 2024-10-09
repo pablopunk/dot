@@ -7,20 +7,28 @@ $ brew install pablopunk/formulae/nos
 $ cd /path/to/dotfiles
 $ tree
 
+# Start of Selection
+profiles/
+├── work.lua
+├── personal.lua
+├── linux-server.lua
 modules/
-├─ neovim/
-│  ├─ init.lua
-│  ├─ config/
-├─ zsh/
-│  ├─ init.lua
-│  ├─ zshrc
-├─ apps/
-   ├─ work/
-   │  ├─ init.lua
-   ├─ personal/
-      ├─ init.lua
+├── neovim/
+│   ├── init.lua
+│   └── config/
+├── zsh/
+│   ├── init.lua
+│   └── zshrc
+└── apps/
+    ├── work/
+    │   └── init.lua
+    └── personal/
+        └── init.lua
+# End of Selection
 
-$ nos
+$ nos # link all dotfiles and install dependencies
+$ nos neovim # only neovim module
+$ nos work # only my work profile
 ```
 
 ## Usage
@@ -77,7 +85,31 @@ return {
 }
 ```
 
-> NOTE: once `nos` detects an init.lua, it will stop going through the subdirectories inside that folder.
+### Profiles
+
+If you have several machines, you might not wanna install all tools on every computer. That's why `nos` allows **profiles**.
+
+Let's created a new "work" profile:
+
+```lua
+-- profiles/work.lua
+return {
+  modules = {
+    "apps/work",
+    "*",
+  }
+}
+```
+
+In this example, using the directories we created in the [recursive section](#recursive) running `nos work` will:
+
+* `apps/work`: install only our work apps under `modules/apps/work/init.lua`
+* `*`: install everything else under `modules/*`, except nested directories (so it won't install `apps/work`)
+
+> NOTE 1: once `nos` detects an init.lua, it will stop going through the subdirectories inside that folder.
+
+> NOTE 2: you probably don't want to name a profile the same as a module (i.e profile/neovim <> modules/neovim)
+> since running `nos neovim` will default to the profile
 
 ## To do
 
