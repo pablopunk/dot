@@ -2,6 +2,14 @@
 
 > Manage your dotfiles and their dependencies automagically
 
+## Index
+- [Installation](#installation)
+- [Usage](#usage)
+  - [init.lua](#initlua)
+  - [Recursive](#recursive)
+  - [Profiles](#profiles)
+- [To do](#to-do)
+
 ```bash
 $ brew install pablopunk/formulae/nos
 $ cd /path/to/dotfiles
