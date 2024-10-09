@@ -1,5 +1,21 @@
 # dotfiles
 
+```bash
+$ brew install pablopunk/formulae/nos
+$ cd /path/to/dotfiles
+$ tree
+
+modules/
+├─ neovim/
+│  ├─ init.lua # this is an entrypoint for nos, not the neovim config
+│  ├─ config/
+├─ zsh/
+│  ├─ init.lua
+│  ├─ zshrc
+
+$ nos
+```
+
 - [x] `nos` will install deps and link files.
 - [x] Support brew dependencies.
 - [x] `nos -f` will remove the existing configs if they exist (moves config to `*.before-nos`)
