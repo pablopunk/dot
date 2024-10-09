@@ -12,8 +12,8 @@ modules/
 │  ├─ init.lua # this is an entrypoint for nos, not the neovim config
 │  ├─ config/
 ├─ zsh/
-│  ├─ init.lua
-│  ├─ zshrc
+   ├─ init.lua
+   ├─ zshrc
 
 $ nos
 ```
