@@ -68,35 +68,42 @@ local function expand_path(path)
   end
 end
 
--- Custom functions to replace lfs functionality
+-- Simple function to check if a path is a directory
 local function is_dir(path)
-  local ok, _ = os.rename(path, path)
-  return ok
-end
-
-local function is_file(path)
-  local f = io.open(path, "r")
-  if f then
-    f:close()
-    return true
-  end
-  return false
-end
-
-local function get_file_attributes(path)
-  local cmd = string.format('stat -f "%%d %%i %%Sp %%z %%m" "%s" 2>/dev/null', path)
+  local cmd = string.format('test -d "%s" && echo "true" || echo "false"', path)
   local exit_code, output = execute(cmd)
-  if exit_code == 0 then
-    local dev, ino, mode, size, mtime = output:match "(%d+) (%d+) (%S+) (%d+) (%d+)"
-    return {
-      dev = tonumber(dev),
-      ino = tonumber(ino),
-      mode = mode,
-      size = tonumber(size),
-      mtime = tonumber(mtime),
-    }
+  return output:match "true" ~= nil
+end
+
+-- Simple function to check if a path is a file
+local function is_file(path)
+  local cmd = string.format('test -f "%s" && echo "true" || echo "false"', path)
+  local exit_code, output = execute(cmd)
+  return output:match "true" ~= nil
+end
+
+-- Function to get basic file information
+local function get_file_info(path)
+  local info = {}
+  info.is_dir = is_dir(path)
+  info.is_file = is_file(path)
+
+  -- Get file size (works for both files and directories on Linux and macOS)
+  local cmd
+  if info.is_dir then
+    cmd = string.format('du -sk "%s" | cut -f1', path)
+  else
+    cmd = string.format('wc -c < "%s"', path)
   end
-  return nil
+  local exit_code, output = execute(cmd)
+  info.size = tonumber(output) or 0
+
+  -- Convert KB to bytes for directories
+  if info.is_dir then
+    info.size = info.size * 1024
+  end
+
+  return info
 end
 
 -- Checks if the symlink at 'output' points to 'source'
@@ -104,9 +111,11 @@ local function is_symlink_correct(source, output)
   local cmd = string.format('readlink "%s"', output)
   local exit_code, link_target = execute(cmd)
   if exit_code == 0 then
-    local source_attr = get_file_attributes(source)
-    local target_attr = get_file_attributes(link_target)
-    return source_attr and target_attr and source_attr.ino == target_attr.ino
+    local source_info = get_file_info(source)
+    local target_info = get_file_info(link_target)
+    return source_info.is_file == target_info.is_file
+      and source_info.is_dir == target_info.is_dir
+      and source_info.size == target_info.size
   end
   return false
 end
@@ -228,7 +237,7 @@ local function process_module(module_name)
     if is_symlink_correct(source, output) then
       print_message("success", "config → symlink correct")
     else
-      local attr = get_file_attributes(output)
+      local attr = get_file_info(output)
       if attr then
         if force_mode then
           local success, result = create_backup(output)
@@ -325,9 +334,9 @@ end
 -- Modified function to process a single tool
 local function process_tool(tool_name)
   local profile_path = os.getenv "PWD" .. "/profiles/" .. tool_name .. ".lua"
-  local profile_attr = get_file_attributes(profile_path)
+  local profile_attr = get_file_info(profile_path)
 
-  if profile_attr and profile_attr.mode:sub(1, 1) == "-" then -- Check if it's a regular file
+  if profile_attr and profile_attr.is_file then
     -- Load and process the profile
     local profile_func, load_err = loadfile(profile_path)
     if not profile_func then
