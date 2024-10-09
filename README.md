@@ -1,4 +1,6 @@
-# dotfiles
+# `nos`
+
+> Manage your dotfiles and their dependencies automagically
 
 ```bash
 $ brew install pablopunk/formulae/nos
