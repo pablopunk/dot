@@ -2,16 +2,24 @@
 
 > Manage your dotfiles and their dependencies automagically
 
-## Index
+## Table of Contents
 - [Installation](#installation)
+- [Quick Start](#quick-start)
 - [Usage](#usage)
   - [init.lua](#initlua)
   - [Recursive](#recursive)
   - [Profiles](#profiles)
 - [To do](#to-do)
 
+## Installation
+
 ```bash
 $ brew install pablopunk/formulae/nos
+```
+
+## Quick Start
+
+```bash
 $ cd /path/to/dotfiles
 $ tree
 
@@ -116,6 +124,16 @@ In this example, using the directories we created in the [recursive section](#re
 
 > NOTE 2: you probably don't want to name a profile the same as a module (i.e profile/neovim <> modules/neovim)
 > since running `nos neovim` will default to the profile
+
+### `-f` to force
+
+By default, `nos` won't touch your existing dotfiles if the destination already exists. If you still want to replace them, you can use the `-f` flag:
+
+```bash
+$ nos -f neovim
+```
+
+> NOTE: It won't remove the existing config, just move it to a new path: `<path-to-config>.before-nos`
 
 ## To do
 
