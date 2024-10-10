@@ -20,10 +20,11 @@ jobs:
         run: |
           CURRENT_TAG="${{ github.ref_name }}"
           PREVIOUS_TAG=$(git describe --tags --abbrev=0 $CURRENT_TAG^ 2>/dev/null || echo "")
+          REPO_URL="https://github.com/${{ github.repository }}"
           if [ -z "$PREVIOUS_TAG" ]; then
-            RELEASE_NOTES=$(git log --pretty=format:"- %s" $CURRENT_TAG)
+            RELEASE_NOTES=$(git log --pretty=format:"- %h %s" $CURRENT_TAG)
           else
-            RELEASE_NOTES=$(git log --pretty=format:"- %s" $PREVIOUS_TAG..$CURRENT_TAG)
+            RELEASE_NOTES=$(git log --pretty=format:"- %h %s" $PREVIOUS_TAG..$CURRENT_TAG)
           fi
           echo "RELEASE_NOTES<<EOF" >> $GITHUB_OUTPUT
           echo "$RELEASE_NOTES" >> $GITHUB_OUTPUT
