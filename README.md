@@ -226,3 +226,4 @@ This command will:
 - [ ] `nos --purge-all` to purge all modules at once.
 - [ ] Support Mac defaults, similar to `nix-darwin`.
 - [ ] Improve profiles syntax. For example, `{ "*", "apps/work" }` should still be recursive except in "apps/". Or maybe accept negative patterns like `{ "!apps/personal" }` -> everything but apps/personal.
+- [ ] Allow array of config. For example I could like two separate folders that are not siblings
