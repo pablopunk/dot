@@ -1,6 +1,6 @@
 #!/usr/bin/env lua
 
-local version = "0.0.4"
+local version = "0.0.5"
 
 -- Parse command-line arguments
 local function parse_args()
