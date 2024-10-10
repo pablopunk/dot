@@ -1,0 +1,37 @@
+name: Publish release
+on:
+  push:
+    tags:
+      - "*"
+jobs:
+  publish:
+    name: Publish release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # Fetch all history for all tags and branches
+
+      - name: Generate Release Notes
+        id: generate_notes
+        run: |
+          CURRENT_TAG="${{ github.ref_name }}"
+          PREVIOUS_TAG=$(git describe --tags --abbrev=0 $CURRENT_TAG^ 2>/dev/null || echo "")
+          if [ -z "$PREVIOUS_TAG" ]; then
+            RELEASE_NOTES=$(git log --pretty=format:"- %s" $CURRENT_TAG)
+          else
+            RELEASE_NOTES=$(git log --pretty=format:"- %s" $PREVIOUS_TAG..$CURRENT_TAG)
+          fi
+          echo "RELEASE_NOTES<<EOF" >> $GITHUB_OUTPUT
+          echo "$RELEASE_NOTES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create ${{ github.ref_name }} \
+            --notes "${{ steps.generate_notes.outputs.RELEASE_NOTES }}"
