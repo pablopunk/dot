@@ -334,28 +334,71 @@ local function handle_config_symlink(config, module_dir, options)
     return
   end
 
-  local source = os.getenv "PWD" .. "/" .. module_dir:gsub("^./", "") .. "/" .. config.config.source:gsub("^./", "")
-  local output = expand_path(config.config.output)
-  local attr = get_file_info(output)
+  local configs = type(config.config) == "table" and config.config[1] and config.config or {config.config}
 
-  if options.purge_mode then
-    -- Remove symlink or config file/directory
-    if attr then
-      local success, err = delete_path(output)
-      if success then
-        print_message("success", "config → removed " .. output)
+  for _, cfg in ipairs(configs) do
+    local source = os.getenv("PWD") .. "/" .. module_dir:gsub("^./", "") .. "/" .. cfg.source:gsub("^./", "")
+    local output = expand_path(cfg.output)
+    local attr = get_file_info(output)
+
+    if options.purge_mode then
+      -- Remove symlink or config file/directory
+      if attr then
+        local success, err = delete_path(output)
+        if success then
+          print_message("success", "config → removed " .. output)
+        else
+          print_message("error", "config → " .. err)
+        end
       else
-        print_message("error", "config → " .. err)
+        print_message("info", "config → " .. output .. " does not exist")
+      end
+    elseif options.unlink_mode then
+      -- Remove symlink and copy source to output
+      if attr and attr.is_symlink then
+        local success, err = delete_path(output)
+        if success then
+          print_message("success", "config → symlink removed")
+
+          -- Ensure parent directory exists
+          local success, err = ensure_parent_directory(output)
+          if not success then
+            print_message("error", "config → " .. err)
+            return
+          end
+
+          -- Copy source to output
+          local success, err = copy_path(source, output)
+          if success then
+            print_message("success", "config → copied " .. source .. " to " .. output)
+          else
+            print_message("error", "config → " .. err)
+          end
+        else
+          print_message("error", "config → failed to remove symlink: " .. err)
+        end
+      else
+        print_message("info", "config → " .. output .. " is not a symlink or does not exist")
       end
     else
-      print_message("info", "config → " .. output .. " does not exist")
-    end
-  elseif options.unlink_mode then
-    -- Remove symlink and copy source to output
-    if attr and attr.is_symlink then
-      local success, err = delete_path(output)
-      if success then
-        print_message("success", "config → symlink removed")
+      -- Normal installation: create symlink
+      if is_symlink_correct(source, output) then
+        print_message("success", "config → symlink correct for " .. output)
+      else
+        if attr then
+          if options.force_mode then
+            local success, result = create_backup(output)
+            if success then
+              print_message("warning", "config → existing config backed up to " .. result)
+            else
+              print_message("error", "config → " .. result)
+              return
+            end
+          else
+            print_message("error", "config → file already exists at " .. output .. ". Use -f to force.")
+            return
+          end
+        end
 
         -- Ensure parent directory exists
         local success, err = ensure_parent_directory(output)
@@ -364,52 +407,13 @@ local function handle_config_symlink(config, module_dir, options)
           return
         end
 
-        -- Copy source to output
-        local success, err = copy_path(source, output)
-        if success then
-          print_message("success", "config → copied " .. source .. " to " .. output)
+        local cmd = string.format('ln -s "%s" "%s"', source, output)
+        local exit_code, error_output = execute(cmd)
+        if exit_code ~= 0 then
+          print_message("error", "config → failed to create symlink: " .. error_output)
         else
-          print_message("error", "config → " .. err)
+          print_message("success", "config → symlink created for " .. output)
         end
-      else
-        print_message("error", "config → failed to remove symlink: " .. err)
-      end
-    else
-      print_message("info", "config → " .. output .. " is not a symlink or does not exist")
-    end
-  else
-    -- Normal installation: create symlink
-    if is_symlink_correct(source, output) then
-      print_message("success", "config → symlink correct")
-    else
-      if attr then
-        if options.force_mode then
-          local success, result = create_backup(output)
-          if success then
-            print_message("warning", "config → existing config backed up to " .. result)
-          else
-            print_message("error", "config → " .. result)
-            return
-          end
-        else
-          print_message("error", "config → file already exists at " .. output .. ". Use -f to force.")
-          return
-        end
-      end
-
-      -- Ensure parent directory exists
-      local success, err = ensure_parent_directory(output)
-      if not success then
-        print_message("error", "config → " .. err)
-        return
-      end
-
-      local cmd = string.format('ln -s "%s" "%s"', source, output)
-      local exit_code, error_output = execute(cmd)
-      if exit_code ~= 0 then
-        print_message("error", "config → failed to create symlink: " .. error_output)
-      else
-        print_message("success", "config → symlink created")
       end
     end
   end
