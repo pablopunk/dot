@@ -21,6 +21,9 @@
 
 ## Installation
 
+> [!WARNING]
+> This package is still a work in progress. Use at your own risk.
+
 ```bash
 $ brew install pablopunk/formulae/nos
 ```
@@ -129,9 +132,11 @@ In this example, using the directories we created in the [Recursive](#recursive)
 - `apps/work`: Install only our work apps under `modules/apps/work/init.lua`.
 - `*`: Install everything else under `modules/*`, except nested directories (so it won't install `apps/work`).
 
-> **Note 1**: Once `nos` detects an `init.lua`, it will stop going through the subdirectories inside that folder.
+> [!NOTE]
+> Once `nos` detects an `init.lua`, it will stop going through the subdirectories inside that folder.
 
-> **Note 2**: You probably don't want to name a profile the same as a module (e.g., `profiles/neovim` vs. `modules/neovim`) since running `nos neovim` will default to the profile.
+> [!NOTE]
+> You probably don't want to name a profile the same as a module (e.g., `profiles/neovim` vs. `modules/neovim`) since running `nos neovim` will default to the profile.
 
 ### Force Mode `-f`
 
@@ -141,7 +146,8 @@ By default, `nos` won't touch your existing dotfiles if the destination already 
 $ nos -f neovim
 ```
 
-> **Note**: It won't remove the existing config but will move it to a new path: `<path-to-config>.before-nos`.
+> [!NOTE]
+> It won't remove the existing config but will move it to a new path: `<path-to-config>.before-nos`.
 
 ### Unlinking Configs `--unlink`
 
@@ -172,8 +178,8 @@ This command will:
 - Remove the symlink or config file/directory specified in `config.output`.
 - Run any `post_purge` hooks if defined in the module.
 
-> **Warning**: `--purge` will uninstall packages from your system and remove configuration files. Use with caution.
-
+> [!WARNING]
+> `--purge` will uninstall packages from your system and remove configuration files. Use with caution.
 ### Summary of Command-Line Options
 
 - **Install Modules**: Install dependencies and link configurations.
