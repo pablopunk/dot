@@ -1,6 +1,6 @@
 #!/usr/bin/env lua
 
-local version = "0.0.7"
+local version = "0.0.8"
 
 -- Parse command-line arguments
 local function parse_args()
@@ -236,7 +236,7 @@ local function get_all_modules()
     for file in output:gmatch "[^\n]+" do
       -- Extract the module path relative to modules_dir
       local module_path = file:match("^" .. modules_dir .. "/(.+)/init.lua$")
-      local parent = module_path:match("^(.+)/[^/]+$")
+      local parent = module_path:match "^(.+)/[^/]+$"
       if not table_string_find(modules, parent) then
         -- Remove trailing /init.lua from the path
         module_path = module_path:gsub("/init.lua$", "")
@@ -334,10 +334,10 @@ local function handle_config_symlink(config, module_dir, options)
     return
   end
 
-  local configs = type(config.config) == "table" and config.config[1] and config.config or {config.config}
+  local configs = type(config.config) == "table" and config.config[1] and config.config or { config.config }
 
   for _, cfg in ipairs(configs) do
-    local source = os.getenv("PWD") .. "/" .. module_dir:gsub("^./", "") .. "/" .. cfg.source:gsub("^./", "")
+    local source = os.getenv "PWD" .. "/" .. module_dir:gsub("^./", "") .. "/" .. cfg.source:gsub("^./", "")
     local output = expand_path(cfg.output)
     local attr = get_file_info(output)
 
@@ -529,3 +529,4 @@ local function main()
 end
 
 main()
+
