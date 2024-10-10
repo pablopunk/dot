@@ -25,7 +25,7 @@
 > This package is still a work in progress. Use at your own risk.
 
 ```bash
-$ brew install pablopunk/formulae/nos
+$ brew install pablopunk/brew/nos
 ```
 
 ## Quick Start
