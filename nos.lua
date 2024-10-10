@@ -225,6 +225,28 @@ local function table_string_find(tbl, item)
   return false
 end
 
+-- Get all modules recursively
+local function get_all_modules()
+  local modules = {}
+  local modules_dir = "modules"
+  -- Find all init.lua files within modules directory
+  local cmd = string.format('find "%s" -type f -name "init.lua"', modules_dir)
+  local exit_code, output = execute(cmd)
+  if exit_code == 0 then
+    for file in output:gmatch "[^\n]+" do
+      -- Extract the module path relative to modules_dir
+      local module_path = file:match("^" .. modules_dir .. "/(.+)/init.lua$")
+      local parent = module_path:match("^(.+)/[^/]+$")
+      if not table_string_find(modules, parent) then
+        -- Remove trailing /init.lua from the path
+        module_path = module_path:gsub("/init.lua$", "")
+        table.insert(modules, module_path)
+      end
+    end
+  end
+  return modules
+end
+
 -- Get all direct child modules
 local function get_direct_child_modules()
   local modules = {}
@@ -490,7 +512,7 @@ local function main()
       return
     end
 
-    local modules = get_direct_child_modules()
+    local modules = get_all_modules()
     if #modules == 0 then
       print_message("error", "no modules found")
       return

@@ -225,4 +225,4 @@ This command will:
 - [ ] Unlinking dotfiles without copying. An option like `nos --unlink --no-copy` could be added.
 - [ ] `nos --purge-all` to purge all modules at once.
 - [ ] Support Mac defaults, similar to `nix-darwin`.
-- [ ] Improve profiles syntax. For example, `{ "*", "apps/work" }` should still be recursive except in "apps/".
+- [ ] Improve profiles syntax. For example, `{ "*", "apps/work" }` should still be recursive except in "apps/". Or maybe accept negative patterns like `{ "!apps/personal" }` -> everything but apps/personal.
