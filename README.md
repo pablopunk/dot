@@ -220,7 +220,7 @@ This command will:
 - [x] Package and distribute `nos` through Homebrew.
 - [x] Add `--unlink` option to remove symlinks and copy configs to output.
 - [x] Add `--purge` option to uninstall dependencies and remove configurations.
-- [ ] Add screenshots to this repo.
+- [ ] Add screenshots to the README.
 - [ ] Support more ways of adding dependencies (e.g., wget binaries).
 - [ ] Unlinking dotfiles without copying. An option like `nos --unlink --no-copy` could be added.
 - [ ] `nos --purge-all` to purge all modules at once.
