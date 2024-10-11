@@ -84,6 +84,32 @@ The config will be linked to the home folder with a soft link. In this case:
 ~/.config/nvim → ~/dotfiles/modules/neovim/config
 ```
 
+You can also specify multiple configurations for a single module:
+
+```lua
+-- modules/multi-config/init.lua
+return {
+  brew = { "cursor" },
+  config = {
+    {
+      source = "./config/settings.json",
+      output = "~/Library/Application Support/Cursor/User/settings.json",
+    },
+    {
+      source = "./config/keybindings.json",
+      output = "~/Library/Application Support/Cursor/User/keybindings.json",
+    }
+  }
+}
+```
+
+This will create two symlinks:
+
+```bash
+~/Library/Application Support/Cursor/User/settings.json → ~/dotfiles/modules/multi-config/config/settings.json
+~/Library/Application Support/Cursor/User/keybindings.json → ~/dotfiles/modules/multi-config/config/keybindings.json
+```
+
 As you can see, you can declare dependencies as [Homebrew](https://brew.sh) packages, which makes it possible to also use `nos` to install GUI apps (Homebrew casks). You can create a module without any config to use it as an installer for your apps:
 
 ```lua
@@ -232,6 +258,7 @@ return {
 - [x] Package and distribute `nos` through Homebrew.
 - [x] Add `--unlink` option to remove symlinks and copy configs to output.
 - [x] Add `--purge` option to uninstall dependencies and remove configurations.
+- [x] Allow array of config. For example I could like two separate folders that are not siblings
 - [ ] Add screenshots to the README.
 - [ ] Support more ways of adding dependencies (e.g., wget binaries).
 - [ ] Unlinking dotfiles without copying. An option like `nos --unlink --no-copy` could be added.
