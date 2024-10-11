@@ -2,11 +2,14 @@
 
 local version = "0.0.8"
 
+local MOCK_BREW = false
+
 -- Parse command-line arguments
 local function parse_args()
   local force_mode = false
   local purge_mode = false
   local unlink_mode = false
+  local mock_brew = false
   local args = {}
 
   local i = 1
@@ -20,6 +23,8 @@ local function parse_args()
       purge_mode = true
     elseif arg[i] == "--unlink" then
       unlink_mode = true
+    elseif arg[i] == "--mock-brew" then
+      mock_brew = true
     else
       table.insert(args, arg[i])
     end
@@ -30,6 +35,7 @@ local function parse_args()
     force_mode = force_mode,
     purge_mode = purge_mode,
     unlink_mode = unlink_mode,
+    mock_brew = mock_brew,
     args = args,
   }
 end
@@ -150,6 +156,14 @@ end
 
 -- Brew utility functions
 local function get_installed_brew_packages()
+  if MOCK_BREW then
+    installed_brew_packages = {
+      neovim= true,
+      zsh= true,
+    }
+    return
+  end
+
   local function add_packages(cmd)
     local exit_code, output = execute(cmd)
     if exit_code == 0 then
@@ -280,6 +294,19 @@ local function process_brew_dependencies(config, purge_mode)
   local dependencies_changed = false
   if not config.brew then
     return dependencies_changed
+  end
+
+  if MOCK_BREW then
+    -- When mocking brew, just print what would happen
+    for _, brew_entry in ipairs(config.brew) do
+      local package_name = type(brew_entry) == "string" and brew_entry or brew_entry.name
+      if purge_mode then
+        print_message("info", "MOCK: Would uninstall " .. package_name)
+      else
+        print_message("info", "MOCK: Would install " .. package_name)
+      end
+    end
+    return true  -- Simulate that dependencies changed
   end
 
   if purge_mode then
@@ -504,6 +531,11 @@ end
 -- Main function
 local function main()
   local options = parse_args()
+
+  if options.mock_brew then
+    MOCK_BREW = true
+  end
+
   get_installed_brew_packages()
 
   local tool_name = options.args[1]
@@ -529,4 +561,3 @@ local function main()
 end
 
 main()
-
