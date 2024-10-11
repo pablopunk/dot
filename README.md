@@ -17,6 +17,8 @@
   - [Force Mode `-f`](#force-mode--f)
   - [Unlinking Configs `--unlink`](#unlinking-configs---unlink)
   - [Purging Modules `--purge`](#purging-modules---purge)
+  - [Hooks](#hooks)
+  - [Summary of Command-Line Options](#summary-of-command-line-options)
 - [To do](#to-do)
 
 ## Installation
