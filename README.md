@@ -180,6 +180,18 @@ This command will:
 
 > [!WARNING]
 > `--purge` will uninstall packages from your system and remove configuration files. Use with caution.
+
+### Hooks
+
+You can define `post_install` and `post_purge` hooks in your module's `init.lua` to run arbitrary commands after the module has been installed or purged.
+
+```lua
+return {
+  brew = { "gh" },
+  post_install = "gh auth login"
+}
+```
+
 ### Summary of Command-Line Options
 
 - **Install Modules**: Install dependencies and link configurations.
