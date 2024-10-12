@@ -261,25 +261,6 @@ local function get_all_modules()
   return modules
 end
 
--- Get all direct child modules
-local function get_direct_child_modules()
-  local modules = {}
-  local modules_dir = "modules"
-  local cmd = string.format('find "%s" -maxdepth 1 -type d', modules_dir)
-  local exit_code, output = execute(cmd)
-  if exit_code == 0 then
-    for dir in output:gmatch "[^\n]+" do
-      if dir ~= modules_dir then
-        local module_name = dir:match("^" .. modules_dir .. "/(.+)$")
-        if module_name and is_file(dir .. "/init.lua") then
-          table.insert(modules, module_name)
-        end
-      end
-    end
-  end
-  return modules
-end
-
 local function run_hook(hook_script, hook_type)
   print_message("info", "Running " .. hook_type .. " hook")
   local exit_code, output = execute(hook_script)
