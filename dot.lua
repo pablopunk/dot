@@ -1,6 +1,6 @@
 #!/usr/bin/env lua
 
-local version = "0.0.9"
+local version = "0.1.0"
 
 local MOCK_BREW = false
 
@@ -566,4 +566,3 @@ local function main()
 end
 
 main()
-
