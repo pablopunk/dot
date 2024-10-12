@@ -1,8 +1,8 @@
-# `nos`
+# `dot`
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/38cc3f6c-f8f7-4ca0-807a-66e499f36ec3#gh-light-mode-only" width="600px" />
-  <img src="https://github.com/user-attachments/assets/f4f53abb-155d-4403-bccc-758c2f228932#gh-dark-mode-only" width="600px" />
+  <img src="https://github.com/user-attachments/assets/61ff9b15-f227-4b4d-a950-57ba0353ff85#gh-light-mode-only" width="600px" />
+  <img src="https://github.com/user-attachments/assets/420e9121-426e-442a-a52a-8332b6f1989b#gh-dark-mode-only" width="600px" />
 </p>
 
 > Manage your dotfiles and their dependencies automagically
@@ -27,7 +27,7 @@
 > This package is still a work in progress. Use at your own risk.
 
 ```bash
-$ brew install pablopunk/brew/nos
+$ brew install pablopunk/brew/dot
 ```
 
 ## Quick Start
@@ -53,9 +53,9 @@ modules/
     └── personal/
         └── init.lua
 
-$ nos          # Link all dotfiles and install dependencies
-$ nos neovim   # Only process the 'neovim' module
-$ nos work     # Only process the 'work' profile
+$ dot          # Link all dotfiles and install dependencies
+$ dot neovim   # Only process the 'neovim' module
+$ dot work     # Only process the 'work' profile
 ```
 
 ## Usage
@@ -112,7 +112,7 @@ This will create two symlinks:
 ~/Library/Application Support/Cursor/User/keybindings.json → ~/dotfiles/modules/multi-config/config/keybindings.json
 ```
 
-As you can see, you can declare dependencies as [Homebrew](https://brew.sh) packages, which makes it possible to also use `nos` to install GUI apps (Homebrew casks). You can create a module without any config to use it as an installer for your apps:
+As you can see, you can declare dependencies as [Homebrew](https://brew.sh) packages, which makes it possible to also use `dot` to install GUI apps (Homebrew casks). You can create a module without any config to use it as an installer for your apps:
 
 ```lua
 -- modules/apps/init.lua
@@ -141,7 +141,7 @@ return {
 
 ### Profiles
 
-If you have several machines, you might not want to install all tools on every computer. That's why `nos` allows **profiles**.
+If you have several machines, you might not want to install all tools on every computer. That's why `dot` allows **profiles**.
 
 Let's create a new "personal" profile:
 
@@ -155,7 +155,7 @@ return {
 }
 ```
 
-In this example, running `nos personal` will:
+In this example, running `dot personal` will:
 
 - `*`: Install everything under `modules/`, including nested directories.
 - `!apps/work`: Exclude the `apps/work` module and its submodules.
@@ -181,14 +181,14 @@ return {
 ```
 
 > [!NOTE]
-> If your profile is named just like a module (e.g., `profiles/neovim` and `modules/neovim`), running `nos neovim` will default to the profile.
+> If your profile is named just like a module (e.g., `profiles/neovim` and `modules/neovim`), running `dot neovim` will default to the profile.
 
 ### Force Mode `-f`
 
-By default, `nos` won't touch your existing dotfiles if the destination already exists. If you still want to replace them, you can use the `-f` flag:
+By default, `dot` won't touch your existing dotfiles if the destination already exists. If you still want to replace them, you can use the `-f` flag:
 
 ```bash
-$ nos -f neovim
+$ dot -f neovim
 ```
 
 > [!NOTE]
@@ -196,10 +196,10 @@ $ nos -f neovim
 
 ### Unlinking Configs `--unlink`
 
-If you want to remove the symlinks created by `nos` for a specific module but keep your configuration, you can use the `--unlink` option:
+If you want to remove the symlinks created by `dot` for a specific module but keep your configuration, you can use the `--unlink` option:
 
 ```bash
-$ nos --unlink neovim
+$ dot --unlink neovim
 ```
 
 This command will:
@@ -207,14 +207,14 @@ This command will:
 - Remove the symlink at the destination specified in `config.output`.
 - Copy the config source from `config.source` to the output location.
 
-This is useful if you want to maintain your configuration files without `nos` managing them anymore.
+This is useful if you want to maintain your configuration files without `dot` managing them anymore.
 
 ### Purging Modules `--purge`
 
 To completely remove a module, including uninstalling its dependencies and removing its configuration, use the `--purge` option:
 
 ```bash
-$ nos --purge neovim
+$ dot --purge neovim
 ```
 
 This command will:
@@ -242,45 +242,45 @@ return {
 - **Install Modules**: Install dependencies and link configurations.
 
   ```bash
-  $ nos             # Install all modules
-  $ nos neovim      # Install only the 'neovim' module
-  $ nos work        # Install only the 'work' profile
+  $ dot             # Install all modules
+  $ dot neovim      # Install only the 'neovim' module
+  $ dot work        # Install only the 'work' profile
   ```
 
 - **Force Mode**: Replace existing configurations, backing them up to `<config>.before-nos`.
 
   ```bash
-  $ nos -f          # Force install all modules
-  $ nos -f neovim   # Force install the 'neovim' module
+  $ dot -f          # Force install all modules
+  $ dot -f neovim   # Force install the 'neovim' module
   ```
 
 - **Unlink Configs**: Remove symlinks but keep the config files in their destination.
 
   ```bash
-  $ nos --unlink neovim
+  $ dot --unlink neovim
   ```
 
 - **Purge Modules**: Uninstall dependencies and remove configurations.
 
   ```bash
-  $ nos --purge neovim
+  $ dot --purge neovim
   ```
 
 ## To do
 
-- [x] `nos` will install dependencies and link files.
+- [x] `dot` will install dependencies and link files.
 - [x] Support Homebrew dependencies.
-- [x] `nos -f` will remove the existing configs if they exist (moves config to `*.before-nos`).
+- [x] `dot -f` will remove the existing configs if they exist (moves config to `*.before-nos`).
 - [x] Allow post-install hooks in bash.
-- [x] Allow installing only one module with `nos neovim`.
-- [x] Allow multiple setups in one repo. Similar to "hosts" in Nix, `nos work` reads `profiles/work.lua` which includes whatever it wants from `modules/`.
-- [x] Package and distribute `nos` through Homebrew.
+- [x] Allow installing only one module with `dot neovim`.
+- [x] Allow multiple setups in one repo. Similar to "hosts" in Nix, `dot work` reads `profiles/work.lua` which includes whatever it wants from `modules/`.
+- [x] Package and distribute `dot` through Homebrew.
 - [x] Add `--unlink` option to remove symlinks and copy configs to output.
 - [x] Add `--purge` option to uninstall dependencies and remove configurations.
 - [x] Allow array of config. For example I could like two separate folders that are not siblings
 - [x] Improve profiles syntax. For example, `{ "*", "apps/work" }` should still be recursive except in "apps/". Or maybe accept negative patterns like `{ "!apps/personal" }` -> everything but apps/personal.
 - [ ] Add screenshots to the README.
 - [ ] Support more ways of adding dependencies (e.g., wget binaries).
-- [ ] Unlinking dotfiles without copying. An option like `nos --unlink --no-copy` could be added.
-- [ ] `nos --purge-all` to purge all modules at once.
+- [ ] Unlinking dotfiles without copying. An option like `dot --unlink --no-copy` could be added.
+- [ ] `dot --purge-all` to purge all modules at once.
 - [ ] Support Mac defaults, similar to `nix-darwin`.
