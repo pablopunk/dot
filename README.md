@@ -192,7 +192,7 @@ $ dot -f neovim
 ```
 
 > [!NOTE]
-> It won't remove the existing config but will move it to a new path: `<path-to-config>.before-nos`.
+> It won't remove the existing config but will move it to a new path: `<path-to-config>.before-dot`.
 
 ### Unlinking Configs `--unlink`
 
@@ -247,7 +247,7 @@ return {
   $ dot work        # Install only the 'work' profile
   ```
 
-- **Force Mode**: Replace existing configurations, backing them up to `<config>.before-nos`.
+- **Force Mode**: Replace existing configurations, backing them up to `<config>.before-dot`.
 
   ```bash
   $ dot -f          # Force install all modules
@@ -270,7 +270,7 @@ return {
 
 - [x] `dot` will install dependencies and link files.
 - [x] Support Homebrew dependencies.
-- [x] `dot -f` will remove the existing configs if they exist (moves config to `*.before-nos`).
+- [x] `dot -f` will remove the existing configs if they exist (moves config to `*.before-dot`).
 - [x] Allow post-install hooks in bash.
 - [x] Allow installing only one module with `dot neovim`.
 - [x] Allow multiple setups in one repo. Similar to "hosts" in Nix, `dot work` reads `profiles/work.lua` which includes whatever it wants from `modules/`.

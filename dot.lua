@@ -158,8 +158,8 @@ end
 local function get_installed_brew_packages()
   if MOCK_BREW then
     installed_brew_packages = {
-      neovim= true,
-      zsh= true,
+      neovim = true,
+      zsh = true,
     }
     return
   end
@@ -197,10 +197,10 @@ local function ensure_parent_directory(path)
 end
 
 local function create_backup(path)
-  local backup_path = path .. ".before-nos"
+  local backup_path = path .. ".before-dot"
   local i = 1
   while is_file(backup_path) or is_dir(backup_path) do
-    backup_path = path .. ".before-nos." .. i
+    backup_path = path .. ".before-dot." .. i
     i = i + 1
   end
   local cmd = string.format('mv "%s" "%s"', path, backup_path)
@@ -287,7 +287,7 @@ local function process_brew_dependencies(config, purge_mode)
         print_message("info", "MOCK: Would install " .. package_name)
       end
     end
-    return true  -- Simulate that dependencies changed
+    return true -- Simulate that dependencies changed
   end
 
   if purge_mode then
@@ -566,3 +566,4 @@ local function main()
 end
 
 main()
+
