@@ -143,28 +143,45 @@ return {
 
 If you have several machines, you might not want to install all tools on every computer. That's why `nos` allows **profiles**.
 
-Let's create a new "work" profile:
+Let's create a new "personal" profile:
+
+```lua
+-- profiles/personal.lua
+return {
+  modules = {
+    "*",
+    "!apps/work",
+  }
+}
+```
+
+In this example, running `nos personal` will:
+
+- `*`: Install everything under `modules/`, including nested directories.
+- `!apps/work`: Exclude the `apps/work` module and its submodules.
+
+You can use the following patterns in your profile:
+
+- `"*"`: Include all modules recursively.
+- `"!module_name"`: Exclude a specific module and its submodules.
+- `"module_name"`: Include a specific module.
+
+For example, a work profile might look like this:
 
 ```lua
 -- profiles/work.lua
 return {
   modules = {
     "apps/work",
-    "*",
+    "slack",
+    "neovim",
+    "zsh"
   }
 }
 ```
 
-In this example, using the directories we created in the [Recursive](#recursive) section, running `nos work` will:
-
-- `apps/work`: Install only our work apps under `modules/apps/work/init.lua`.
-- `*`: Install everything else under `modules/*`, except nested directories (so it won't install `apps/work`).
-
 > [!NOTE]
-> Once `nos` detects an `init.lua`, it will stop going through the subdirectories inside that folder.
-
-> [!NOTE]
-> You probably don't want to name a profile the same as a module (e.g., `profiles/neovim` vs. `modules/neovim`) since running `nos neovim` will default to the profile.
+> If your profile is named just like a module (e.g., `profiles/neovim` and `modules/neovim`), running `nos neovim` will default to the profile.
 
 ### Force Mode `-f`
 
@@ -261,9 +278,9 @@ return {
 - [x] Add `--unlink` option to remove symlinks and copy configs to output.
 - [x] Add `--purge` option to uninstall dependencies and remove configurations.
 - [x] Allow array of config. For example I could like two separate folders that are not siblings
+- [x] Improve profiles syntax. For example, `{ "*", "apps/work" }` should still be recursive except in "apps/". Or maybe accept negative patterns like `{ "!apps/personal" }` -> everything but apps/personal.
 - [ ] Add screenshots to the README.
 - [ ] Support more ways of adding dependencies (e.g., wget binaries).
 - [ ] Unlinking dotfiles without copying. An option like `nos --unlink --no-copy` could be added.
 - [ ] `nos --purge-all` to purge all modules at once.
 - [ ] Support Mac defaults, similar to `nix-darwin`.
-- [ ] Improve profiles syntax. For example, `{ "*", "apps/work" }` should still be recursive except in "apps/". Or maybe accept negative patterns like `{ "!apps/personal" }` -> everything but apps/personal.
