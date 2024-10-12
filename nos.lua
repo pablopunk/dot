@@ -346,7 +346,7 @@ local function process_brew_dependencies(config, purge_mode)
           installed_brew_packages[package_name] = true
         end
       else
-        print_message("success", "dependencies → `" .. package_name .. "` already installed")
+        -- print_message("success", "dependencies → `" .. package_name .. "` already installed")
       end
     end
     if all_deps_installed then
@@ -362,6 +362,7 @@ local function handle_config_symlink(config, module_dir, options)
   end
 
   local configs = type(config.config) == "table" and config.config[1] and config.config or { config.config }
+  local all_configs_linked = true
 
   for _, cfg in ipairs(configs) do
     local source = os.getenv "PWD" .. "/" .. module_dir:gsub("^./", "") .. "/" .. cfg.source:gsub("^./", "")
@@ -410,8 +411,9 @@ local function handle_config_symlink(config, module_dir, options)
     else
       -- Normal installation: create symlink
       if is_symlink_correct(source, output) then
-        print_message("success", "config → symlink correct for " .. output)
+        -- print_message("success", "config → symlink correct for " .. output)
       else
+        all_configs_linked = false
         if attr then
           if options.force_mode then
             local success, result = create_backup(output)
@@ -443,6 +445,14 @@ local function handle_config_symlink(config, module_dir, options)
         end
       end
     end
+  end
+
+  if all_configs_linked and not options.unlink_mode and not options.purge_mode then
+    print_message("success", "all configurations are linked")
+  elseif all_configs_linked and options.purge_mode then
+    print_message("success", "all configurations are removed")
+  elseif all_configs_linked and options.unlink_mode then
+    print_message("success", "all configurations are unlinked")
   end
 end
 
