@@ -23,9 +23,6 @@
 
 ## Installation
 
-> [!WARNING]
-> This package is still a work in progress. Use at your own risk.
-
 ```bash
 $ brew install pablopunk/brew/dot
 ```
