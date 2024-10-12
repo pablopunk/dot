@@ -14,7 +14,7 @@ describe("dot.lua", function()
   local home_dir
   local modules_dir
   local profiles_dir
-  local nos_executable
+  local dot_executable
 
   -- Function to check if a path is a symbolic link
   local function is_link(path)
@@ -23,9 +23,9 @@ describe("dot.lua", function()
   end
 
   -- Function to run dot.lua with given arguments
-  local function run_nos(args)
+  local function run_dot(args)
     args = args or ""
-    local cmd = string.format("cd %q && HOME=%q lua %q %s --mock-brew", dotfiles_dir, home_dir, nos_executable, args)
+    local cmd = string.format("cd %q && HOME=%q lua %q %s --mock-brew", dotfiles_dir, home_dir, dot_executable, args)
     return os.execute(cmd)
   end
 
@@ -55,7 +55,7 @@ describe("dot.lua", function()
     home_dir = pl_path.join(tmp_dir, "home")
     modules_dir = pl_path.join(dotfiles_dir, "modules")
     profiles_dir = pl_path.join(dotfiles_dir, "profiles")
-    nos_executable = pl_path.join(dotfiles_dir, "dot.lua")
+    dot_executable = pl_path.join(dotfiles_dir, "dot.lua")
 
     -- Create necessary directories
     pl_dir.makepath(dotfiles_dir)
@@ -64,9 +64,9 @@ describe("dot.lua", function()
     pl_dir.makepath(profiles_dir)
 
     -- Copy dot.lua to dotfiles_dir
-    os.execute(string.format("cp %q %q", "./dot.lua", nos_executable))
+    os.execute(string.format("cp %q %q", "./dot.lua", dot_executable))
     -- Ensure dot.lua is executable
-    os.execute(string.format("chmod +x %q", nos_executable))
+    os.execute(string.format("chmod +x %q", dot_executable))
   end)
 
   after_each(function()
@@ -111,7 +111,7 @@ return {
     pl_file.write(pl_path.join(modules_dir, "zsh", "zshrc"), "export ZSH=~/.oh-my-zsh")
 
     -- Run dot.lua without arguments to install all modules
-    assert.is_true(run_nos())
+    assert.is_true(run_dot())
 
     -- Check if symlinks are created
     local nvim_config = pl_path.join(home_dir, ".config", "nvim")
@@ -140,7 +140,7 @@ return {
     pl_file.write(pl_path.join(modules_dir, "neovim", "config", "init.vim"), "set number")
 
     -- Run dot.lua for 'neovim' module
-    assert.is_true(run_nos "neovim")
+    assert.is_true(run_dot "neovim")
 
     -- Check if symlink is created for nvim and no symlink for zshrc
     local nvim_config = pl_path.join(home_dir, ".config", "nvim")
@@ -196,7 +196,7 @@ return {
     pl_file.write(pl_path.join(modules_dir, "zsh", "zshrc"), "export ZSH=~/.oh-my-zsh")
 
     -- Run dot.lua with 'work' profile
-    assert.is_true(run_nos "work")
+    assert.is_true(run_dot "work")
 
     -- Check if symlinks are created for both modules
     local nvim_config = pl_path.join(home_dir, ".config", "nvim")
@@ -269,7 +269,7 @@ return {
     pl_file.write(pl_path.join(modules_dir, "apps", "work", "config", "settings.json"), '{"key": "value"}')
 
     -- Run dot.lua with 'personal' profile
-    assert.is_true(run_nos "personal")
+    assert.is_true(run_dot "personal")
 
     -- Check if symlinks are created for neovim and zsh, but not for apps/work
     local nvim_config = pl_path.join(home_dir, ".config", "nvim")
@@ -310,7 +310,7 @@ return {
     pl_file.write(pl_path.join(modules_dir, "neovim", "config", "init.vim"), "set number")
 
     -- Run dot.lua with force flag
-    assert.is_true(run_nos "-f neovim")
+    assert.is_true(run_dot "-f neovim")
 
     -- Check if symlink is created
     assert.is_true(is_link(nvim_config), "Expected symlink for nvim_config")
@@ -318,7 +318,7 @@ return {
     -- Check if backup exists
     local backup_exists = false
     for file in lfs.dir(pl_path.join(home_dir, ".config")) do
-      if file:match "^nvim.before%-nos" then
+      if file:match "^nvim.before%-dot" then
         backup_exists = true
         break
       end
@@ -346,13 +346,13 @@ return {
     pl_file.write(pl_path.join(modules_dir, "neovim", "config", "init.vim"), "set number")
 
     -- Run dot.lua to install 'neovim'
-    assert.is_true(run_nos "neovim")
+    assert.is_true(run_dot "neovim")
 
     local nvim_config = pl_path.join(home_dir, ".config", "nvim")
     assert.is_true(is_link(nvim_config), "Expected symlink for nvim_config")
 
     -- Run dot.lua with --unlink option for 'neovim'
-    assert.is_true(run_nos "--unlink neovim")
+    assert.is_true(run_dot "--unlink neovim")
 
     -- Check if symlink is removed and config is copied
     assert.is_false(is_link(nvim_config), "Expected symlink for nvim_config to be removed")
@@ -385,13 +385,13 @@ return {
     pl_file.write(pl_path.join(modules_dir, "neovim", "config", "init.vim"), "set number")
 
     -- Run dot.lua to install 'neovim'
-    assert.is_true(run_nos "neovim")
+    assert.is_true(run_dot "neovim")
 
     local nvim_config = pl_path.join(home_dir, ".config", "nvim")
     assert.is_true(is_link(nvim_config), "Expected symlink for nvim_config")
 
     -- Run dot.lua with --purge option for 'neovim'
-    assert.is_true(run_nos "--purge neovim")
+    assert.is_true(run_dot "--purge neovim")
 
     -- Check if symlink is removed
     assert.is_false(path_exists(nvim_config), "Expected nvim_config to be removed after purge")
@@ -423,7 +423,7 @@ return {
     pl_file.write(pl_path.join(modules_dir, "dummy_app", "config", "config.txt"), "dummy config")
 
     -- Run dot.lua to install 'dummy_app'
-    assert.is_true(run_nos "dummy_app")
+    assert.is_true(run_dot "dummy_app")
 
     -- Check if post_install hook ran
     local hook_install = pl_path.join(home_dir, ".hooks_post_install_ran")
@@ -431,7 +431,7 @@ return {
     assert.is_true(path_exists(hook_install), "Post-install hook did not run")
 
     -- Run dot.lua with --purge option for 'dummy_app'
-    assert.is_true(run_nos "--purge dummy_app")
+    assert.is_true(run_dot "--purge dummy_app")
 
     -- Check if post_purge hook ran
     local hook_purge = pl_path.join(home_dir, ".hooks_post_purge_ran")
@@ -466,7 +466,7 @@ return {
     pl_file.write(pl_path.join(modules_dir, "multi_config", "config", "keybindings.json"), [[{ "key": "binding" }]])
 
     -- Run dot.lua to install 'multi_config'
-    assert.is_true(run_nos "multi_config")
+    assert.is_true(run_dot "multi_config")
 
     -- Check if symlinks are created
     local settings = pl_path.join(home_dir, "settings.json")
@@ -475,4 +475,3 @@ return {
     assert.is_true(is_link(keybindings), "Expected symlink for keybindings.json")
   end)
 end)
-
