@@ -1,14 +1,14 @@
-local lfs = require("lfs")
-local pl_path = require("pl.path")
-local pl_dir = require("pl.dir")
-local pl_file = require("pl.file")
+local lfs = require "lfs"
+local pl_dir = require "pl.dir"
+local pl_file = require "pl.file"
+local pl_path = require "pl.path"
 
 local function path_exists(path)
   local result = pl_path.exists(path)
   return result and result == path
 end
 
-describe("nos.lua", function()
+describe("dot.lua", function()
   local tmp_dir
   local dotfiles_dir
   local home_dir
@@ -22,16 +22,10 @@ describe("nos.lua", function()
     return attr and attr.mode == "link"
   end
 
-  -- Function to run nos.lua with given arguments
+  -- Function to run dot.lua with given arguments
   local function run_nos(args)
     args = args or ""
-    local cmd = string.format(
-      "cd %q && HOME=%q lua %q %s --mock-brew",
-      dotfiles_dir,
-      home_dir,
-      nos_executable,
-      args
-    )
+    local cmd = string.format("cd %q && HOME=%q lua %q %s --mock-brew", dotfiles_dir, home_dir, nos_executable, args)
     return os.execute(cmd)
   end
 
@@ -51,17 +45,17 @@ describe("nos.lua", function()
 
   before_each(function()
     -- Create a unique temporary directory using mktemp -d
-    local handle = io.popen("mktemp -d")
-    tmp_dir = handle:read("*a")
+    local handle = io.popen "mktemp -d"
+    tmp_dir = handle:read "*a"
     handle:close()
-    tmp_dir = tmp_dir:gsub("%s+$", "")  -- Remove any trailing whitespace
+    tmp_dir = tmp_dir:gsub("%s+$", "") -- Remove any trailing whitespace
 
     -- Define directory paths
     dotfiles_dir = pl_path.join(tmp_dir, "dotfiles")
     home_dir = pl_path.join(tmp_dir, "home")
     modules_dir = pl_path.join(dotfiles_dir, "modules")
     profiles_dir = pl_path.join(dotfiles_dir, "profiles")
-    nos_executable = pl_path.join(dotfiles_dir, "nos.lua")
+    nos_executable = pl_path.join(dotfiles_dir, "dot.lua")
 
     -- Create necessary directories
     pl_dir.makepath(dotfiles_dir)
@@ -69,9 +63,9 @@ describe("nos.lua", function()
     pl_dir.makepath(modules_dir)
     pl_dir.makepath(profiles_dir)
 
-    -- Copy nos.lua to dotfiles_dir
-    os.execute(string.format("cp %q %q", "./nos.lua", nos_executable))
-    -- Ensure nos.lua is executable
+    -- Copy dot.lua to dotfiles_dir
+    os.execute(string.format("cp %q %q", "./dot.lua", nos_executable))
+    -- Ensure dot.lua is executable
     os.execute(string.format("chmod +x %q", nos_executable))
   end)
 
@@ -84,7 +78,9 @@ describe("nos.lua", function()
 
   it("should install all modules", function()
     -- Set up 'neovim' module
-    setup_module("neovim", [[
+    setup_module(
+      "neovim",
+      [[
 return {
   brew = { "neovim" },
   config = {
@@ -92,10 +88,13 @@ return {
     output = "~/.config/nvim",
   }
 }
-]])
+]]
+    )
 
     -- Set up 'zsh' module
-    setup_module("zsh", [[
+    setup_module(
+      "zsh",
+      [[
 return {
   brew = { "zsh" },
   config = {
@@ -103,14 +102,15 @@ return {
     output = "~/.zshrc",
   }
 }
-]])
+]]
+    )
 
     -- Create config directories and files
     pl_dir.makepath(pl_path.join(modules_dir, "neovim", "config"))
     pl_file.write(pl_path.join(modules_dir, "neovim", "config", "init.vim"), "set number")
     pl_file.write(pl_path.join(modules_dir, "zsh", "zshrc"), "export ZSH=~/.oh-my-zsh")
 
-    -- Run nos.lua without arguments to install all modules
+    -- Run dot.lua without arguments to install all modules
     assert.is_true(run_nos())
 
     -- Check if symlinks are created
@@ -122,7 +122,9 @@ return {
 
   it("should install a specific module", function()
     -- Set up 'neovim' module
-    setup_module("neovim", [[
+    setup_module(
+      "neovim",
+      [[
 return {
   brew = { "neovim" },
   config = {
@@ -130,14 +132,15 @@ return {
     output = "~/.config/nvim",
   }
 }
-]])
+]]
+    )
 
     -- Create config directories and files
     pl_dir.makepath(pl_path.join(modules_dir, "neovim", "config"))
     pl_file.write(pl_path.join(modules_dir, "neovim", "config", "init.vim"), "set number")
 
-    -- Run nos.lua for 'neovim' module
-    assert.is_true(run_nos("neovim"))
+    -- Run dot.lua for 'neovim' module
+    assert.is_true(run_nos "neovim")
 
     -- Check if symlink is created for nvim and no symlink for zshrc
     local nvim_config = pl_path.join(home_dir, ".config", "nvim")
@@ -148,7 +151,9 @@ return {
 
   it("should install a profile", function()
     -- Set up 'neovim' module
-    setup_module("neovim", [[
+    setup_module(
+      "neovim",
+      [[
 return {
   brew = { "neovim" },
   config = {
@@ -156,10 +161,13 @@ return {
     output = "~/.config/nvim",
   }
 }
-]])
+]]
+    )
 
     -- Set up 'zsh' module
-    setup_module("zsh", [[
+    setup_module(
+      "zsh",
+      [[
 return {
   brew = { "zsh" },
   config = {
@@ -167,24 +175,28 @@ return {
     output = "~/.zshrc",
   }
 }
-]])
+]]
+    )
 
     -- Create 'work' profile
-    setup_profile("work", [[
+    setup_profile(
+      "work",
+      [[
 return {
   modules = {
     "*"
   }
 }
-]])
+]]
+    )
 
     -- Create config directories and files
     pl_dir.makepath(pl_path.join(modules_dir, "neovim", "config"))
     pl_file.write(pl_path.join(modules_dir, "neovim", "config", "init.vim"), "set number")
     pl_file.write(pl_path.join(modules_dir, "zsh", "zshrc"), "export ZSH=~/.oh-my-zsh")
 
-    -- Run nos.lua with 'work' profile
-    assert.is_true(run_nos("work"))
+    -- Run dot.lua with 'work' profile
+    assert.is_true(run_nos "work")
 
     -- Check if symlinks are created for both modules
     local nvim_config = pl_path.join(home_dir, ".config", "nvim")
@@ -195,7 +207,9 @@ return {
 
   it("should handle exclusions in profiles", function()
     -- Set up 'neovim' module
-    setup_module("neovim", [[
+    setup_module(
+      "neovim",
+      [[
 return {
   brew = { "neovim" },
   config = {
@@ -203,10 +217,13 @@ return {
     output = "~/.config/nvim",
   }
 }
-]])
+]]
+    )
 
     -- Set up 'zsh' module
-    setup_module("zsh", [[
+    setup_module(
+      "zsh",
+      [[
 return {
   brew = { "zsh" },
   config = {
@@ -214,10 +231,13 @@ return {
     output = "~/.zshrc",
   }
 }
-]])
+]]
+    )
 
     -- Set up 'apps/work' module
-    setup_module("apps/work", [[
+    setup_module(
+      "apps/work",
+      [[
 return {
   brew = { "work-app" },
   config = {
@@ -225,17 +245,21 @@ return {
     output = "~/.config/work-app",
   }
 }
-]])
+]]
+    )
 
     -- Create 'personal' profile with exclusion
-    setup_profile("personal", [[
+    setup_profile(
+      "personal",
+      [[
 return {
   modules = {
     "*",
     "!apps/work"
   }
 }
-]])
+]]
+    )
 
     -- Create config directories and files
     pl_dir.makepath(pl_path.join(modules_dir, "neovim", "config"))
@@ -244,8 +268,8 @@ return {
     pl_dir.makepath(pl_path.join(modules_dir, "apps", "work", "config"))
     pl_file.write(pl_path.join(modules_dir, "apps", "work", "config", "settings.json"), '{"key": "value"}')
 
-    -- Run nos.lua with 'personal' profile
-    assert.is_true(run_nos("personal"))
+    -- Run dot.lua with 'personal' profile
+    assert.is_true(run_nos "personal")
 
     -- Check if symlinks are created for neovim and zsh, but not for apps/work
     local nvim_config = pl_path.join(home_dir, ".config", "nvim")
@@ -258,7 +282,10 @@ return {
 
   it("should replace existing configs in force mode", function()
     -- Set up 'neovim' module
-    setup_module("neovim", string.format([[
+    setup_module(
+      "neovim",
+      string.format(
+        [[
 return {
   brew = { "neovim" },
   config = {
@@ -266,7 +293,11 @@ return {
     output = "~/.config/nvim",
   }
 }
-]], home_dir, home_dir))  -- Ensure absolute paths if needed
+]],
+        home_dir,
+        home_dir
+      )
+    ) -- Ensure absolute paths if needed
 
     -- Create existing config
     local nvim_config = pl_path.join(home_dir, ".config", "nvim")
@@ -278,8 +309,8 @@ return {
     pl_dir.makepath(pl_path.join(modules_dir, "neovim", "config"))
     pl_file.write(pl_path.join(modules_dir, "neovim", "config", "init.vim"), "set number")
 
-    -- Run nos.lua with force flag
-    assert.is_true(run_nos("-f neovim"))
+    -- Run dot.lua with force flag
+    assert.is_true(run_nos "-f neovim")
 
     -- Check if symlink is created
     assert.is_true(is_link(nvim_config), "Expected symlink for nvim_config")
@@ -287,7 +318,7 @@ return {
     -- Check if backup exists
     local backup_exists = false
     for file in lfs.dir(pl_path.join(home_dir, ".config")) do
-      if file:match("^nvim.before%-nos") then
+      if file:match "^nvim.before%-nos" then
         backup_exists = true
         break
       end
@@ -297,7 +328,9 @@ return {
 
   it("should unlink configs with --unlink", function()
     -- Set up 'neovim' module
-    setup_module("neovim", [[
+    setup_module(
+      "neovim",
+      [[
 return {
   brew = { "neovim" },
   config = {
@@ -305,20 +338,21 @@ return {
     output = "~/.config/nvim",
   }
 }
-]])
+]]
+    )
 
     -- Create module config
     pl_dir.makepath(pl_path.join(modules_dir, "neovim", "config"))
     pl_file.write(pl_path.join(modules_dir, "neovim", "config", "init.vim"), "set number")
 
-    -- Run nos.lua to install 'neovim'
-    assert.is_true(run_nos("neovim"))
+    -- Run dot.lua to install 'neovim'
+    assert.is_true(run_nos "neovim")
 
     local nvim_config = pl_path.join(home_dir, ".config", "nvim")
     assert.is_true(is_link(nvim_config), "Expected symlink for nvim_config")
 
-    -- Run nos.lua with --unlink option for 'neovim'
-    assert.is_true(run_nos("--unlink neovim"))
+    -- Run dot.lua with --unlink option for 'neovim'
+    assert.is_true(run_nos "--unlink neovim")
 
     -- Check if symlink is removed and config is copied
     assert.is_false(is_link(nvim_config), "Expected symlink for nvim_config to be removed")
@@ -333,7 +367,9 @@ return {
 
   it("should purge modules with --purge", function()
     -- Set up 'neovim' module
-    setup_module("neovim", [[
+    setup_module(
+      "neovim",
+      [[
 return {
   brew = { "neovim" },
   config = {
@@ -341,20 +377,21 @@ return {
     output = "~/.config/nvim",
   }
 }
-]])
+]]
+    )
 
     -- Create module config
     pl_dir.makepath(pl_path.join(modules_dir, "neovim", "config"))
     pl_file.write(pl_path.join(modules_dir, "neovim", "config", "init.vim"), "set number")
 
-    -- Run nos.lua to install 'neovim'
-    assert.is_true(run_nos("neovim"))
+    -- Run dot.lua to install 'neovim'
+    assert.is_true(run_nos "neovim")
 
     local nvim_config = pl_path.join(home_dir, ".config", "nvim")
     assert.is_true(is_link(nvim_config), "Expected symlink for nvim_config")
 
-    -- Run nos.lua with --purge option for 'neovim'
-    assert.is_true(run_nos("--purge neovim"))
+    -- Run dot.lua with --purge option for 'neovim'
+    assert.is_true(run_nos "--purge neovim")
 
     -- Check if symlink is removed
     assert.is_false(path_exists(nvim_config), "Expected nvim_config to be removed after purge")
@@ -362,7 +399,10 @@ return {
 
   it("should run hooks", function()
     -- Set up 'dummy_app' module with hooks using absolute paths
-    setup_module("dummy_app", string.format([[
+    setup_module(
+      "dummy_app",
+      string.format(
+        [[
 return {
   brew = { },
   config = {
@@ -372,22 +412,26 @@ return {
   post_install = "touch %s/.hooks_post_install_ran",
   post_purge = "touch %s/.hooks_post_purge_ran",
 }
-]], home_dir, home_dir))
+]],
+        home_dir,
+        home_dir
+      )
+    )
 
     -- Create module config
     pl_dir.makepath(pl_path.join(modules_dir, "dummy_app", "config"))
     pl_file.write(pl_path.join(modules_dir, "dummy_app", "config", "config.txt"), "dummy config")
 
-    -- Run nos.lua to install 'dummy_app'
-    assert.is_true(run_nos("dummy_app"))
+    -- Run dot.lua to install 'dummy_app'
+    assert.is_true(run_nos "dummy_app")
 
     -- Check if post_install hook ran
     local hook_install = pl_path.join(home_dir, ".hooks_post_install_ran")
     print("Checking for hook_install at:", hook_install)
     assert.is_true(path_exists(hook_install), "Post-install hook did not run")
 
-    -- Run nos.lua with --purge option for 'dummy_app'
-    assert.is_true(run_nos("--purge dummy_app"))
+    -- Run dot.lua with --purge option for 'dummy_app'
+    assert.is_true(run_nos "--purge dummy_app")
 
     -- Check if post_purge hook ran
     local hook_purge = pl_path.join(home_dir, ".hooks_post_purge_ran")
@@ -397,7 +441,9 @@ return {
 
   it("should handle multiple configs in a module", function()
     -- Set up 'multi_config' module with multiple configs
-    setup_module("multi_config", [[
+    setup_module(
+      "multi_config",
+      [[
 return {
   brew = { },
   config = {
@@ -411,15 +457,16 @@ return {
     }
   }
 }
-]])
+]]
+    )
 
     -- Create config files
     pl_dir.makepath(pl_path.join(modules_dir, "multi_config", "config"))
     pl_file.write(pl_path.join(modules_dir, "multi_config", "config", "settings.json"), [[{ "setting": "value" }]])
     pl_file.write(pl_path.join(modules_dir, "multi_config", "config", "keybindings.json"), [[{ "key": "binding" }]])
 
-    -- Run nos.lua to install 'multi_config'
-    assert.is_true(run_nos("multi_config"))
+    -- Run dot.lua to install 'multi_config'
+    assert.is_true(run_nos "multi_config")
 
     -- Check if symlinks are created
     local settings = pl_path.join(home_dir, "settings.json")
@@ -428,3 +475,4 @@ return {
     assert.is_true(is_link(keybindings), "Expected symlink for keybindings.json")
   end)
 end)
+
