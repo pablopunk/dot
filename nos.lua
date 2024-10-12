@@ -482,6 +482,16 @@ local function process_module(module_name, options)
   print "" -- Add a blank line between modules
 end
 
+-- Check if a module should be excluded
+local function should_exclude(module_name, exclusions)
+  for _, exclusion in ipairs(exclusions) do
+    if module_name == exclusion or module_name:match("^" .. exclusion .. "/") then
+      return true
+    end
+  end
+  return false
+end
+
 -- Process a single tool or profile
 local function process_tool(tool_name, options)
   local profile_path = os.getenv "PWD" .. "/profiles/" .. tool_name .. ".lua"
@@ -501,13 +511,15 @@ local function process_tool(tool_name, options)
     end
 
     local modules_to_process = {}
+    local exclusions = {}
+
     for _, module_name in ipairs(profile.modules) do
-      if module_name == "*" then
-        local direct_children = get_direct_child_modules()
-        for _, child in ipairs(direct_children) do
-          if not modules_to_process[child] then
-            modules_to_process[child] = true
-          end
+      if module_name:sub(1, 1) == "!" then
+        table.insert(exclusions, module_name:sub(2))
+      elseif module_name == "*" then
+        local all_modules = get_all_modules()
+        for _, module in ipairs(all_modules) do
+          modules_to_process[module] = true
         end
       else
         modules_to_process[module_name] = true
@@ -515,7 +527,9 @@ local function process_tool(tool_name, options)
     end
 
     for module_name in pairs(modules_to_process) do
-      process_module(module_name, options)
+      if not should_exclude(module_name, exclusions) then
+        process_module(module_name, options)
+      end
     end
   else
     -- Process the single tool module

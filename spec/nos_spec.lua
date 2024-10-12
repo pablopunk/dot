@@ -158,11 +158,22 @@ return {
 }
 ]])
 
+    -- Set up 'zsh' module
+    setup_module("zsh", [[
+return {
+  brew = { "zsh" },
+  config = {
+    source = "./zshrc",
+    output = "~/.zshrc",
+  }
+}
+]])
+
     -- Create 'work' profile
     setup_profile("work", [[
 return {
   modules = {
-    "neovim"
+    "*"
   }
 }
 ]])
@@ -170,13 +181,79 @@ return {
     -- Create config directories and files
     pl_dir.makepath(pl_path.join(modules_dir, "neovim", "config"))
     pl_file.write(pl_path.join(modules_dir, "neovim", "config", "init.vim"), "set number")
+    pl_file.write(pl_path.join(modules_dir, "zsh", "zshrc"), "export ZSH=~/.oh-my-zsh")
 
     -- Run nos.lua with 'work' profile
     assert.is_true(run_nos("work"))
 
-    -- Check if symlink is created for nvim
+    -- Check if symlinks are created for both modules
     local nvim_config = pl_path.join(home_dir, ".config", "nvim")
+    local zshrc = pl_path.join(home_dir, ".zshrc")
     assert.is_true(is_link(nvim_config), "Expected symlink for nvim_config")
+    assert.is_true(is_link(zshrc), "Expected symlink for zshrc")
+  end)
+
+  it("should handle exclusions in profiles", function()
+    -- Set up 'neovim' module
+    setup_module("neovim", [[
+return {
+  brew = { "neovim" },
+  config = {
+    source = "./config",
+    output = "~/.config/nvim",
+  }
+}
+]])
+
+    -- Set up 'zsh' module
+    setup_module("zsh", [[
+return {
+  brew = { "zsh" },
+  config = {
+    source = "./zshrc",
+    output = "~/.zshrc",
+  }
+}
+]])
+
+    -- Set up 'apps/work' module
+    setup_module("apps/work", [[
+return {
+  brew = { "work-app" },
+  config = {
+    source = "./config",
+    output = "~/.config/work-app",
+  }
+}
+]])
+
+    -- Create 'personal' profile with exclusion
+    setup_profile("personal", [[
+return {
+  modules = {
+    "*",
+    "!apps/work"
+  }
+}
+]])
+
+    -- Create config directories and files
+    pl_dir.makepath(pl_path.join(modules_dir, "neovim", "config"))
+    pl_file.write(pl_path.join(modules_dir, "neovim", "config", "init.vim"), "set number")
+    pl_file.write(pl_path.join(modules_dir, "zsh", "zshrc"), "export ZSH=~/.oh-my-zsh")
+    pl_dir.makepath(pl_path.join(modules_dir, "apps", "work", "config"))
+    pl_file.write(pl_path.join(modules_dir, "apps", "work", "config", "settings.json"), '{"key": "value"}')
+
+    -- Run nos.lua with 'personal' profile
+    assert.is_true(run_nos("personal"))
+
+    -- Check if symlinks are created for neovim and zsh, but not for apps/work
+    local nvim_config = pl_path.join(home_dir, ".config", "nvim")
+    local zshrc = pl_path.join(home_dir, ".zshrc")
+    local work_app_config = pl_path.join(home_dir, ".config", "work-app")
+    assert.is_true(is_link(nvim_config), "Expected symlink for nvim_config")
+    assert.is_true(is_link(zshrc), "Expected symlink for zshrc")
+    assert.is_false(path_exists(work_app_config), "Did not expect symlink for work-app config")
   end)
 
   it("should replace existing configs in force mode", function()
