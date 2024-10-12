@@ -1,8 +1,8 @@
 # `nos`
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/c878b7d3-e1f6-49b3-a2c0-25d5e39d1dfa#gh-light-mode-only" width="600px" />
-  <img src="https://github.com/user-attachments/assets/64b98236-da26-4f8e-8706-ca27667b5f9c#gh-dark-mode-only" width="600px" />
+  <img src="https://github.com/user-attachments/assets/38cc3f6c-f8f7-4ca0-807a-66e499f36ec3#gh-light-mode-only" width="600px" />
+  <img src="https://github.com/user-attachments/assets/f4f53abb-155d-4403-bccc-758c2f228932#gh-dark-mode-only" width="600px" />
 </p>
 
 > Manage your dotfiles and their dependencies automagically
