@@ -283,3 +283,4 @@ return {
 - [ ] Unlinking dotfiles without copying. An option like `dot --unlink --no-copy` could be added.
 - [ ] `dot --purge-all` to purge all modules at once.
 - [ ] Support Mac defaults, similar to `nix-darwin`.
+- [ ] Support an `os` field. i.e `os = { "mac" }` will be ignored on Linux.
