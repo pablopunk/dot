@@ -417,7 +417,7 @@ local function handle_config_symlink(config, module_dir, options)
           return
         end
 
-        local cmd = string.format('ln -s "%s" "%s"', source, output)
+        local cmd = string.format('ln -sf "%s" "%s"', source, output)
         local exit_code, error_output = execute(cmd)
         if exit_code ~= 0 then
           print_message("error", "config → failed to create symlink: " .. error_output)
