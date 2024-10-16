@@ -19,6 +19,7 @@
   - [Purging Modules `--purge`](#purging-modules---purge)
   - [Hooks](#hooks)
   - [Summary of Command-Line Options](#summary-of-command-line-options)
+- [Examples](#examples)
 - [To do](#to-do)
 
 ## Installation
@@ -264,6 +265,10 @@ return {
   ```bash
   $ dot --purge neovim
   ```
+
+## Examples
+
+- [pablopunk/dotfiles](https://github.com/pablopunk/dotfiles): my own dotfiles.
 
 ## To do
 
