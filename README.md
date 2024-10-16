@@ -284,7 +284,7 @@ return {
 - [x] Allow array of config. For example I could like two separate folders that are not siblings
 - [x] Improve profiles syntax. For example, `{ "*", "apps/work" }` should still be recursive except in "apps/". Or maybe accept negative patterns like `{ "!apps/personal" }` -> everything but apps/personal.
 - [x] Add screenshots to the README.
-- [ ] Support more ways of adding dependencies (e.g., wget binaries).
+- [ ] Support more ways of adding dependencies (e.g., wget binaries, git clone, apt...).
 - [ ] Unlinking dotfiles without copying. An option like `dot --unlink --no-copy` could be added.
 - [ ] `dot --purge-all` to purge all modules at once.
 - [ ] Support Mac defaults, similar to `nix-darwin`.
