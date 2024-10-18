@@ -10,6 +10,7 @@ local function parse_args()
   local purge_mode = false
   local unlink_mode = false
   local mock_brew = false
+  local hooks_mode = false
   local args = {}
 
   local i = 1
@@ -25,6 +26,8 @@ local function parse_args()
       unlink_mode = true
     elseif arg[i] == "--mock-brew" then
       mock_brew = true
+    elseif arg[i] == "--hooks" then
+      hooks_mode = true
     else
       table.insert(args, arg[i])
     end
@@ -36,6 +39,7 @@ local function parse_args()
     purge_mode = purge_mode,
     unlink_mode = unlink_mode,
     mock_brew = mock_brew,
+    hooks_mode = hooks_mode,
     args = args,
   }
 end
@@ -261,14 +265,41 @@ local function get_all_modules()
   return modules
 end
 
+local function str_split(str, delimiter)
+  local result = {}
+  for match in (str .. delimiter):gmatch("(.-)" .. delimiter) do
+    table.insert(result, match)
+  end
+  return result
+end
+
+local function str_trim(str)
+  return str:gsub("^%s*(.-)%s*$", "%1")
+end
+
+local function table_remove_empty(tbl)
+  local new_tbl = {}
+  for _, v in ipairs(tbl) do
+    local v_trim = str_trim(v)
+    if v_trim ~= "" then
+      table.insert(new_tbl, v)
+    end
+  end
+  return new_tbl
+end
+
 local function run_hook(hook_script, hook_type)
   print_message("info", "Running " .. hook_type .. " hook")
-  local exit_code, output = execute(hook_script)
-  if exit_code ~= 0 then
-    print_message("error", hook_type .. " → failed: " .. output)
-  else
-    print_message("success", hook_type .. " → completed successfully")
+  local hook_lines = str_split(hook_script, "\n")
+  hook_lines = table_remove_empty(hook_lines)
+  for _, line in ipairs(hook_lines) do
+    local exit_code, output = execute(line)
+    if exit_code ~= 0 then
+      print_message("error", hook_type .. " → failed: " .. output)
+      return
+    end
   end
+  print_message("success", hook_type .. " → completed successfully")
 end
 
 local function process_brew_dependencies(config, purge_mode)
@@ -462,7 +493,7 @@ local function process_module(module_name, options)
   handle_config_symlink(config, module_dir, options)
 
   -- Run post_install or post_purge hooks
-  if dependencies_changed then
+  if dependencies_changed or options.hooks_mode then
     if options.purge_mode and config.post_purge then
       run_hook(config.post_purge, "post-purge")
     elseif not options.purge_mode and config.post_install then
