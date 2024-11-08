@@ -499,11 +499,20 @@ local function process_module(module_name, options)
   local config_changed = handle_config_symlink(config, module_dir, options)
 
   -- Run post_install or post_purge hooks
-  if dependencies_changed or config_changed or options.hooks_mode then
+  if dependencies_changed or options.hooks_mode then
     if options.purge_mode and config.post_purge then
       run_hook(config.post_purge, "post-purge")
     elseif not options.purge_mode and config.post_install then
       run_hook(config.post_install, "post-install")
+    end
+  end
+
+  -- Run post_config or post_config_purge hooks
+  if config_changed or options.hooks_mode then
+    if options.purge_mode and config.post_config_purge then
+      run_hook(config.post_config_purge, "post-config-purge")
+    elseif not options.purge_mode and config.post_config then
+      run_hook(config.post_config, "post-config")
     end
   end
 
