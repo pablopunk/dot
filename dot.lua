@@ -507,12 +507,12 @@ local function process_module(module_name, options)
     end
   end
 
-  -- Run post_config or post_config_purge hooks
+  -- Run post_link or post_unlink hooks
   if config_changed or options.hooks_mode then
-    if options.purge_mode and config.post_config_purge then
-      run_hook(config.post_config_purge, "post-config-purge")
-    elseif not options.purge_mode and config.post_config then
-      run_hook(config.post_config, "post-config")
+    if options.purge_mode and config.post_unlink then
+      run_hook(config.post_unlink, "post-unlink")
+    elseif not options.purge_mode and config.post_link then
+      run_hook(config.post_link, "post-link")
     end
   end
 
