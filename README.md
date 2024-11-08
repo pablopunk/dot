@@ -228,8 +228,16 @@ This command will:
 
 ### Hooks
 
-You can define `post_install` and `post_purge` hooks in your module's `init.lua` to run arbitrary commands after the module has been installed or purged.
+You can define custom hooks in your module's `init.lua` file to run specific commands at different stages of the module's lifecycle.
 
+#### Available Hooks
+
+- **`post_install`**: Runs after the specified packages have been installed via `brew`.
+- **`post_purge`**: Runs after the specified packages have been removed via `brew`.
+- **`post_link`**: Runs after configuration files have been linked.
+- **`post_unlink`**: Runs after configuration files have been unlinked.
+
+#### Basic Hook Definition
 ```lua
 return {
   brew = { "gh" },
@@ -237,7 +245,9 @@ return {
 }
 ```
 
-You can also define multi-line hooks:
+#### Multi-Line Hook Definition
+
+You can also define multi-line hooks using Lua's multi-line string syntax.
 
 ```lua
 return {
