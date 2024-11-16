@@ -28,6 +28,20 @@ local function parse_args()
       mock_brew = true
     elseif arg[i] == "--hooks" then
       hooks_mode = true
+    elseif arg[i] == "-h" then
+      print([[
+Usage: dot [options] [module/profile]
+
+Options:
+  -f            Force mode: replace existing configurations, backing them up to <config>.before-dot
+  --version     Display the version of dot
+  --purge       Purge mode: uninstall dependencies and remove configurations
+  --unlink      Unlink mode: remove symlinks but keep the config files in their destination
+  --mock-brew   Mock brew operations (for testing purposes)
+  --hooks       Run hooks even if dependencies haven't changed
+  -h            Display this help message
+]])
+      os.exit(0)
     else
       table.insert(args, arg[i])
     end

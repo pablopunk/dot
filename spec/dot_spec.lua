@@ -474,4 +474,16 @@ return {
     assert.is_true(is_link(settings), "Expected symlink for settings.json")
     assert.is_true(is_link(keybindings), "Expected symlink for keybindings.json")
   end)
+
+  it("should display help message with -h option", function()
+    -- Run dot.lua with -h option
+    local cmd = string.format("cd %q && HOME=%q lua %q -h", dotfiles_dir, home_dir, dot_executable)
+    local handle = io.popen(cmd)
+    local output = handle:read("*a")
+    handle:close()
+
+    -- Check if the output contains the expected start of the help message
+    local expected_start = "Usage: dot"
+    assert.is_true(output:find(expected_start, 1, true) ~= nil, "Help message not displayed correctly")
+  end)
 end)
