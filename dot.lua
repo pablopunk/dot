@@ -1,6 +1,6 @@
 #!/usr/bin/env lua
 
-local version = "0.2.0"
+local version = "0.3.0"
 
 local MOCK_BREW = false
 local MOCK_WGET = false
