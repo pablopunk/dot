@@ -285,12 +285,18 @@ It now supports downloading files using `wget`. This can be useful for fetching 
 Example:
 
 ```lua
--- modules/1piece/init.lua
+-- modules/apps/init.lua
 return {
   wget = {
-    url = "https://app1piece.com/1Piece-4.2.1.zip",
-    output = "/Applications/1Piece.app",
-    zip = true,
+    {
+      url = "https://app1piece.com/1Piece-4.2.1.zip",
+      output = "/Applications/1Piece.app",
+      zip = true,
+    },
+    {
+      url = "https://fakedomain.com/fake.app",
+      output = "/Applications/Fake.app",
+    },
   },
 }
 ```
@@ -298,12 +304,13 @@ return {
 This will:
 
 - Download the file from the specified URL.
-- Unzip it to the specified output path.
+- Unzip it if `zip = true`.
+- Install it to the specified output path.
 
 Just use it like any other module:
 
 ```bash
-$ dot 1piece
+$ dot apps
 ```
 
 > [!NOTE]
