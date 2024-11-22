@@ -3,6 +3,7 @@
 local version = "0.2.0"
 
 local MOCK_BREW = false
+local MOCK_WGET = false
 
 -- Parse command-line arguments
 local function parse_args()
@@ -10,6 +11,7 @@ local function parse_args()
   local purge_mode = false
   local unlink_mode = false
   local mock_brew = false
+  local mock_wget = false
   local hooks_mode = false
   local args = {}
 
@@ -26,6 +28,8 @@ local function parse_args()
       unlink_mode = true
     elseif arg[i] == "--mock-brew" then
       mock_brew = true
+    elseif arg[i] == "--mock-wget" then
+      mock_wget = true
     elseif arg[i] == "--hooks" then
       hooks_mode = true
     elseif arg[i] == "-h" then
@@ -38,6 +42,7 @@ Options:
   --purge       Purge mode: uninstall dependencies and remove configurations
   --unlink      Unlink mode: remove symlinks but keep the config files in their destination
   --mock-brew   Mock brew operations (for testing purposes)
+  --mock-wget   Mock wget operations (for testing purposes)
   --hooks       Run hooks even if dependencies haven't changed
   -h            Display this help message
 ]])
@@ -53,6 +58,7 @@ Options:
     purge_mode = purge_mode,
     unlink_mode = unlink_mode,
     mock_brew = mock_brew,
+    mock_wget = mock_wget,
     hooks_mode = hooks_mode,
     args = args,
   }
@@ -482,6 +488,93 @@ local function handle_config_symlink(config, module_dir, options)
   end
 end
 
+local function process_wget(config)
+  if not config.wget then
+    return false
+  end
+
+  local url = config.wget.url
+  local output = expand_path(config.wget.output)
+  local is_zip = config.wget.zip == true
+
+  -- Check if the output already exists
+  if is_file(output) or is_dir(output) then
+    print_message("info", "wget → dependency already exists at " .. output)
+    return false
+  end
+
+  -- Create a temporary directory for downloading
+  local temp_dir = "/tmp/dot_wget_temp"
+  local mkdir_cmd = string.format('mkdir -p "%s"', temp_dir)
+  local exit_code, mkdir_output = execute(mkdir_cmd)
+  if exit_code ~= 0 then
+    print_message("error", "wget → failed to create temporary directory: " .. mkdir_output)
+    return false
+  end
+
+  -- Extract the file name from the output path
+  local file_name = output:match("^.+/(.+)$")
+  if not file_name then
+    print_message("error", "wget → failed to extract file name from output path")
+    return false
+  end
+
+  -- Mock wget if MOCK_WGET is true
+  if MOCK_WGET then
+    print_message("info", "wget → mock download to " .. temp_dir .. "/" .. file_name)
+    local mock_file_path = temp_dir .. "/" .. file_name
+    -- Simulate the presence of files in the temp directory
+    local touch_cmd = string.format('touch "%s"', mock_file_path)
+    execute(touch_cmd)
+  else
+    -- Download the file using wget to the temporary directory
+    local temp_file = temp_dir .. "/" .. file_name .. (is_zip and ".zip" or "")
+    local download_cmd = string.format('wget -O "%s" "%s"', temp_file, url)
+    exit_code, download_output = execute(download_cmd)
+    if exit_code ~= 0 then
+      print_message("error", "wget → failed to download: " .. download_output)
+      return false
+    end
+    print_message("success", "wget → downloaded to " .. temp_file)
+
+    -- If the file is a zip, unzip it
+    if is_zip then
+      local unzip_cmd = string.format('unzip -o "%s" -d "%s"', temp_file, temp_dir)
+      exit_code, unzip_output = execute(unzip_cmd)
+      if exit_code ~= 0 then
+        print_message("error", "wget → failed to unzip: " .. unzip_output)
+        return false
+      end
+      print_message("success", "wget → unzipped to " .. temp_dir)
+
+      -- Remove the zip file
+      local remove_cmd = string.format('rm "%s"', temp_file)
+      exit_code, remove_output = execute(remove_cmd)
+      if exit_code ~= 0 then
+        print_message("error", "wget → failed to remove zip file: " .. remove_output)
+        return false
+      end
+      print_message("success", "wget → removed zip file")
+    end
+  end
+
+  -- Move the contents to the output directory
+  local move_cmd = string.format('mv "%s" "%s"', temp_dir .. "/" .. file_name, output)
+  local exit_code, move_output = execute(move_cmd)
+  if exit_code ~= 0 then
+    print_message("error", "wget → failed to move files to output: " .. move_output)
+    return false
+  end
+  print_message("success", "wget → moved files to " .. output)
+
+  -- Clean up the temporary directory
+  local cleanup_cmd = string.format('rm -rf "%s"', temp_dir)
+  print_message("info", cleanup_cmd)
+  execute(cleanup_cmd)
+
+  return true
+end
+
 -- Process each module by installing/uninstalling dependencies and managing symlinks
 local function process_module(module_name, options)
   print(colors.bold .. colors.blue .. "[" .. module_name .. "]" .. colors.reset)
@@ -502,7 +595,14 @@ local function process_module(module_name, options)
     return
   end
 
-  local dependencies_changed = process_brew_dependencies(config, options.purge_mode)
+  local dependencies_changed = false
+  if process_wget(config) then
+    dependencies_changed = true
+  end
+
+  if process_brew_dependencies(config, options.purge_mode) then
+    dependencies_changed = true
+  end
 
   handle_config_symlink(config, module_dir, options)
 
@@ -584,6 +684,10 @@ local function main()
 
   if options.mock_brew then
     MOCK_BREW = true
+  end
+
+  if options.mock_wget then
+    MOCK_WGET = true
   end
 
   get_installed_brew_packages()

@@ -486,4 +486,26 @@ return {
     local expected_start = "Usage: dot"
     assert.is_true(output:find(expected_start, 1, true) ~= nil, "Help message not displayed correctly")
   end)
+
+  it("should handle wget configuration", function()
+    -- Set up 'wget_test' module with wget configuration
+    setup_module(
+      "wget_test",
+      [[
+return {
+  wget = {
+    url = "https://example.com/test.bin",
+    output = "]] .. pl_path.join(home_dir, "test_output") .. [[",
+  }
+}
+]]
+    )
+
+    -- Run dot.lua for 'wget_test' module with mock-wget
+    assert.is_true(run_dot "wget_test --mock-wget")
+
+    -- Check if the mock download and unzip operations were performed
+    local test_output = pl_path.join(home_dir, "test_output")
+    assert.is_true(path_exists(test_output), "Expected test_output to exist after mock wget operation")
+  end)
 end)

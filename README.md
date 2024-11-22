@@ -278,6 +278,37 @@ return {
   $ dot --purge neovim
   ```
 
+### Wget Configuration
+
+It now supports downloading files using `wget`. This can be useful for fetching binaries or other resources that are not available through Homebrew. You can specify a `wget` configuration in your module's `init.lua` file.
+
+Example:
+
+```lua
+-- modules/1piece/init.lua
+return {
+  wget = {
+    url = "https://app1piece.com/1Piece-4.2.1.zip",
+    output = "/Applications/1Piece.app",
+    zip = true,
+  },
+}
+```
+
+This will:
+
+- Download the file from the specified URL.
+- Unzip it to the specified output path.
+
+Just use it like any other module:
+
+```bash
+$ dot 1piece
+```
+
+> [!NOTE]
+> When using `zip = true`, make sure the output file name matches the unzipped file name. In the example above, the output is `/Applications/1Piece.app` because the zip file contains a file named `1Piece.app`.
+
 ## Examples
 
 - [pablopunk/dotfiles](https://github.com/pablopunk/dotfiles): my own dotfiles.
@@ -297,6 +328,9 @@ return {
 - [x] Improve profiles syntax. For example, `{ "*", "apps/work" }` should still be recursive except in "apps/". Or maybe accept negative patterns like `{ "!apps/personal" }` -> everything but apps/personal.
 - [x] Add screenshots to the README.
 - [ ] Support more ways of adding dependencies (e.g., wget binaries, git clone, apt...).
+  - [x] wget
+  - [ ] git clone
+  - [ ] apt
 - [ ] Unlinking dotfiles without copying. An option like `dot --unlink --no-copy` could be added.
 - [ ] `dot --purge-all` to purge all modules at once.
 - [ ] Support Mac defaults, similar to `nix-darwin`.
