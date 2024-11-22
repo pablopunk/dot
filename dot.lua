@@ -488,91 +488,94 @@ local function handle_config_symlink(config, module_dir, options)
   end
 end
 
+-- Process wget dependencies
 local function process_wget(config)
   if not config.wget then
     return false
   end
 
-  local url = config.wget.url
-  local output = expand_path(config.wget.output)
-  local is_zip = config.wget.zip == true
+  local wget_entries = type(config.wget) == "table" and config.wget[1] and config.wget or { config.wget }
+  local dependencies_changed = false
 
-  -- Check if the output already exists
-  if is_file(output) or is_dir(output) then
-    print_message("info", "wget → dependency already exists at " .. output)
-    return false
-  end
+  for _, wget_entry in ipairs(wget_entries) do
+    local url = wget_entry.url
+    local output = expand_path(wget_entry.output)
+    local is_zip = wget_entry.zip == true
 
-  -- Create a temporary directory for downloading
-  local temp_dir = "/tmp/dot_wget_temp"
-  local mkdir_cmd = string.format('mkdir -p "%s"', temp_dir)
-  local exit_code, mkdir_output = execute(mkdir_cmd)
-  if exit_code ~= 0 then
-    print_message("error", "wget → failed to create temporary directory: " .. mkdir_output)
-    return false
-  end
-
-  -- Extract the file name from the output path
-  local file_name = output:match("^.+/(.+)$")
-  if not file_name then
-    print_message("error", "wget → failed to extract file name from output path")
-    return false
-  end
-
-  -- Mock wget if MOCK_WGET is true
-  if MOCK_WGET then
-    print_message("info", "wget → mock download to " .. temp_dir .. "/" .. file_name)
-    local mock_file_path = temp_dir .. "/" .. file_name
-    -- Simulate the presence of files in the temp directory
-    local touch_cmd = string.format('touch "%s"', mock_file_path)
-    execute(touch_cmd)
-  else
-    -- Download the file using wget to the temporary directory
-    local temp_file = temp_dir .. "/" .. file_name .. (is_zip and ".zip" or "")
-    local download_cmd = string.format('wget -O "%s" "%s"', temp_file, url)
-    exit_code, download_output = execute(download_cmd)
-    if exit_code ~= 0 then
-      print_message("error", "wget → failed to download: " .. download_output)
-      return false
-    end
-    print_message("success", "wget → downloaded to " .. temp_file)
-
-    -- If the file is a zip, unzip it
-    if is_zip then
-      local unzip_cmd = string.format('unzip -o "%s" -d "%s"', temp_file, temp_dir)
-      exit_code, unzip_output = execute(unzip_cmd)
+    -- Check if the output already exists
+    if is_file(output) or is_dir(output) then
+      print_message("info", "wget → dependency already exists at " .. output)
+    else
+      dependencies_changed = true
+      -- Create a temporary directory for downloading
+      local temp_dir = "/tmp/dot_wget_temp"
+      local mkdir_cmd = string.format('mkdir -p "%s"', temp_dir)
+      local exit_code, mkdir_output = execute(mkdir_cmd)
       if exit_code ~= 0 then
-        print_message("error", "wget → failed to unzip: " .. unzip_output)
+        print_message("error", "wget → failed to create temporary directory: " .. mkdir_output)
         return false
       end
-      print_message("success", "wget → unzipped to " .. temp_dir)
 
-      -- Remove the zip file
-      local remove_cmd = string.format('rm "%s"', temp_file)
-      exit_code, remove_output = execute(remove_cmd)
-      if exit_code ~= 0 then
-        print_message("error", "wget → failed to remove zip file: " .. remove_output)
+      -- Extract the file name from the output path
+      local file_name = output:match("^.+/(.+)$")
+      if not file_name then
+        print_message("error", "wget → failed to extract file name from output path")
         return false
       end
-      print_message("success", "wget → removed zip file")
+
+      -- Mock wget if MOCK_WGET is true
+      if MOCK_WGET then
+        print_message("info", "wget → mock download to " .. temp_dir .. "/" .. file_name)
+        local mock_file_path = temp_dir .. "/" .. file_name
+        -- Simulate the presence of files in the temp directory
+        local touch_cmd = string.format('touch "%s"', mock_file_path)
+        execute(touch_cmd)
+      else
+        -- Download the file using wget to the temporary directory
+        local temp_file = temp_dir .. "/" .. file_name .. (is_zip and ".zip" or "")
+        local download_cmd = string.format('wget -O "%s" "%s"', temp_file, url)
+        exit_code, download_output = execute(download_cmd)
+        if exit_code ~= 0 then
+          print_message("error", "wget → failed to download: " .. download_output)
+          return false
+        end
+        print_message("success", "wget →  to " .. temp_file)
+
+        -- If the file is a zip, unzip it
+        if is_zip then
+          local unzip_cmd = string.format('unzip -o "%s" -d "%s"', temp_file, temp_dir)
+          exit_code, unzip_output = execute(unzip_cmd)
+          if exit_code ~= 0 then
+            print_message("error", "wget → failed to unzip: " .. unzip_output)
+            return false
+          end
+
+          -- Remove the zip file
+          local remove_cmd = string.format('rm "%s"', temp_file)
+          exit_code, remove_output = execute(remove_cmd)
+          if exit_code ~= 0 then
+            print_message("error", "wget → failed to remove zip file: " .. remove_output)
+            return false
+          end
+        end
+      end
+
+      -- Move the contents to the output directory
+      local move_cmd = string.format('mv "%s" "%s"', temp_dir .. "/" .. file_name, output)
+      local exit_code, move_output = execute(move_cmd)
+      if exit_code ~= 0 then
+        print_message("error", "wget → failed to move files to output: " .. move_output)
+        return false
+      end
+      print_message("success", "wget → installed file at " .. output)
+
+      -- Clean up the temporary directory
+      local cleanup_cmd = string.format('rm -rf "%s"', temp_dir)
+      execute(cleanup_cmd)
     end
   end
 
-  -- Move the contents to the output directory
-  local move_cmd = string.format('mv "%s" "%s"', temp_dir .. "/" .. file_name, output)
-  local exit_code, move_output = execute(move_cmd)
-  if exit_code ~= 0 then
-    print_message("error", "wget → failed to move files to output: " .. move_output)
-    return false
-  end
-  print_message("success", "wget → moved files to " .. output)
-
-  -- Clean up the temporary directory
-  local cleanup_cmd = string.format('rm -rf "%s"', temp_dir)
-  print_message("info", cleanup_cmd)
-  execute(cleanup_cmd)
-
-  return true
+  return dependencies_changed
 end
 
 -- Process each module by installing/uninstalling dependencies and managing symlinks
