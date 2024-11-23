@@ -33,7 +33,7 @@ local function parse_args()
     elseif arg[i] == "--hooks" then
       hooks_mode = true
     elseif arg[i] == "-h" then
-      print([[
+      print [[
 Usage: dot [options] [module/profile]
 
 Options:
@@ -45,7 +45,7 @@ Options:
   --mock-wget   Mock wget operations (for testing purposes)
   --hooks       Run hooks even if dependencies haven't changed
   -h            Display this help message
-]])
+]]
       os.exit(0)
     else
       table.insert(args, arg[i])
@@ -504,7 +504,7 @@ local function process_wget(config)
 
     -- Check if the output already exists
     if is_file(output) or is_dir(output) then
-      print_message("info", "wget → dependency already exists at " .. output)
+      -- print_message("info", "wget → dependency already exists at " .. output)
     else
       dependencies_changed = true
       -- Create a temporary directory for downloading
@@ -517,7 +517,7 @@ local function process_wget(config)
       end
 
       -- Extract the file name from the output path
-      local file_name = output:match("^.+/(.+)$")
+      local file_name = output:match "^.+/(.+)$"
       if not file_name then
         print_message("error", "wget → failed to extract file name from output path")
         return false
