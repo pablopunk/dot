@@ -87,7 +87,7 @@ local function print_message(message_type, message)
   elseif message_type == "info" then
     color, symbol = colors.blue, "•"
   else
-    color, symbol = colors.reset, "-"
+    color, symbol = colors.reset, ">"
   end
 
   local prefix = "  "
@@ -578,6 +578,100 @@ local function process_wget(config)
   return dependencies_changed
 end
 
+-- Compare two files and return true if they are the same, otherwise print differences
+local function files_are_equal(file1, file2)
+  local cmd = string.format('diff "%s" "%s"', file1, file2)
+  local exit_code, output = execute(cmd)
+  if exit_code == 0 then
+    return true
+  else
+    -- print_message("info", "Differences between files:\n" .. output)
+    return false
+  end
+end
+
+-- Process defaults configurations
+local function process_defaults(config, module_dir, options)
+  if not config.defaults then
+    return false
+  end
+
+  local defaults_entries = type(config.defaults) == "table" and config.defaults[1] and config.defaults or { config.defaults }
+  local defaults_changed = false
+
+  for _, defaults_entry in ipairs(defaults_entries) do
+    local plist = defaults_entry.plist
+    local app = defaults_entry.app
+
+    if plist and app then
+      -- Resolve plist path relative to the module directory
+      local resolved_plist = os.getenv("PWD") .. "/" .. module_dir:gsub("^./", "") .. "/" .. plist:gsub("^./", "")
+      local tmp_file = os.tmpname()
+
+      -- Export current preferences to a temporary file
+      local export_cmd = string.format('defaults export "%s" "%s"', app, tmp_file)
+      local exit_code, export_output = execute(export_cmd)
+      if exit_code ~= 0 then
+        print_message("error", "defaults → could not export preferences for app `" .. app .. "`: " .. export_output)
+        os.remove(tmp_file)
+        return false
+      end
+
+      -- Check if resolved_plist exists
+      if not is_file(resolved_plist) then
+        -- If resolved_plist does not exist, export current preferences to it
+        local move_cmd = string.format('mv "%s" "%s"', tmp_file, resolved_plist)
+        local exit_code, move_output = execute(move_cmd)
+        if exit_code == 0 then
+          print_message("success", "defaults → exported current preferences for `" .. app .. "` to dotfiles as `" .. resolved_plist .. "` did not exist")
+        else
+          print_message("error", "defaults → failed to export preferences: " .. move_output)
+        end
+      else
+        -- Compare the exported preferences with the module's plist
+        if not options.defaults_export and not options.defaults_import then
+          if files_are_equal(tmp_file, resolved_plist) then
+            -- print_message("info", "defaults → preferences for `" .. app .. "` are already up-to-date")
+          else
+            print_message("warning", "preferences for `" .. app .. "` differ between the app and the dotfiles. Choose which one matters using:")
+            print_message("log", "dot --defaults-export " .. module_dir .. " # choose app preferences")
+            print_message("log", "dot --defaults-import " .. module_dir .. " # choose dotfiles preferences")
+          end
+        end
+
+        -- Handle --defaults-export option
+        if options.defaults_export then
+          local move_cmd = string.format('mv "%s" "%s"', tmp_file, resolved_plist)
+          local exit_code, move_output = execute(move_cmd)
+          if exit_code == 0 then
+            print_message("success", "defaults → exported current preferences for `" .. app .. "` to dotfiles")
+          else
+            print_message("error", "defaults → failed to export preferences: " .. move_output)
+          end
+        end
+
+        -- Handle --defaults-import option
+        if options.defaults_import then
+          local import_cmd = string.format('defaults import "%s" "%s"', app, resolved_plist)
+          local exit_code, import_output = execute(import_cmd)
+          if exit_code == 0 then
+            print_message("success", "defaults → imported preferences for `" .. app .. "` from dotfiles")
+            defaults_changed = true
+          else
+            print_message("error", "defaults → could not import preferences: " .. import_output)
+          end
+        end
+      end
+
+      os.remove(tmp_file)
+    else
+      print_message("error", "defaults → missing plist or app in entry")
+    end
+  end
+
+  return defaults_changed
+end
+
 -- Process each module by installing/uninstalling dependencies and managing symlinks
 local function process_module(module_name, options)
   print(colors.bold .. colors.blue .. "[" .. module_name .. "]" .. colors.reset)
@@ -604,6 +698,10 @@ local function process_module(module_name, options)
   end
 
   if process_brew_dependencies(config, options.purge_mode) then
+    dependencies_changed = true
+  end
+
+  if process_defaults(config, module_dir, options) then
     dependencies_changed = true
   end
 
@@ -692,6 +790,10 @@ local function main()
   if options.mock_wget then
     MOCK_WGET = true
   end
+
+  -- Add options for defaults export and import
+  options.defaults_export = table_string_find(options.args, "--defaults-export")
+  options.defaults_import = table_string_find(options.args, "--defaults-import")
 
   get_installed_brew_packages()
 
