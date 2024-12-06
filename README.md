@@ -340,6 +340,6 @@ $ dot apps
   - [ ] apt
 - [ ] Unlinking dotfiles without copying. An option like `dot --unlink --no-copy` could be added.
 - [ ] `dot --purge-all` to purge all modules at once.
-- [ ] Support Mac defaults, similar to `nix-darwin`.
+- [x] Support Mac defaults, similar to `nix-darwin`.
 - [ ] Support an `os` field. i.e `os = { "mac" }` will be ignored on Linux.
 - [ ] After using a profile, like `dot profile1`, it should remember it and all calls to `dot` should be done with this profile unless another profile is explicitely invoked, like `dot profile2`, which will replace it for the next invokations.
