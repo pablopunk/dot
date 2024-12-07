@@ -917,7 +917,10 @@ local function main()
       print_message("log", "dot --remove-profile  # remove the current profile")
     end
   else
-    save_last_profile(tool_name)
+    local profile_path = os.getenv "PWD" .. "/profiles/" .. tool_name .. ".lua"
+    if is_file(profile_path) then
+      save_last_profile(tool_name)
+    end
   end
 
   if tool_name then
