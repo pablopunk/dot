@@ -17,6 +17,7 @@ local function parse_args()
   local mock_defaults = false
   local defaults_export = false
   local defaults_import = false
+  local remove_profile = false
   local args = {}
 
   local i = 1
@@ -42,6 +43,8 @@ local function parse_args()
       defaults_import = true
     elseif arg[i] == "--hooks" then
       hooks_mode = true
+    elseif arg[i] == "--remove-profile" then
+      remove_profile = true
     elseif arg[i] == "-h" then
       print [[
 Usage: dot [options] [module/profile]
@@ -57,6 +60,7 @@ Options:
   --defaults-export Save app preferences to a plist file
   --defaults-import Import app preferences from a plist file
   --hooks           Run hooks even if dependencies haven't changed
+  --remove-profile  Remove the last used profile
   -h                Display this help message
 ]]
       os.exit(0)
@@ -76,6 +80,7 @@ Options:
     defaults_export = defaults_export,
     defaults_import = defaults_import,
     hooks_mode = hooks_mode,
+    remove_profile = remove_profile,
     args = args,
   }
 end
@@ -90,6 +95,10 @@ local colors = {
   blue = "\27[34m",
   magenta = "\27[35m",
 }
+
+local function print_section(message)
+  print(colors.bold .. colors.blue .. "[" .. message .. "]" .. colors.reset)
+end
 
 -- Unified print function
 local function print_message(message_type, message)
@@ -225,7 +234,7 @@ local function get_installed_brew_packages()
         installed_brew_packages[package] = true
       end
     else
-      print(colors.red .. "Warning: Failed to get list of installed brew packages" .. colors.reset)
+      print_message("error", "Failed to get list of installed brew packages")
     end
   end
   add_packages "brew list --formula"
@@ -683,7 +692,7 @@ local function process_defaults(config, module_dir, options)
         local move_cmd = string.format('mv "%s" "%s"', tmp_file, resolved_plist)
         local exit_code, move_output = execute(move_cmd)
         if exit_code == 0 then
-          print_message("success", "defaults → exported current preferences for `" .. app .. "` to dotfiles as `" .. resolved_plist .. "` did not exist")
+          print_message("success", "defaults �� exported current preferences for `" .. app .. "` to dotfiles as `" .. resolved_plist .. "` did not exist")
         else
           print_message("error", "defaults → failed to export preferences: " .. move_output)
         end
@@ -735,7 +744,7 @@ end
 
 -- Process each module by installing/uninstalling dependencies and managing symlinks
 local function process_module(module_name, options)
-  print(colors.bold .. colors.blue .. "[" .. module_name .. "]" .. colors.reset)
+  print_section(module_name)
 
   local module_dir = "modules/" .. module_name
   local init_file = module_dir .. "/init.lua"
@@ -798,13 +807,13 @@ local function process_tool(tool_name, options)
     -- Load and process the profile
     local profile_func, load_err = loadfile(profile_path)
     if not profile_func then
-      print(colors.red .. "Error loading profile: " .. load_err .. colors.reset)
+      print_message("error", "Error loading profile: " .. load_err)
       return
     end
 
     local success, profile = pcall(profile_func)
     if not success or not profile or not profile.modules then
-      print(colors.red .. "Error executing profile or invalid profile structure" .. colors.reset)
+      print_message("error", "Error executing profile or invalid profile structure")
       return
     end
 
@@ -835,9 +844,43 @@ local function process_tool(tool_name, options)
     if is_file(module_path) then
       process_module(tool_name, options)
     else
-      print(colors.red .. "Module not found: " .. tool_name .. colors.reset)
+      print_message("error", "Module not found: " .. tool_name)
     end
   end
+end
+
+local function save_last_profile(profile_name)
+  local file_path = ".git/dot"
+  if not is_dir(".git") then
+    file_path = ".dot"
+  end
+  local file = io.open(file_path, "w")
+  if file then
+    file:write(profile_name)
+    file:close()
+  end
+end
+
+local function get_last_profile()
+  local file_path = ".git/dot"
+  if not is_dir(".git") then
+    file_path = ".dot"
+  end
+  local file = io.open(file_path, "r")
+  if file then
+    local profile_name = file:read("*a")
+    file:close()
+    return profile_name:match("^%s*(.-)%s*$") -- Trim whitespace
+  end
+  return nil
+end
+
+local function remove_last_profile()
+  local file_path = ".git/dot"
+  if not is_dir(".git") then
+    file_path = ".dot"
+  end
+  os.remove(file_path)
 end
 
 -- Main function
@@ -858,7 +901,25 @@ local function main()
   
   get_installed_brew_packages()
 
+  if options.remove_profile then
+    remove_last_profile()
+    print_message("info", "Profile removed.")
+    return
+  end
+
   local tool_name = options.args[1]
+
+  if not tool_name then
+    tool_name = get_last_profile()
+    if tool_name then
+      print_section("using profile " .. tool_name)
+      print_message("log", "dot <another-profile> # use another profile")
+      print_message("log", "dot --remove-profile  # remove the current profile")
+    end
+  else
+    save_last_profile(tool_name)
+  end
+
   if tool_name then
     process_tool(tool_name, options)
   else
