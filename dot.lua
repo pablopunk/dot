@@ -4,6 +4,7 @@ local version = "0.3.1"
 
 local MOCK_BREW = false
 local MOCK_WGET = false
+local MOCK_DEFAULTS = false
 
 -- Parse command-line arguments
 local function parse_args()
@@ -13,6 +14,9 @@ local function parse_args()
   local mock_brew = false
   local mock_wget = false
   local hooks_mode = false
+  local mock_defaults = false
+  local defaults_export = false
+  local defaults_import = false
   local args = {}
 
   local i = 1
@@ -30,6 +34,12 @@ local function parse_args()
       mock_brew = true
     elseif arg[i] == "--mock-wget" then
       mock_wget = true
+    elseif arg[i] == "--mock-defaults" then
+      mock_defaults = true
+    elseif arg[i] == "--defaults-export" then
+      defaults_export = true
+    elseif arg[i] == "--defaults-import" then
+      defaults_import = true
     elseif arg[i] == "--hooks" then
       hooks_mode = true
     elseif arg[i] == "-h" then
@@ -37,14 +47,17 @@ local function parse_args()
 Usage: dot [options] [module/profile]
 
 Options:
-  -f            Force mode: replace existing configurations, backing them up to <config>.before-dot
-  --version     Display the version of dot
-  --purge       Purge mode: uninstall dependencies and remove configurations
-  --unlink      Unlink mode: remove symlinks but keep the config files in their destination
-  --mock-brew   Mock brew operations (for testing purposes)
-  --mock-wget   Mock wget operations (for testing purposes)
-  --hooks       Run hooks even if dependencies haven't changed
-  -h            Display this help message
+  -f                Force mode: replace existing configurations, backing them up to <config>.before-dot
+  --version         Display the version of dot
+  --purge           Purge mode: uninstall dependencies and remove configurations
+  --unlink          Unlink mode: remove symlinks but keep the config files in their destination
+  --mock-brew       Mock brew operations (for testing purposes)
+  --mock-wget       Mock wget operations (for testing purposes)
+  --mock-defaults   Mock defaults operations (for testing purposes)
+  --defaults-export Save app preferences to a plist file
+  --defaults-import Import app preferences from a plist file
+  --hooks           Run hooks even if dependencies haven't changed
+  -h                Display this help message
 ]]
       os.exit(0)
     else
@@ -59,6 +72,9 @@ Options:
     unlink_mode = unlink_mode,
     mock_brew = mock_brew,
     mock_wget = mock_wget,
+    mock_defaults = mock_defaults,
+    defaults_export = defaults_export,
+    defaults_import = defaults_import,
     hooks_mode = hooks_mode,
     args = args,
   }
@@ -98,6 +114,20 @@ local installed_brew_packages = {}
 
 -- Execute an OS command and return exit code and output
 local function execute(cmd)
+  if MOCK_DEFAULTS and cmd:match("^defaults") then
+    if cmd:match("export") then
+      -- Simulate exporting preferences to a file
+      local plist_file = cmd:match('export ".-" "(.-)"')
+      local file = io.open(plist_file, "w")
+      file:write("mocked preferences")
+      file:close()
+      return 0, ""
+    elseif cmd:match("import") then
+      -- Simulate importing preferences
+      return 0, ""
+    end
+  end
+
   local handle = io.popen(cmd .. " ; echo $?")
   local result = handle:read "*a"
   handle:close()
@@ -791,10 +821,10 @@ local function main()
     MOCK_WGET = true
   end
 
-  -- Add options for defaults export and import
-  options.defaults_export = table_string_find(options.args, "--defaults-export")
-  options.defaults_import = table_string_find(options.args, "--defaults-import")
-
+  if options.mock_defaults then
+    MOCK_DEFAULTS = true
+  end
+  
   get_installed_brew_packages()
 
   local tool_name = options.args[1]
