@@ -880,7 +880,15 @@ local function remove_last_profile()
   if not is_dir(".git") then
     file_path = ".dot"
   end
-  os.remove(file_path)
+  if is_file(file_path) then
+    local success, err = os.remove(file_path)
+    if not success then
+      print_message("error", "Failed to remove profile: " .. err)
+      return false
+    end
+    return true
+  end
+  return true
 end
 
 -- Main function
