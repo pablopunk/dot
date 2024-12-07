@@ -652,7 +652,7 @@ local function process_defaults(config, module_dir, options)
     return false
   end
   
-  if not is_macos() and not config.mock_defaults then
+  if not is_macos() and not MOCK_DEFAULTS then
     return false
   end
 
