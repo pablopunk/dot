@@ -1,11 +1,11 @@
 # `dot`
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/61ff9b15-f227-4b4d-a950-57ba0353ff85#gh-light-mode-only" width="600px" />
-  <img src="https://github.com/user-attachments/assets/420e9121-426e-442a-a52a-8332b6f1989b#gh-dark-mode-only" width="600px" />
+  <img src="https://github.com/user-attachments/assets/3984a5c4-67f7-4f0e-a4dd-6ebdec323b49#gh-light-mode-only" width="600px" />
+  <img src="https://github.com/user-attachments/assets/3733f2ea-b640-4d6c-b750-b2393638fd90#gh-dark-mode-only" width="600px" />
 </p>
 
-> Manage your dotfiles and their dependencies automagically
+> Manage your apps, dotfiles, preferences, and their dependencies automagically
 
 ## Table of Contents
 
@@ -15,14 +15,13 @@
   - [Modules](#modules)
   - [Dependencies](#dependencies)
   - [Dotfiles](#dotfiles)
-  - [macOS Preferences (Defaults)](#macos-preferences-defaults)
+  - [macOS Preferences (defaults)](#macos-preferences-defaults)
   - [Profiles](#profiles)
   - [Force Mode `-f`](#force-mode--f)
   - [Unlinking Configs `--unlink`](#unlinking-configs---unlink)
   - [Purging Modules `--purge`](#purging-modules---purge)
   - [Hooks](#hooks)
 - [Summary of Command-Line Options](#summary-of-command-line-options)
-- [Wget Configuration](#wget-configuration)
 - [Examples](#examples)
 - [To do](#to-do)
 
@@ -160,7 +159,7 @@ This will create two symlinks:
 ~/Library/Application Support/Cursor/User/keybindings.json → ~/dotfiles/modules/multi-config/config/keybindings.json
 ```
 
-### macOS Preferences (Defaults)
+### macOS Preferences (defaults)
 
 You can manage macOS application preferences using the `defaults` field in your module's `init.lua`. This allows you to export and import application preferences to and from plist files. Since macOS `defaults` don't play nice with symlinks, you'll need to run `dot` every time you want to update/import the preferences. But don't worry, it's easy:
 
@@ -371,6 +370,6 @@ return {
 - [x] Support Mac defaults, similar to `nix-darwin`.
   - [x] Add tests
   - [x] Ignore on linux
-  - [ ] Add cog images to the header so it's easier to tell that it's not only about plaintext dotfiles
+  - [x] Add cog images to the header so it's easier to tell that it's not only about plaintext dotfiles
 - [ ] Support an `os` field. i.e `os = { "mac" }` will be ignored on Linux.
 - [ ] After using a profile, like `dot profile1`, it should remember it and all calls to `dot` should be done with this profile unless another profile is explicitely invoked, like `dot profile2`, which will replace it for the next invokations.
