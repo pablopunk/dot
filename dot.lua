@@ -620,9 +620,17 @@ local function files_are_equal(file1, file2)
   end
 end
 
+local function is_macos()
+  return os.getenv("OS") == "Darwin"
+end
+
+local function is_linux()
+  return os.getenv("OS") == "Linux"
+end
+
 -- Process defaults configurations
 local function process_defaults(config, module_dir, options)
-  if not config.defaults then
+  if not config.defaults or not is_macos() then
     return false
   end
 
