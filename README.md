@@ -370,7 +370,7 @@ return {
 - [ ] `dot --purge-all` to purge all modules at once.
 - [x] Support Mac defaults, similar to `nix-darwin`.
   - [x] Add tests
-  - [ ] Ignore on linux
+  - [x] Ignore on linux
   - [ ] Add cog images to the header so it's easier to tell that it's not only about plaintext dotfiles
 - [ ] Support an `os` field. i.e `os = { "mac" }` will be ignored on Linux.
 - [ ] After using a profile, like `dot profile1`, it should remember it and all calls to `dot` should be done with this profile unless another profile is explicitely invoked, like `dot profile2`, which will replace it for the next invokations.
