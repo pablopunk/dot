@@ -508,4 +508,40 @@ return {
     local test_output = pl_path.join(home_dir, "test_output")
     assert.is_true(path_exists(test_output), "Expected test_output to exist after mock wget operation")
   end)
+
+  it("should handle defaults export and import", function()
+    -- Set up 'defaults_test' module with defaults configuration
+    setup_module(
+      "defaults_test",
+      [[
+return {
+  defaults = {
+    {
+      plist = "./defaults/SwiftShift.plist",
+      app = "com.pablopunk.SwiftShift",
+    }
+  }
+}
+]]
+    )
+
+    -- Create module directory
+    pl_dir.makepath(pl_path.join(modules_dir, "defaults_test", "defaults"))
+
+    -- Run dot.lua with --defaults-export and --mock-defaults options
+    assert.is_true(run_dot "defaults_test --defaults-export --mock-defaults")
+
+    -- Check if the plist file was created
+    local plist_path = pl_path.join(modules_dir, "defaults_test", "defaults", "SwiftShift.plist")
+    assert.is_true(pl_path.isfile(plist_path), "Expected plist file to be created")
+
+    -- Verify the content of the plist file
+    local content = pl_file.read(plist_path)
+    assert.are.equal("mocked preferences", content)
+
+    -- Run dot.lua with --defaults-import and --mock-defaults options
+    assert.is_true(run_dot "defaults_test --defaults-import --mock-defaults")
+    -- Check if the import was successful (mocked, so no actual change)
+    -- This is mainly to ensure no errors occur during the import process
+  end)
 end)

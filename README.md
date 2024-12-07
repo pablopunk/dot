@@ -8,17 +8,21 @@
 > Manage your dotfiles and their dependencies automagically
 
 ## Table of Contents
+
 - [Installation](#installation)
 - [Quick Start](#quick-start)
 - [Usage](#usage)
-  - [`init.lua`](#initlua)
-  - [Recursive](#recursive)
+  - [Modules](#modules)
+  - [Dependencies](#dependencies)
+  - [Dotfiles](#dotfiles)
+  - [macOS Preferences (Defaults)](#macos-preferences-defaults)
   - [Profiles](#profiles)
   - [Force Mode `-f`](#force-mode--f)
   - [Unlinking Configs `--unlink`](#unlinking-configs---unlink)
   - [Purging Modules `--purge`](#purging-modules---purge)
   - [Hooks](#hooks)
-  - [Summary of Command-Line Options](#summary-of-command-line-options)
+- [Summary of Command-Line Options](#summary-of-command-line-options)
+- [Wget Configuration](#wget-configuration)
 - [Examples](#examples)
 - [To do](#to-do)
 
@@ -60,9 +64,11 @@ $ dot work     # Only process the 'work' profile
 
 ## Usage
 
-Each module under the `modules/` folder needs to have at least an `init.lua`. If not, it will be ignored.
+### Modules
 
-### `init.lua`
+Each module under the `modules/` folder needs to have at least an `init.lua`. If not, it will be ignored. **Modules can be recursive**, meaning you can have nested directories within the `modules/` folder, and each can contain its own `init.lua` to define configurations and dependencies.
+
+#### `init.lua`
 
 Example for neovim:
 
@@ -79,6 +85,48 @@ return {
   }
 }
 ```
+
+### Dependencies
+
+#### Brew
+
+As you can see, you can declare dependencies as [Homebrew](https://brew.sh) packages, which makes it possible to also use `dot` to install GUI apps (Homebrew casks). You can create a module without any config to use it as an installer for your apps:
+
+```lua
+-- modules/apps/init.lua
+return {
+  brew = { "whatsapp", "spotify", "slack", "vscode" }
+}
+```
+
+#### Wget
+
+`dot` now supports downloading files using `wget`. This can be useful for fetching binaries or other resources that are not available through Homebrew. You can specify a `wget` configuration in your module's `init.lua` file.
+
+Example:
+
+```lua
+-- modules/apps/init.lua
+return {
+  wget = {
+    {
+      url = "https://app1piece.com/1Piece-4.2.1.zip",
+      output = "/Applications/1Piece.app",
+      zip = true,
+    },
+    {
+      url = "https://fakedomain.com/fake.app",
+      output = "/Applications/Fake.app",
+    },
+  },
+}
+```
+
+> [!NOTE]
+> When using `zip = true`, make sure the output file name matches the unzipped file name. In the example above, the output is `/Applications/1Piece.app` because the zip file contains a file named `1Piece.app`.
+
+
+### Dotfiles
 
 The config will be linked to the home folder with a soft link. In this case:
 
@@ -112,32 +160,43 @@ This will create two symlinks:
 ~/Library/Application Support/Cursor/User/keybindings.json → ~/dotfiles/modules/multi-config/config/keybindings.json
 ```
 
-As you can see, you can declare dependencies as [Homebrew](https://brew.sh) packages, which makes it possible to also use `dot` to install GUI apps (Homebrew casks). You can create a module without any config to use it as an installer for your apps:
+### macOS Preferences (Defaults)
+
+You can manage macOS application preferences using the `defaults` field in your module's `init.lua`. This allows you to export and import application preferences to and from plist files. Since macOS `defaults` don't play nice with symlinks, you'll need to run `dot` every time you want to update/import the preferences. But don't worry, it's easy:
+
+Example:
 
 ```lua
--- modules/apps/init.lua
+-- modules/defaults_test/init.lua
 return {
-  brew = { "whatsapp", "spotify", "slack", "vscode" }
+  defaults = {
+    {
+      plist = "./defaults/SwiftShift.plist",
+      app = "com.pablopunk.Swift-Shift", -- Info on how to get this below
+    }
+  }
 }
 ```
 
-### Recursive
+> [!NOTE]
+> To find the app id, you can run `defaults domains | tr ', ' '\n' | grep -i <app-name>`.
 
-In the example above, let's say we want to separate our apps into "work" and "personal". We could either create 2 modules on the root folder or create a nested folder for each:
+The first time you run this without any files, it will export the current preferences to the plist file.
 
-```lua
--- modules/apps/work/init.lua
-return {
-  brew = { "slack", "vscode" }
-}
+Whenever you want them to be exported again, run:
+
+```bash
+$ dot defaults_test --defaults-export
 ```
 
-```lua
--- modules/apps/personal/init.lua
-return {
-  brew = { "whatsapp", "spotify" }
-}
+To import the preferences from the saved file, run:
+
+```bash
+$ dot defaults_test --defaults-import
 ```
+
+By default, `dot` will only alert you that your saved preferences differ from the current ones.
+It's up to you to choose which one you want to keep.
 
 ### Profiles
 
@@ -249,7 +308,7 @@ return {
 }
 ```
 
-### Summary of Command-Line Options
+## Summary of Command-Line Options
 
 - **Install Modules**: Install dependencies and link configurations.
 
@@ -278,47 +337,16 @@ return {
   $ dot --purge neovim
   ```
 
-### Wget Configuration
+- **Defaults Export/Import**: Manage macOS application preferences.
 
-It now supports downloading files using `wget`. This can be useful for fetching binaries or other resources that are not available through Homebrew. You can specify a `wget` configuration in your module's `init.lua` file.
-
-Example:
-
-```lua
--- modules/apps/init.lua
-return {
-  wget = {
-    {
-      url = "https://app1piece.com/1Piece-4.2.1.zip",
-      output = "/Applications/1Piece.app",
-      zip = true,
-    },
-    {
-      url = "https://fakedomain.com/fake.app",
-      output = "/Applications/Fake.app",
-    },
-  },
-}
-```
-
-This will:
-
-- Download the file from the specified URL.
-- Unzip it if `zip = true`.
-- Install it to the specified output path.
-
-Just use it like any other module:
-
-```bash
-$ dot apps
-```
-
-> [!NOTE]
-> When using `zip = true`, make sure the output file name matches the unzipped file name. In the example above, the output is `/Applications/1Piece.app` because the zip file contains a file named `1Piece.app`.
+  ```bash
+  $ dot defaults_test --defaults-export  # Export app preferences to plist
+  $ dot defaults_test --defaults-import  # Import app preferences from plist
+  ```
 
 ## Examples
 
-- [pablopunk/dotfiles](https://github.com/pablopunk/dotfiles): my own dotfiles.
+- [pablopunk/dotfiles](https://github.com/pablopunk/dotfiles): my own dotfiles, using `dot` to manage them.
 
 ## To do
 
@@ -340,6 +368,9 @@ $ dot apps
   - [ ] apt
 - [ ] Unlinking dotfiles without copying. An option like `dot --unlink --no-copy` could be added.
 - [ ] `dot --purge-all` to purge all modules at once.
-- [ ] Support Mac defaults, similar to `nix-darwin`.
+- [x] Support Mac defaults, similar to `nix-darwin`.
+  - [x] Add tests
+  - [x] Ignore on linux
+  - [ ] Add cog images to the header so it's easier to tell that it's not only about plaintext dotfiles
 - [ ] Support an `os` field. i.e `os = { "mac" }` will be ignored on Linux.
 - [ ] After using a profile, like `dot profile1`, it should remember it and all calls to `dot` should be done with this profile unless another profile is explicitely invoked, like `dot profile2`, which will replace it for the next invokations.

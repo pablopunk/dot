@@ -4,6 +4,7 @@ local version = "0.3.1"
 
 local MOCK_BREW = false
 local MOCK_WGET = false
+local MOCK_DEFAULTS = false
 
 -- Parse command-line arguments
 local function parse_args()
@@ -13,6 +14,9 @@ local function parse_args()
   local mock_brew = false
   local mock_wget = false
   local hooks_mode = false
+  local mock_defaults = false
+  local defaults_export = false
+  local defaults_import = false
   local args = {}
 
   local i = 1
@@ -30,6 +34,12 @@ local function parse_args()
       mock_brew = true
     elseif arg[i] == "--mock-wget" then
       mock_wget = true
+    elseif arg[i] == "--mock-defaults" then
+      mock_defaults = true
+    elseif arg[i] == "--defaults-export" then
+      defaults_export = true
+    elseif arg[i] == "--defaults-import" then
+      defaults_import = true
     elseif arg[i] == "--hooks" then
       hooks_mode = true
     elseif arg[i] == "-h" then
@@ -37,14 +47,17 @@ local function parse_args()
 Usage: dot [options] [module/profile]
 
 Options:
-  -f            Force mode: replace existing configurations, backing them up to <config>.before-dot
-  --version     Display the version of dot
-  --purge       Purge mode: uninstall dependencies and remove configurations
-  --unlink      Unlink mode: remove symlinks but keep the config files in their destination
-  --mock-brew   Mock brew operations (for testing purposes)
-  --mock-wget   Mock wget operations (for testing purposes)
-  --hooks       Run hooks even if dependencies haven't changed
-  -h            Display this help message
+  -f                Force mode: replace existing configurations, backing them up to <config>.before-dot
+  --version         Display the version of dot
+  --purge           Purge mode: uninstall dependencies and remove configurations
+  --unlink          Unlink mode: remove symlinks but keep the config files in their destination
+  --mock-brew       Mock brew operations (for testing purposes)
+  --mock-wget       Mock wget operations (for testing purposes)
+  --mock-defaults   Mock defaults operations (for testing purposes)
+  --defaults-export Save app preferences to a plist file
+  --defaults-import Import app preferences from a plist file
+  --hooks           Run hooks even if dependencies haven't changed
+  -h                Display this help message
 ]]
       os.exit(0)
     else
@@ -59,6 +72,9 @@ Options:
     unlink_mode = unlink_mode,
     mock_brew = mock_brew,
     mock_wget = mock_wget,
+    mock_defaults = mock_defaults,
+    defaults_export = defaults_export,
+    defaults_import = defaults_import,
     hooks_mode = hooks_mode,
     args = args,
   }
@@ -87,7 +103,7 @@ local function print_message(message_type, message)
   elseif message_type == "info" then
     color, symbol = colors.blue, "•"
   else
-    color, symbol = colors.reset, "-"
+    color, symbol = colors.reset, ">"
   end
 
   local prefix = "  "
@@ -98,6 +114,20 @@ local installed_brew_packages = {}
 
 -- Execute an OS command and return exit code and output
 local function execute(cmd)
+  if MOCK_DEFAULTS and cmd:match("^defaults") then
+    if cmd:match("export") then
+      -- Simulate exporting preferences to a file
+      local plist_file = cmd:match('export ".-" "(.-)"')
+      local file = io.open(plist_file, "w")
+      file:write("mocked preferences")
+      file:close()
+      return 0, ""
+    elseif cmd:match("import") then
+      -- Simulate importing preferences
+      return 0, ""
+    end
+  end
+
   local handle = io.popen(cmd .. " ; echo $?")
   local result = handle:read "*a"
   handle:close()
@@ -578,6 +608,130 @@ local function process_wget(config)
   return dependencies_changed
 end
 
+-- Compare two files and return true if they are the same, otherwise print differences
+local function files_are_equal(file1, file2)
+  local cmd = string.format('diff "%s" "%s"', file1, file2)
+  local exit_code, output = execute(cmd)
+  if exit_code == 0 then
+    return true
+  else
+    -- print_message("info", "Differences between files:\n" .. output)
+    return false
+  end
+end
+
+function os_name()
+  local osname
+  -- ask LuaJIT first
+  if jit then
+    return jit.os
+  end
+
+  -- Unix, Linux variants
+  local fh, err = assert(io.popen("uname -o 2>/dev/null", "r"))
+  if fh then
+    osname = fh:read()
+  end
+
+  return osname or "Windows"
+end
+
+local OS_NAME = os_name()
+
+local function is_macos()
+  return OS_NAME == "Darwin"
+end
+
+local function is_linux()
+  return OS_NAME == "Linux"
+end
+
+-- Process defaults configurations
+local function process_defaults(config, module_dir, options)
+  if not config.defaults then
+    return false
+  end
+  
+  if not is_macos() and not MOCK_DEFAULTS then
+    return false
+  end
+
+  local defaults_entries = type(config.defaults) == "table" and config.defaults[1] and config.defaults or { config.defaults }
+  local defaults_changed = false
+
+  for _, defaults_entry in ipairs(defaults_entries) do
+    local plist = defaults_entry.plist
+    local app = defaults_entry.app
+
+    if plist and app then
+      -- Resolve plist path relative to the module directory
+      local resolved_plist = os.getenv("PWD") .. "/" .. module_dir:gsub("^./", "") .. "/" .. plist:gsub("^./", "")
+      local tmp_file = os.tmpname()
+
+      -- Export current preferences to a temporary file
+      local export_cmd = string.format('defaults export "%s" "%s"', app, tmp_file)
+      local exit_code, export_output = execute(export_cmd)
+      if exit_code ~= 0 then
+        print_message("error", "defaults → could not export preferences for app `" .. app .. "`: " .. export_output)
+        os.remove(tmp_file)
+        return false
+      end
+
+      -- Check if resolved_plist exists
+      if not is_file(resolved_plist) then
+        -- If resolved_plist does not exist, export current preferences to it
+        local move_cmd = string.format('mv "%s" "%s"', tmp_file, resolved_plist)
+        local exit_code, move_output = execute(move_cmd)
+        if exit_code == 0 then
+          print_message("success", "defaults → exported current preferences for `" .. app .. "` to dotfiles as `" .. resolved_plist .. "` did not exist")
+        else
+          print_message("error", "defaults → failed to export preferences: " .. move_output)
+        end
+      else
+        -- Compare the exported preferences with the module's plist
+        if not options.defaults_export and not options.defaults_import then
+          if files_are_equal(tmp_file, resolved_plist) then
+            -- print_message("info", "defaults → preferences for `" .. app .. "` are already up-to-date")
+          else
+            print_message("warning", "preferences for `" .. app .. "` differ between the app and the dotfiles. Choose which one matters using:")
+            print_message("log", "dot --defaults-export " .. module_dir .. " # choose app preferences")
+            print_message("log", "dot --defaults-import " .. module_dir .. " # choose dotfiles preferences")
+          end
+        end
+
+        -- Handle --defaults-export option
+        if options.defaults_export then
+          local move_cmd = string.format('mv "%s" "%s"', tmp_file, resolved_plist)
+          local exit_code, move_output = execute(move_cmd)
+          if exit_code == 0 then
+            print_message("success", "defaults → exported current preferences for `" .. app .. "` to dotfiles")
+          else
+            print_message("error", "defaults → failed to export preferences: " .. move_output)
+          end
+        end
+
+        -- Handle --defaults-import option
+        if options.defaults_import then
+          local import_cmd = string.format('defaults import "%s" "%s"', app, resolved_plist)
+          local exit_code, import_output = execute(import_cmd)
+          if exit_code == 0 then
+            print_message("success", "defaults → imported preferences for `" .. app .. "` from dotfiles")
+            defaults_changed = true
+          else
+            print_message("error", "defaults → could not import preferences: " .. import_output)
+          end
+        end
+      end
+
+      os.remove(tmp_file)
+    else
+      print_message("error", "defaults → missing plist or app in entry")
+    end
+  end
+
+  return defaults_changed
+end
+
 -- Process each module by installing/uninstalling dependencies and managing symlinks
 local function process_module(module_name, options)
   print(colors.bold .. colors.blue .. "[" .. module_name .. "]" .. colors.reset)
@@ -604,6 +758,10 @@ local function process_module(module_name, options)
   end
 
   if process_brew_dependencies(config, options.purge_mode) then
+    dependencies_changed = true
+  end
+
+  if process_defaults(config, module_dir, options) then
     dependencies_changed = true
   end
 
@@ -693,6 +851,10 @@ local function main()
     MOCK_WGET = true
   end
 
+  if options.mock_defaults then
+    MOCK_DEFAULTS = true
+  end
+  
   get_installed_brew_packages()
 
   local tool_name = options.args[1]
