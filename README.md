@@ -180,6 +180,10 @@ return {
 > [!NOTE]
 > To find the app id, you can run `defaults domains | tr ', ' '\n' | grep -i <app-name>`.
 
+
+https://github.com/user-attachments/assets/173d882c-3fb5-4fe1-bce4-4ac8fa6be7f0
+
+
 The first time you run this without any files, it will export the current preferences to the plist file.
 
 Whenever you want them to be exported again, run:
