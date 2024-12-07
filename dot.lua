@@ -693,9 +693,10 @@ local function process_defaults(config, module_dir, options)
           if files_are_equal(tmp_file, resolved_plist) then
             -- print_message("info", "defaults → preferences for `" .. app .. "` are already up-to-date")
           else
+            local module_dir_relative = module_dir:gsub("^modules/", "")
             print_message("warning", "preferences for `" .. app .. "` differ between the app and the dotfiles. Choose which one matters using:")
-            print_message("log", "dot --defaults-export " .. module_dir .. " # choose app preferences")
-            print_message("log", "dot --defaults-import " .. module_dir .. " # choose dotfiles preferences")
+            print_message("log", "dot --defaults-export " .. module_dir_relative .. " # choose app preferences")
+            print_message("log", "dot --defaults-import " .. module_dir_relative .. " # choose dotfiles preferences")
           end
         end
 
