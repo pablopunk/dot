@@ -23,8 +23,8 @@ local function parse_args()
   while i <= #arg do
     if arg[i] == "-f" then
       force_mode = true
-    elseif arg[i] == "--version" then
-      print("nos version " .. version)
+    elseif arg[i] == "--version" or arg[i] == "-v" then
+      print("dot version " .. version)
       os.exit(0)
     elseif arg[i] == "--purge" then
       purge_mode = true
