@@ -411,6 +411,8 @@ return {
   },
   post_install = "touch %s/.hooks_post_install_ran",
   post_purge = "touch %s/.hooks_post_purge_ran",
+  post_link = "touch %s/.hooks_post_link_ran",
+  post_unlink = "touch %s/.hooks_post_unlink_ran",
 }
 ]],
         home_dir,
@@ -430,6 +432,11 @@ return {
     print("Checking for hook_install at:", hook_install)
     assert.is_true(path_exists(hook_install), "Post-install hook did not run")
 
+    -- Check if post_link hook ran
+    local hook_link = pl_path.join(home_dir, ".hooks_post_link_ran")
+    print("Checking for hook_link at:", hook_link)
+    assert.is_true(path_exists(hook_link), "Post-link hook did not run")
+
     -- Run dot.lua with --purge option for 'dummy_app'
     assert.is_true(run_dot "--purge dummy_app")
 
@@ -437,6 +444,11 @@ return {
     local hook_purge = pl_path.join(home_dir, ".hooks_post_purge_ran")
     print("Checking for hook_purge at:", hook_purge)
     assert.is_true(path_exists(hook_purge), "Post-purge hook did not run")
+
+    -- Check if post_unlink hook ran
+    local hook_unlink = pl_path.join(home_dir, ".hooks_post_unlink_ran")
+    print("Checking for hook_unlink at:", hook_unlink)
+    assert.is_true(path_exists(hook_unlink), "Post-unlink hook did not run")
   end)
 
   it("should handle multiple configs in a module", function()

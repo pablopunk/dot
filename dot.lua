@@ -429,11 +429,12 @@ end
 
 local function handle_config_symlink(config, module_dir, options)
   if not config.config then
-    return
+    return false
   end
 
   local configs = type(config.config) == "table" and config.config[1] and config.config or { config.config }
   local all_configs_linked = true
+  local config_changed = false
 
   for _, cfg in ipairs(configs) do
     local source = os.getenv "PWD" .. "/" .. module_dir:gsub("^./", "") .. "/" .. cfg.source:gsub("^./", "")
@@ -446,6 +447,7 @@ local function handle_config_symlink(config, module_dir, options)
         local success, err = delete_path(output)
         if success then
           print_message("success", "config → removed " .. output)
+          config_changed = true
         else
           print_message("error", "config → " .. err)
         end
@@ -463,13 +465,14 @@ local function handle_config_symlink(config, module_dir, options)
           local success, err = ensure_parent_directory(output)
           if not success then
             print_message("error", "config → " .. err)
-            return
+            return false
           end
 
           -- Copy source to output
           local success, err = copy_path(source, output)
           if success then
             print_message("success", "config → copied " .. source .. " to " .. output)
+            config_changed = true
           else
             print_message("error", "config → " .. err)
           end
@@ -492,11 +495,11 @@ local function handle_config_symlink(config, module_dir, options)
               print_message("warning", "config → existing config backed up to " .. result)
             else
               print_message("error", "config → " .. result)
-              return
+              return false
             end
           else
             print_message("error", "config → file already exists at " .. output .. ". Use -f to force.")
-            return
+            return false
           end
         end
 
@@ -504,7 +507,7 @@ local function handle_config_symlink(config, module_dir, options)
         local success, err = ensure_parent_directory(output)
         if not success then
           print_message("error", "config → " .. err)
-          return
+          return false
         end
 
         local cmd = string.format('ln -sf "%s" "%s"', source, output)
@@ -513,6 +516,7 @@ local function handle_config_symlink(config, module_dir, options)
           print_message("error", "config → failed to create symlink: " .. error_output)
         else
           print_message("success", "config → symlink created for " .. output)
+          config_changed = true
         end
       end
     end
@@ -525,6 +529,8 @@ local function handle_config_symlink(config, module_dir, options)
   elseif all_configs_linked and options.unlink_mode then
     print_message("success", "all configurations are unlinked")
   end
+
+  return config_changed
 end
 
 -- Process wget dependencies
@@ -775,7 +781,7 @@ local function process_module(module_name, options)
     dependencies_changed = true
   end
 
-  handle_config_symlink(config, module_dir, options)
+  local config_changed = handle_config_symlink(config, module_dir, options)
 
   -- Run post_install or post_purge hooks
   if dependencies_changed or options.hooks_mode then
@@ -783,6 +789,15 @@ local function process_module(module_name, options)
       run_hook(config.post_purge, "post-purge")
     elseif not options.purge_mode and config.post_install then
       run_hook(config.post_install, "post-install")
+    end
+  end
+
+  -- Run post_link or post_unlink hooks
+  if config_changed or options.hooks_mode then
+    if options.purge_mode and config.post_unlink then
+      run_hook(config.post_unlink, "post-unlink")
+    elseif not options.purge_mode and config.post_link then
+      run_hook(config.post_link, "post-link")
     end
   end
 
