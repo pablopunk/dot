@@ -620,17 +620,39 @@ local function files_are_equal(file1, file2)
   end
 end
 
+function os_name()
+  local osname
+  -- ask LuaJIT first
+  if jit then
+    return jit.os
+  end
+
+  -- Unix, Linux variants
+  local fh, err = assert(io.popen("uname -o 2>/dev/null", "r"))
+  if fh then
+    osname = fh:read()
+  end
+
+  return osname or "Windows"
+end
+
+local OS_NAME = os_name()
+
 local function is_macos()
-  return os.getenv("OS") == "Darwin"
+  return OS_NAME == "Darwin"
 end
 
 local function is_linux()
-  return os.getenv("OS") == "Linux"
+  return OS_NAME == "Linux"
 end
 
 -- Process defaults configurations
 local function process_defaults(config, module_dir, options)
-  if not config.defaults or not is_macos() then
+  if not config.defaults then
+    return false
+  end
+  
+  if not is_macos() and not config.mock_defaults then
     return false
   end
 
