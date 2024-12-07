@@ -245,6 +245,24 @@ return {
 > [!NOTE]
 > If your profile is named just like a module (e.g., `profiles/neovim` and `modules/neovim`), running `dot neovim` will default to the profile.
 
+#### Profiles are persistent
+
+When you run `dot <profile-name>`, it will remember it, so next time you only need to run `dot` to use the same profile.
+
+```bash
+$ dot work
+...installing work profile...
+
+$ dot
+...installing work profile again...
+```
+
+To get rid of the last profile used, select any other profile or run:
+
+```bash
+$ dot --remove-profile
+```
+
 ### Force Mode `-f`
 
 By default, `dot` won't touch your existing dotfiles if the destination already exists. If you still want to replace them, you can use the `-f` flag:
@@ -376,4 +394,4 @@ return {
   - [x] Ignore on linux
   - [x] Add cog images to the header so it's easier to tell that it's not only about plaintext dotfiles
 - [ ] Support an `os` field. i.e `os = { "mac" }` will be ignored on Linux.
-- [ ] After using a profile, like `dot profile1`, it should remember it and all calls to `dot` should be done with this profile unless another profile is explicitely invoked, like `dot profile2`, which will replace it for the next invokations.
+- [x] After using a profile, like `dot profile1`, it should remember it and all calls to `dot` should be done with this profile unless another profile is explicitely invoked, like `dot profile2`, which will replace it for the next invokations.

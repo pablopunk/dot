@@ -544,4 +544,46 @@ return {
     -- Check if the import was successful (mocked, so no actual change)
     -- This is mainly to ensure no errors occur during the import process
   end)
+
+  it("should save the last used profile", function()
+    -- Set up 'neovim' module
+    setup_module(
+      "neovim",
+      [[
+return {
+  brew = { "neovim" },
+  config = {
+    source = "./config",
+    output = "~/.config/nvim",
+  }
+}
+]]
+    )
+
+    -- Create config directories and files for 'neovim'
+    pl_dir.makepath(pl_path.join(modules_dir, "neovim", "config"))
+    pl_file.write(pl_path.join(modules_dir, "neovim", "config", "init.vim"), "set number")
+
+    -- Set up a dummy profile
+    setup_profile(
+      "test_profile",
+      [[
+return {
+  modules = {
+    "neovim"
+  }
+}
+]]
+    )
+
+    -- Run dot.lua with the 'test_profile' profile
+    assert.is_true(run_dot "test_profile")
+
+    -- Check if the .dot file contains the correct profile name
+    local dot_file_path = pl_path.join(dotfiles_dir, ".dot")
+    assert.is_true(pl_path.isfile(dot_file_path), ".dot file not found")
+
+    local content = pl_file.read(dot_file_path)
+    assert.are.equal("test_profile", content:match("^%s*(.-)%s*$"), "Profile name in .dot file is incorrect")
+  end)
 end)
