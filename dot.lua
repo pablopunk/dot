@@ -123,15 +123,15 @@ local installed_brew_packages = {}
 
 -- Execute an OS command and return exit code and output
 local function execute(cmd)
-  if MOCK_DEFAULTS and cmd:match("^defaults") then
-    if cmd:match("export") then
+  if MOCK_DEFAULTS and cmd:match "^defaults" then
+    if cmd:match "export" then
       -- Simulate exporting preferences to a file
-      local plist_file = cmd:match('export ".-" "(.-)"')
+      local plist_file = cmd:match 'export ".-" "(.-)"'
       local file = io.open(plist_file, "w")
-      file:write("mocked preferences")
+      file:write "mocked preferences"
       file:close()
       return 0, ""
-    elseif cmd:match("import") then
+    elseif cmd:match "import" then
       -- Simulate importing preferences
       return 0, ""
     end
@@ -660,12 +660,13 @@ local function process_defaults(config, module_dir, options)
   if not config.defaults then
     return false
   end
-  
+
   if not is_macos() and not MOCK_DEFAULTS then
     return false
   end
 
-  local defaults_entries = type(config.defaults) == "table" and config.defaults[1] and config.defaults or { config.defaults }
+  local defaults_entries = type(config.defaults) == "table" and config.defaults[1] and config.defaults
+    or { config.defaults }
   local defaults_changed = false
 
   for _, defaults_entry in ipairs(defaults_entries) do
@@ -674,7 +675,7 @@ local function process_defaults(config, module_dir, options)
 
     if plist and app then
       -- Resolve plist path relative to the module directory
-      local resolved_plist = os.getenv("PWD") .. "/" .. module_dir:gsub("^./", "") .. "/" .. plist:gsub("^./", "")
+      local resolved_plist = os.getenv "PWD" .. "/" .. module_dir:gsub("^./", "") .. "/" .. plist:gsub("^./", "")
       local tmp_file = os.tmpname()
 
       -- Export current preferences to a temporary file
@@ -692,7 +693,10 @@ local function process_defaults(config, module_dir, options)
         local move_cmd = string.format('mv "%s" "%s"', tmp_file, resolved_plist)
         local exit_code, move_output = execute(move_cmd)
         if exit_code == 0 then
-          print_message("success", "defaults �� exported current preferences for `" .. app .. "` to dotfiles as `" .. resolved_plist .. "` did not exist")
+          print_message(
+            "success",
+            "exported current preferences for `" .. app .. "` to dotfiles as `" .. resolved_plist .. "` did not exist"
+          )
         else
           print_message("error", "defaults → failed to export preferences: " .. move_output)
         end
@@ -703,7 +707,10 @@ local function process_defaults(config, module_dir, options)
             -- print_message("info", "defaults → preferences for `" .. app .. "` are already up-to-date")
           else
             local module_dir_relative = module_dir:gsub("^modules/", "")
-            print_message("warning", "preferences for `" .. app .. "` differ between the app and the dotfiles. Choose which one matters using:")
+            print_message(
+              "warning",
+              "preferences for `" .. app .. "` differ between the app and the dotfiles. Choose which one matters using:"
+            )
             print_message("log", "dot --defaults-export " .. module_dir_relative .. " # choose app preferences")
             print_message("log", "dot --defaults-import " .. module_dir_relative .. " # choose dotfiles preferences")
           end
@@ -851,7 +858,7 @@ end
 
 local function save_last_profile(profile_name)
   local file_path = ".git/dot"
-  if not is_dir(".git") then
+  if not is_dir ".git" then
     file_path = ".dot"
   end
   local file = io.open(file_path, "w")
@@ -863,21 +870,21 @@ end
 
 local function get_last_profile()
   local file_path = ".git/dot"
-  if not is_dir(".git") then
+  if not is_dir ".git" then
     file_path = ".dot"
   end
   local file = io.open(file_path, "r")
   if file then
-    local profile_name = file:read("*a")
+    local profile_name = file:read "*a"
     file:close()
-    return profile_name:match("^%s*(.-)%s*$") -- Trim whitespace
+    return profile_name:match "^%s*(.-)%s*$" -- Trim whitespace
   end
   return nil
 end
 
 local function remove_last_profile()
   local file_path = ".git/dot"
-  if not is_dir(".git") then
+  if not is_dir ".git" then
     file_path = ".dot"
   end
   if is_file(file_path) then
@@ -906,7 +913,7 @@ local function main()
   if options.mock_defaults then
     MOCK_DEFAULTS = true
   end
-  
+
   get_installed_brew_packages()
 
   if options.remove_profile then
