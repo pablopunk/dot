@@ -94,6 +94,7 @@ local colors = {
   red = "\27[31m",
   blue = "\27[34m",
   magenta = "\27[35m",
+  cyan = "\27[36m",
 }
 
 local function print_section(message)
@@ -122,16 +123,85 @@ local installed_brew_packages = {}
 
 -- Execute an OS command and return exit code and output
 local function execute(cmd)
-  if MOCK_DEFAULTS and cmd:match "^defaults" then
-    if cmd:match "export" then
-      -- Simulate exporting preferences to a file
-      local plist_file = cmd:match 'export ".-" "(.-)"'
-      local file = io.open(plist_file, "w")
-      file:write "mocked preferences"
-      file:close()
+  -- Special handling for macOS-specific commands when mocking is enabled
+  if MOCK_DEFAULTS then
+    -- Handle defaults export command
+    if cmd:match "^defaults export" then
+      local app = cmd:match 'defaults export "([^"]+)"'
+      local output_file = cmd:match 'defaults export "[^"]+" "([^"]+)"'
+
+      -- Also match plutil command pattern that often follows defaults export
+      if not output_file and cmd:match "plutil" then
+        output_file = cmd:match 'plutil .-o "([^"]+)"'
+      end
+
+      if output_file then
+        -- Ensure the parent directory exists
+        local parent_dir = output_file:match "(.+)/[^/]*$"
+        if parent_dir then
+          -- Create parent directory directly instead of calling ensure_parent_directory
+          os.execute('mkdir -p "' .. parent_dir .. '"')
+        end
+
+        local file = io.open(output_file, "w")
+        if file then
+          if output_file:match "%.xml$" or cmd:match "xml1" then
+            -- XML format
+            file:write [[<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>MockedKey</key>
+  <string>mocked preferences</string>
+</dict>
+</plist>]]
+          else
+            -- Binary or other format
+            file:write "mocked preferences"
+          end
+          file:close()
+          return 0, ""
+        end
+      end
       return 0, ""
-    elseif cmd:match "import" then
-      -- Simulate importing preferences
+    end
+
+    -- Handle defaults import command
+    if cmd:match "^defaults import" then
+      return 0, ""
+    end
+
+    -- Handle plutil command on its own
+    if cmd:match "^plutil" then
+      -- If there's an output file specified
+      local output_file = cmd:match '-o "([^"]+)"' or cmd:match "-o ([^ ]+)"
+      if output_file and output_file ~= "-" then
+        -- Ensure the parent directory exists
+        local parent_dir = output_file:match "(.+)/[^/]*$"
+        if parent_dir then
+          -- Create parent directory directly instead of calling ensure_parent_directory
+          os.execute('mkdir -p "' .. parent_dir .. '"')
+        end
+
+        local file = io.open(output_file, "w")
+        if file then
+          if output_file:match "%.xml$" or cmd:match "xml1" then
+            -- XML format
+            file:write [[<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>MockedKey</key>
+  <string>mocked preferences</string>
+</dict>
+</plist>]]
+          else
+            -- Binary format
+            file:write "mocked binary plist"
+          end
+          file:close()
+        end
+      end
       return 0, ""
     end
   end
@@ -618,13 +688,13 @@ end
 
 -- Compare two files and return true if they are the same, otherwise print differences
 local function files_are_equal(file1, file2)
-  local cmd = string.format('diff "%s" "%s"', file1, file2)
+  -- Use diff with unified format (-U1) to show 1 line of context before and after each change
+  local cmd = string.format('diff -U1 "%s" "%s"', file1, file2)
   local exit_code, output = execute(cmd)
   if exit_code == 0 then
     return true
   else
-    -- print_message("info", "Differences between files:\n" .. output)
-    return false
+    return false, output
   end
 end
 
@@ -636,9 +706,10 @@ function os_name()
   end
 
   -- Unix, Linux variants
-  local fh, err = assert(io.popen("uname -o 2>/dev/null", "r"))
+  local fh, err = assert(io.popen("uname -o 2>/dev/null || uname -s", "r"))
   if fh then
     osname = fh:read()
+    fh:close()
   end
 
   return osname or "Windows"
@@ -654,12 +725,76 @@ local function is_linux()
   return OS_NAME == "Linux" or OS_NAME == "GNU/Linux"
 end
 
+-- Format and display differences between plist files
+local function format_plist_diff(diff_output)
+  if not diff_output then
+    return
+  end
+
+  local indent = "  "
+  print ""
+
+  -- Use a simpler approach by directly parsing the formatted diff lines
+  local lines = {}
+  for line in diff_output:gmatch "[^\r\n]+" do
+    table.insert(lines, line)
+  end
+
+  local settings_found = 0
+
+  for i = 1, #lines - 2 do
+    -- Look for patterns that indicate a key and changed values
+    if lines[i]:match "<key>([^<]+)</key>" and lines[i + 1]:match "^%-" and lines[i + 2]:match "^%+" then
+
+      local key = lines[i]:match "<key>([^<]+)</key>"
+      local app_line = lines[i + 1]
+      local saved_line = lines[i + 2]
+
+      -- Extract values
+      local app_value = app_line:gsub("^%- +", "")
+      local saved_value = saved_line:gsub("^%+ +", "")
+
+      -- Extract content from XML tags
+      local app_content = app_value:match "<[^>]+>([^<]*)</" or app_value:match "<([^/]+)/>" or app_value
+      local saved_content = saved_value:match "<[^>]+>([^<]*)</" or saved_value:match "<([^/]+)/>" or saved_value
+
+      print(colors.cyan .. indent .. key .. ":" .. colors.reset)
+      print(colors.red .. indent .. "App: " .. app_content .. colors.reset)
+      print(colors.green .. indent .. "Dotfiles: " .. saved_content .. colors.reset)
+
+      settings_found = settings_found + 1
+    end
+  end
+
+  if settings_found == 0 then
+    -- If parsing failed, show the standard diff
+    print_message("info", "Differences between current app preferences and saved dotfiles:")
+    for line in diff_output:gmatch "[^\r\n]+" do
+      if line:match "^@@" then
+        print(colors.blue .. indent .. line .. colors.reset)
+      elseif line:match "^%-%-%-" or line:match "^%+%+%+" then
+        -- Skip file headers
+      elseif line:match "^%-" and not line:match "^%-%-%-" then
+        print(colors.red .. indent .. line .. colors.reset)
+      elseif line:match "^%+" and not line:match "^%+%+%+" then
+        print(colors.green .. indent .. line .. colors.reset)
+      else
+        print(colors.cyan .. indent .. line .. colors.reset)
+      end
+    end
+  end
+
+  return settings_found > 0
+end
+
 -- Process defaults configurations
 local function process_defaults(config, module_dir, options)
   if not config.defaults then
     return false
   end
 
+  -- Only run on macOS unless mocking is enabled
+  -- When mocking, we'll create the necessary files regardless of OS
   if not is_macos() and not MOCK_DEFAULTS then
     return false
   end
@@ -677,8 +812,16 @@ local function process_defaults(config, module_dir, options)
       local resolved_plist = os.getenv "PWD" .. "/" .. module_dir:gsub("^./", "") .. "/" .. plist:gsub("^./", "")
       local tmp_file = os.tmpname()
 
-      -- Export current preferences to a temporary file
-      local export_cmd = string.format('defaults export "%s" "%s"', app, tmp_file)
+      -- Export current preferences to a temporary file in XML format for better readability
+      local export_cmd
+      if plist:match "%.xml$" then
+        -- Use XML format for better readability
+        export_cmd = string.format('defaults export "%s" - | plutil -convert xml1 -o "%s" -', app, tmp_file)
+      else
+        -- Default to binary plist
+        export_cmd = string.format('defaults export "%s" "%s"', app, tmp_file)
+      end
+
       local exit_code, export_output = execute(export_cmd)
       if exit_code ~= 0 then
         print_message("error", "defaults → could not export preferences for app `" .. app .. "`: " .. export_output)
@@ -702,7 +845,8 @@ local function process_defaults(config, module_dir, options)
       else
         -- Compare the exported preferences with the module's plist
         if not options.defaults_export and not options.defaults_import then
-          if files_are_equal(tmp_file, resolved_plist) then
+          local files_equal, diff_output = files_are_equal(tmp_file, resolved_plist)
+          if files_equal then
             -- print_message("info", "defaults → preferences for `" .. app .. "` are already up-to-date")
           else
             local module_dir_relative = module_dir:gsub("^modules/", "")
@@ -712,6 +856,9 @@ local function process_defaults(config, module_dir, options)
             )
             print_message("log", "dot --defaults-export " .. module_dir_relative .. " # choose app preferences")
             print_message("log", "dot --defaults-import " .. module_dir_relative .. " # choose dotfiles preferences")
+
+            -- Display a formatted diff
+            format_plist_diff(diff_output)
           end
         end
 
@@ -728,7 +875,16 @@ local function process_defaults(config, module_dir, options)
 
         -- Handle --defaults-import option
         if options.defaults_import then
-          local import_cmd = string.format('defaults import "%s" "%s"', app, resolved_plist)
+          -- Import the preferences from the plist file
+          local import_cmd
+          if plist:match "%.xml$" then
+            -- For XML, convert back to binary format for import
+            import_cmd =
+              string.format('plutil -convert binary1 -o - "%s" | defaults import "%s" -', resolved_plist, app)
+          else
+            import_cmd = string.format('defaults import "%s" "%s"', app, resolved_plist)
+          end
+          
           local exit_code, import_output = execute(import_cmd)
           if exit_code == 0 then
             print_message("success", "defaults → imported preferences for `" .. app .. "` from dotfiles")

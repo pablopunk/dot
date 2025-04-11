@@ -545,6 +545,44 @@ return {
     -- This is mainly to ensure no errors occur during the import process
   end)
 
+  it("should handle XML format for defaults export and import", function()
+    -- Set up a module with XML format for defaults
+    setup_module(
+      "defaults_xml_test",
+      [[
+return {
+  defaults = {
+    {
+      plist = "./defaults/SwiftShift.xml",
+      app = "com.pablopunk.SwiftShift",
+    }
+  }
+}
+]]
+    )
+
+    -- Create module directory
+    pl_dir.makepath(pl_path.join(modules_dir, "defaults_xml_test", "defaults"))
+
+    -- Run dot.lua with --defaults-export and --mock-defaults options
+    assert.is_true(run_dot "defaults_xml_test --defaults-export --mock-defaults")
+
+    -- Check if the XML file was created
+    local xml_path = pl_path.join(modules_dir, "defaults_xml_test", "defaults", "SwiftShift.xml")
+    assert.is_true(pl_path.isfile(xml_path), "Expected XML file to be created")
+
+    -- Verify the content of the XML file
+    local content = pl_file.read(xml_path)
+    assert.is_true(content:match "<plist" ~= nil, "Expected XML content in the file")
+    assert.is_true(content:match "<!DOCTYPE plist" ~= nil, "Expected DOCTYPE in XML content")
+    assert.is_true(content:match "<dict" ~= nil, "Expected dict element in XML content")
+
+    -- Run dot.lua with --defaults-import and --mock-defaults options
+    assert.is_true(run_dot "defaults_xml_test --defaults-import --mock-defaults")
+    -- Check if the import was successful (mocked, so no actual change)
+    -- This is mainly to ensure no errors occur during the import process
+  end)
+
   it("should save the last used profile", function()
     -- Set up 'neovim' module
     setup_module(
