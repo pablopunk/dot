@@ -15,6 +15,7 @@
   - [Modules](#modules)
   - [Dependencies](#dependencies)
   - [Dotfiles](#dotfiles)
+  - [OS Restrictions](#os-restrictions)
   - [macOS Preferences (defaults)](#macos-preferences-defaults)
   - [Profiles](#profiles)
   - [Force Mode `-f`](#force-mode--f)
@@ -84,28 +85,6 @@ return {
   }
 }
 ```
-
-#### OS Restrictions
-
-You can restrict modules to specific operating systems using the `os` field in your module's `init.lua`:
-
-```lua
--- modules/macos-only/init.lua
-return {
-  os = { "mac" },  -- This module will only run on macOS
-  brew = { "mac-specific-app" },
-  config = {
-    source = "./config",
-    output = "~/.config/mac-specific-app",
-  }
-}
-```
-
-The module will be automatically skipped when run on non-matching operating systems. 
-Supported OS values:
-- `"mac"`, `"macos"`, or `"darwin"` for macOS
-- `"linux"` for Linux systems
-- `"windows"` for Windows systems
 
 ### Dependencies
 
@@ -180,6 +159,28 @@ This will create two symlinks:
 ~/Library/Application Support/Cursor/User/settings.json → ~/dotfiles/modules/multi-config/config/settings.json
 ~/Library/Application Support/Cursor/User/keybindings.json → ~/dotfiles/modules/multi-config/config/keybindings.json
 ```
+### OS Restrictions
+
+You can restrict modules to specific operating systems using the `os` field in your module's `init.lua`:
+
+```lua
+-- modules/macos-only/init.lua
+return {
+  os = { "mac" },  -- This module will only run on macOS
+  brew = { "mac-specific-app" },
+  config = {
+    source = "./config",
+    output = "~/.config/mac-specific-app",
+  }
+}
+```
+
+The module will be automatically skipped when run on non-matching operating systems. 
+Supported OS values:
+- `"mac"`, `"macos"`, or `"darwin"` for macOS
+- `"linux"` for Linux systems
+- `"windows"` for Windows systems
+
 
 ### macOS Preferences (defaults)
 
