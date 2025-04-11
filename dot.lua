@@ -768,6 +768,32 @@ local function process_module(module_name, options)
     return
   end
 
+  -- Check if the module has OS restrictions
+  if config.os then
+    local current_os = OS_NAME:lower()
+    local os_supported = false
+    
+    for _, os_name in ipairs(config.os) do
+      local normalized_os = os_name:lower()
+      
+      if (normalized_os == "mac" or normalized_os == "macos" or normalized_os == "darwin") and is_macos() then
+        os_supported = true
+        break
+      elseif normalized_os == "linux" and is_linux() then
+        os_supported = true
+        break
+      elseif normalized_os == "windows" and OS_NAME:lower():match("windows") then
+        os_supported = true
+        break
+      end
+    end
+    
+    if not os_supported then
+      print_message("info", "Skipping module: not supported on " .. OS_NAME)
+      return
+    end
+  end
+
   local dependencies_changed = false
   if process_wget(config) then
     dependencies_changed = true
