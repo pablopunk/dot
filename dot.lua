@@ -123,46 +123,29 @@ local installed_brew_packages = {}
 
 -- Execute an OS command and return exit code and output
 local function execute(cmd)
+  -- Special handling for macOS-specific commands when mocking is enabled
   if MOCK_DEFAULTS then
-    -- Mock defaults operations
-    if cmd:match "^defaults" then
-      if cmd:match "export" then
-        -- Simulate exporting preferences to a file
-        local plist_file = cmd:match 'export ".-" "(.-)"' or cmd:match 'plutil.-o "(.-)" -$'
-        if plist_file then
-          local file = io.open(plist_file, "w")
-          -- Check if we're mocking an XML file export
-          if cmd:match "xml1" or plist_file:match "%.xml$" then
-            file:write [[<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>MockedKey</key>
-  <string>mocked preferences</string>
-</dict>
-</plist>]]
-          else
-            file:write "mocked preferences"
-          end
-          file:close()
-          return 0, ""
-        end
-      elseif cmd:match "import" then
-        -- Simulate importing preferences
-        return 0, ""
+    -- Handle defaults export command
+    if cmd:match "^defaults export" then
+      local app = cmd:match 'defaults export "([^"]+)"'
+      local output_file = cmd:match 'defaults export "[^"]+" "([^"]+)"'
+
+      -- Also match plutil command pattern that often follows defaults export
+      if not output_file and cmd:match "plutil" then
+        output_file = cmd:match 'plutil .-o "([^"]+)"'
       end
-    end
 
-    -- Also mock plutil operations when MOCK_DEFAULTS is enabled
-    if cmd:match "^plutil" then
-      -- Extract the output file from plutil command
-      local output_file = cmd:match '-o "([^"]+)"' or cmd:match "-o ([^ ]+)"
+      if output_file then
+        -- Ensure the parent directory exists
+        local parent_dir = output_file:match "(.+)/[^/]*$"
+        if parent_dir then
+          -- Create parent directory directly instead of calling ensure_parent_directory
+          os.execute('mkdir -p "' .. parent_dir .. '"')
+        end
 
-      if output_file and output_file ~= "-" then
-        -- Create the output file with mock content
         local file = io.open(output_file, "w")
         if file then
-          if output_file:match "%.xml$" then
+          if output_file:match "%.xml$" or cmd:match "xml1" then
             -- XML format
             file:write [[<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -173,13 +156,52 @@ local function execute(cmd)
 </dict>
 </plist>]]
           else
-            -- Binary format (just a placeholder)
+            -- Binary or other format
+            file:write "mocked preferences"
+          end
+          file:close()
+          return 0, ""
+        end
+      end
+      return 0, ""
+    end
+
+    -- Handle defaults import command
+    if cmd:match "^defaults import" then
+      return 0, ""
+    end
+
+    -- Handle plutil command on its own
+    if cmd:match "^plutil" then
+      -- If there's an output file specified
+      local output_file = cmd:match '-o "([^"]+)"' or cmd:match "-o ([^ ]+)"
+      if output_file and output_file ~= "-" then
+        -- Ensure the parent directory exists
+        local parent_dir = output_file:match "(.+)/[^/]*$"
+        if parent_dir then
+          -- Create parent directory directly instead of calling ensure_parent_directory
+          os.execute('mkdir -p "' .. parent_dir .. '"')
+        end
+
+        local file = io.open(output_file, "w")
+        if file then
+          if output_file:match "%.xml$" or cmd:match "xml1" then
+            -- XML format
+            file:write [[<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>MockedKey</key>
+  <string>mocked preferences</string>
+</dict>
+</plist>]]
+          else
+            -- Binary format
             file:write "mocked binary plist"
           end
           file:close()
         end
       end
-
       return 0, ""
     end
   end
@@ -771,6 +793,8 @@ local function process_defaults(config, module_dir, options)
     return false
   end
 
+  -- Only run on macOS unless mocking is enabled
+  -- When mocking, we'll create the necessary files regardless of OS
   if not is_macos() and not MOCK_DEFAULTS then
     return false
   end
