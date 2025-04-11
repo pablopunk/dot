@@ -115,8 +115,7 @@ local function print_message(message_type, message)
     color, symbol = colors.reset, ">"
   end
 
-  local prefix = "  "
-  print(prefix .. color .. symbol .. " " .. message .. colors.reset)
+  print(color .. symbol .. " " .. message .. colors.reset)
 end
 
 local installed_brew_packages = {}
