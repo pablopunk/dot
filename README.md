@@ -15,6 +15,7 @@
   - [Modules](#modules)
   - [Dependencies](#dependencies)
   - [Dotfiles](#dotfiles)
+  - [OS Restrictions](#os-restrictions)
   - [macOS Preferences (defaults)](#macos-preferences-defaults)
   - [Profiles](#profiles)
   - [Force Mode `-f`](#force-mode--f)
@@ -158,6 +159,40 @@ This will create two symlinks:
 ~/Library/Application Support/Cursor/User/settings.json → ~/dotfiles/modules/multi-config/config/settings.json
 ~/Library/Application Support/Cursor/User/keybindings.json → ~/dotfiles/modules/multi-config/config/keybindings.json
 ```
+### OS Restrictions
+
+You can restrict modules to specific operating systems using the `os` field in your module's `init.lua`:
+
+```lua
+-- modules/macos-only/init.lua
+return {
+  os = { "mac" },  -- This module will only run on macOS
+  brew = { "mac-specific-app" },
+  config = {
+    source = "./config",
+    output = "~/.config/mac-specific-app",
+  }
+}
+```
+
+You can also specify multiple operating systems for a module:
+
+```lua
+return {
+  os = { "mac", "linux" },  -- This module will run on both macOS and Linux
+  config = {
+    source = "./config",
+    output = "~/.config/cross-platform-app",
+  }
+}
+```
+
+The module will be automatically skipped when run on non-matching operating systems. 
+Supported OS values:
+- `"mac"`, `"macos"`, or `"darwin"` for macOS
+- `"linux"` for Linux systems
+- `"windows"` for Windows systems
+
 
 ### macOS Preferences (defaults)
 
@@ -393,5 +428,5 @@ return {
   - [x] Add tests
   - [x] Ignore on linux
   - [x] Add cog images to the header so it's easier to tell that it's not only about plaintext dotfiles
-- [ ] Support an `os` field. i.e `os = { "mac" }` will be ignored on Linux.
+- [x] Support an `os` field. i.e `os = { "mac" }` will be ignored on Linux.
 - [x] After using a profile, like `dot profile1`, it should remember it and all calls to `dot` should be done with this profile unless another profile is explicitely invoked, like `dot profile2`, which will replace it for the next invokations.
