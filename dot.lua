@@ -94,6 +94,7 @@ local colors = {
   red = "\27[31m",
   blue = "\27[34m",
   magenta = "\27[35m",
+  cyan = "\27[36m",
 }
 
 local function print_section(message)
@@ -632,13 +633,13 @@ end
 
 -- Compare two files and return true if they are the same, otherwise print differences
 local function files_are_equal(file1, file2)
-  local cmd = string.format('diff "%s" "%s"', file1, file2)
+  -- Use diff with unified format (-U1) to show 1 line of context before and after each change
+  local cmd = string.format('diff -U1 "%s" "%s"', file1, file2)
   local exit_code, output = execute(cmd)
   if exit_code == 0 then
     return true
   else
-    -- print_message("info", "Differences between files:\n" .. output)
-    return false
+    return false, output
   end
 end
 
@@ -666,6 +667,68 @@ end
 
 local function is_linux()
   return OS_NAME == "Linux" or OS_NAME == "GNU/Linux"
+end
+
+-- Format and display differences between plist files
+local function format_plist_diff(diff_output)
+  if not diff_output then
+    return
+  end
+
+  local indent = "  "
+
+  -- Use a simpler approach by directly parsing the formatted diff lines
+  local lines = {}
+  for line in diff_output:gmatch "[^\r\n]+" do
+    table.insert(lines, line)
+  end
+
+  local settings_found = 0
+
+  for i = 1, #lines - 2 do
+    -- Look for patterns that indicate a key and changed values
+    if lines[i]:match "<key>([^<]+)</key>" and lines[i + 1]:match "^%-" and lines[i + 2]:match "^%+" then
+
+      local key = lines[i]:match "<key>([^<]+)</key>"
+      local app_line = lines[i + 1]
+      local saved_line = lines[i + 2]
+
+      -- Extract values
+      local app_value = app_line:gsub("^%- +", "")
+      local saved_value = saved_line:gsub("^%+ +", "")
+
+      -- Extract content from XML tags
+      local app_content = app_value:match "<[^>]+>([^<]*)</" or app_value:match "<([^/]+)/>" or app_value
+      local saved_content = saved_value:match "<[^>]+>([^<]*)</" or saved_value:match "<([^/]+)/>" or saved_value
+
+      print(colors.cyan .. indent .. key .. ":" .. colors.reset)
+      print(colors.red .. indent .. "App: " .. app_content .. colors.reset)
+      print(colors.green .. indent .. "Dotfiles: " .. saved_content .. colors.reset)
+      print ""
+
+      settings_found = settings_found + 1
+    end
+  end
+
+  if settings_found == 0 then
+    -- If parsing failed, show the standard diff
+    print_message("info", "Differences between current app preferences and saved dotfiles:")
+    for line in diff_output:gmatch "[^\r\n]+" do
+      if line:match "^@@" then
+        print(colors.blue .. indent .. line .. colors.reset)
+      elseif line:match "^%-%-%-" or line:match "^%+%+%+" then
+        -- Skip file headers
+      elseif line:match "^%-" and not line:match "^%-%-%-" then
+        print(colors.red .. indent .. line .. colors.reset)
+      elseif line:match "^%+" and not line:match "^%+%+%+" then
+        print(colors.green .. indent .. line .. colors.reset)
+      else
+        print(colors.cyan .. indent .. line .. colors.reset)
+      end
+    end
+  end
+
+  return settings_found > 0
 end
 
 -- Process defaults configurations
@@ -724,7 +787,8 @@ local function process_defaults(config, module_dir, options)
       else
         -- Compare the exported preferences with the module's plist
         if not options.defaults_export and not options.defaults_import then
-          if files_are_equal(tmp_file, resolved_plist) then
+          local files_equal, diff_output = files_are_equal(tmp_file, resolved_plist)
+          if files_equal then
             -- print_message("info", "defaults → preferences for `" .. app .. "` are already up-to-date")
           else
             local module_dir_relative = module_dir:gsub("^modules/", "")
@@ -734,6 +798,9 @@ local function process_defaults(config, module_dir, options)
             )
             print_message("log", "dot --defaults-export " .. module_dir_relative .. " # choose app preferences")
             print_message("log", "dot --defaults-import " .. module_dir_relative .. " # choose dotfiles preferences")
+
+            -- Display a formatted diff
+            format_plist_diff(diff_output)
           end
         end
 
