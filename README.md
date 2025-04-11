@@ -175,6 +175,18 @@ return {
 }
 ```
 
+You can also specify multiple operating systems for a module:
+
+```lua
+return {
+  os = { "mac", "linux" },  -- This module will run on both macOS and Linux
+  config = {
+    source = "./config",
+    output = "~/.config/cross-platform-app",
+  }
+}
+```
+
 The module will be automatically skipped when run on non-matching operating systems. 
 Supported OS values:
 - `"mac"`, `"macos"`, or `"darwin"` for macOS

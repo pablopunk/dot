@@ -621,6 +621,20 @@ return {
 ]]
     )
     
+    -- Set up a module that works on multiple OSes
+    setup_module(
+      "os_specific_multi",
+      [[
+return {
+  os = { "mac", "linux" },
+  config = {
+    source = "./config",
+    output = "~/.config/os_specific_multi",
+  }
+}
+]]
+    )
+    
     -- Create config directories and files
     pl_dir.makepath(pl_path.join(modules_dir, "os_specific_current", "config"))
     pl_file.write(pl_path.join(modules_dir, "os_specific_current", "config", "config.txt"), "current os config")
@@ -628,14 +642,19 @@ return {
     pl_dir.makepath(pl_path.join(modules_dir, "os_specific_other", "config"))
     pl_file.write(pl_path.join(modules_dir, "os_specific_other", "config", "config.txt"), "other os config")
     
+    pl_dir.makepath(pl_path.join(modules_dir, "os_specific_multi", "config"))
+    pl_file.write(pl_path.join(modules_dir, "os_specific_multi", "config", "config.txt"), "multi os config")
+    
     -- Run dot.lua without arguments to install all modules
     assert.is_true(run_dot())
     
     -- Check if the current OS module is installed and the other OS module is skipped
     local current_config = pl_path.join(home_dir, ".config", "os_specific_current")
     local other_config = pl_path.join(home_dir, ".config", "os_specific_other")
+    local multi_config = pl_path.join(home_dir, ".config", "os_specific_multi")
     
     assert.is_true(is_link(current_config), "Expected symlink for current OS module")
     assert.is_false(path_exists(other_config), "Did not expect symlink for other OS module")
+    assert.is_true(is_link(multi_config), "Expected symlink for multi-OS module")
   end)
 end)
