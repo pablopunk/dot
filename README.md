@@ -232,7 +232,7 @@ return {
 
 XML files are much easier to read, compare, and track changes with version control compared to binary plist files.
 
-!!insert screenshot here
+![CleanShot 2025-04-11 at 21 33 46](https://github.com/user-attachments/assets/2396b7c5-bdb9-4f0e-9de8-348f7c49a6f2)
 
 The first time you run this without any files, it will export the current preferences to the plist file.
 
