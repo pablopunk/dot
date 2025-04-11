@@ -125,11 +125,25 @@ local function execute(cmd)
   if MOCK_DEFAULTS and cmd:match "^defaults" then
     if cmd:match "export" then
       -- Simulate exporting preferences to a file
-      local plist_file = cmd:match 'export ".-" "(.-)"'
-      local file = io.open(plist_file, "w")
-      file:write "mocked preferences"
-      file:close()
-      return 0, ""
+      local plist_file = cmd:match 'export ".-" "(.-)"' or cmd:match 'plutil.-o "(.-)" -$'
+      if plist_file then
+        local file = io.open(plist_file, "w")
+        -- Check if we're mocking an XML file export
+        if cmd:match "xml1" or plist_file:match "%.xml$" then
+          file:write [[<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>MockedKey</key>
+  <string>mocked preferences</string>
+</dict>
+</plist>]]
+        else
+          file:write "mocked preferences"
+        end
+        file:close()
+        return 0, ""
+      end
     elseif cmd:match "import" then
       -- Simulate importing preferences
       return 0, ""
@@ -677,8 +691,16 @@ local function process_defaults(config, module_dir, options)
       local resolved_plist = os.getenv "PWD" .. "/" .. module_dir:gsub("^./", "") .. "/" .. plist:gsub("^./", "")
       local tmp_file = os.tmpname()
 
-      -- Export current preferences to a temporary file
-      local export_cmd = string.format('defaults export "%s" "%s"', app, tmp_file)
+      -- Export current preferences to a temporary file in XML format for better readability
+      local export_cmd
+      if plist:match "%.xml$" then
+        -- Use XML format for better readability
+        export_cmd = string.format('defaults export "%s" - | plutil -convert xml1 -o "%s" -', app, tmp_file)
+      else
+        -- Default to binary plist
+        export_cmd = string.format('defaults export "%s" "%s"', app, tmp_file)
+      end
+
       local exit_code, export_output = execute(export_cmd)
       if exit_code ~= 0 then
         print_message("error", "defaults → could not export preferences for app `" .. app .. "`: " .. export_output)
@@ -728,7 +750,16 @@ local function process_defaults(config, module_dir, options)
 
         -- Handle --defaults-import option
         if options.defaults_import then
-          local import_cmd = string.format('defaults import "%s" "%s"', app, resolved_plist)
+          -- Import the preferences from the plist file
+          local import_cmd
+          if plist:match "%.xml$" then
+            -- For XML, convert back to binary format for import
+            import_cmd =
+              string.format('plutil -convert binary1 -o - "%s" | defaults import "%s" -', resolved_plist, app)
+          else
+            import_cmd = string.format('defaults import "%s" "%s"', app, resolved_plist)
+          end
+          
           local exit_code, import_output = execute(import_cmd)
           if exit_code == 0 then
             print_message("success", "defaults → imported preferences for `" .. app .. "` from dotfiles")

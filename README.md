@@ -215,6 +215,23 @@ return {
 > [!NOTE]
 > To find the app id, you can run `defaults domains | tr ', ' '\n' | grep -i <app-name>`.
 
+#### Human-readable format
+
+`dot` now supports human-readable XML format for preferences by using a `.xml` extension:
+
+```lua
+return {
+  defaults = {
+    {
+      plist = "./defaults/SwiftShift.xml",
+      app = "com.pablopunk.Swift-Shift",
+    }
+  }
+}
+```
+
+XML files are much easier to read, compare, and track changes with version control compared to binary plist files.
+
 
 https://github.com/user-attachments/assets/173d882c-3fb5-4fe1-bce4-4ac8fa6be7f0
 
