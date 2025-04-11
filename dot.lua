@@ -123,15 +123,17 @@ local installed_brew_packages = {}
 
 -- Execute an OS command and return exit code and output
 local function execute(cmd)
-  if MOCK_DEFAULTS and cmd:match "^defaults" then
-    if cmd:match "export" then
-      -- Simulate exporting preferences to a file
-      local plist_file = cmd:match 'export ".-" "(.-)"' or cmd:match 'plutil.-o "(.-)" -$'
-      if plist_file then
-        local file = io.open(plist_file, "w")
-        -- Check if we're mocking an XML file export
-        if cmd:match "xml1" or plist_file:match "%.xml$" then
-          file:write [[<?xml version="1.0" encoding="UTF-8"?>
+  if MOCK_DEFAULTS then
+    -- Mock defaults operations
+    if cmd:match "^defaults" then
+      if cmd:match "export" then
+        -- Simulate exporting preferences to a file
+        local plist_file = cmd:match 'export ".-" "(.-)"' or cmd:match 'plutil.-o "(.-)" -$'
+        if plist_file then
+          local file = io.open(plist_file, "w")
+          -- Check if we're mocking an XML file export
+          if cmd:match "xml1" or plist_file:match "%.xml$" then
+            file:write [[<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
@@ -139,14 +141,45 @@ local function execute(cmd)
   <string>mocked preferences</string>
 </dict>
 </plist>]]
-        else
-          file:write "mocked preferences"
+          else
+            file:write "mocked preferences"
+          end
+          file:close()
+          return 0, ""
         end
-        file:close()
+      elseif cmd:match "import" then
+        -- Simulate importing preferences
         return 0, ""
       end
-    elseif cmd:match "import" then
-      -- Simulate importing preferences
+    end
+
+    -- Also mock plutil operations when MOCK_DEFAULTS is enabled
+    if cmd:match "^plutil" then
+      -- Extract the output file from plutil command
+      local output_file = cmd:match '-o "([^"]+)"' or cmd:match "-o ([^ ]+)"
+
+      if output_file and output_file ~= "-" then
+        -- Create the output file with mock content
+        local file = io.open(output_file, "w")
+        if file then
+          if output_file:match "%.xml$" then
+            -- XML format
+            file:write [[<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>MockedKey</key>
+  <string>mocked preferences</string>
+</dict>
+</plist>]]
+          else
+            -- Binary format (just a placeholder)
+            file:write "mocked binary plist"
+          end
+          file:close()
+        end
+      end
+
       return 0, ""
     end
   end
@@ -651,9 +684,10 @@ function os_name()
   end
 
   -- Unix, Linux variants
-  local fh, err = assert(io.popen("uname -o 2>/dev/null", "r"))
+  local fh, err = assert(io.popen("uname -o 2>/dev/null || uname -s", "r"))
   if fh then
     osname = fh:read()
+    fh:close()
   end
 
   return osname or "Windows"
@@ -676,6 +710,7 @@ local function format_plist_diff(diff_output)
   end
 
   local indent = "  "
+  print ""
 
   -- Use a simpler approach by directly parsing the formatted diff lines
   local lines = {}
@@ -704,7 +739,6 @@ local function format_plist_diff(diff_output)
       print(colors.cyan .. indent .. key .. ":" .. colors.reset)
       print(colors.red .. indent .. "App: " .. app_content .. colors.reset)
       print(colors.green .. indent .. "Dotfiles: " .. saved_content .. colors.reset)
-      print ""
 
       settings_found = settings_found + 1
     end
