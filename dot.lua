@@ -789,7 +789,7 @@ local function process_module(module_name, options)
     end
     
     if not os_supported then
-      print_message("info", "Skipping module: not supported on " .. OS_NAME)
+      print_message("info", "Skipping "..config.os[1].."-only module")
       return
     end
   end
