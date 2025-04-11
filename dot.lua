@@ -779,7 +779,7 @@ local function process_module(module_name, options)
       if (normalized_os == "mac" or normalized_os == "macos" or normalized_os == "darwin") and is_macos() then
         os_supported = true
         break
-      elseif normalized_os == "linux" and is_linux() then
+      elseif (normalized_os == "linux" or normalized_os == "gnu/linux" or normalized_os == "ubuntu") and is_linux() then
         os_supported = true
         break
       elseif normalized_os == "windows" and OS_NAME:lower():match("windows") then
