@@ -201,7 +201,7 @@ You can manage macOS application preferences using the `defaults` field in your 
 Example:
 
 ```lua
--- modules/defaults_test/init.lua
+-- modules/swiftshift/init.lua
 return {
   defaults = {
     {
@@ -411,8 +411,8 @@ return {
 - **Defaults Export/Import**: Manage macOS application preferences.
 
   ```bash
-  $ dot defaults_test --defaults-export  # Export app preferences to plist
-  $ dot defaults_test --defaults-import  # Import app preferences from plist
+  $ dot app [-e,--defaults-export]  # Export app preferences to plist
+  $ dot app [-i,--defaults-import]  # Import app preferences from plist
   ```
 
 ## Examples
