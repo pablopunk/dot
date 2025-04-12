@@ -187,7 +187,7 @@ return {
 }
 ```
 
-The module will be automatically skipped when run on non-matching operating systems. 
+The module will be automatically skipped when run on non-matching operating systems.
 Supported OS values:
 - `"mac"`, `"macos"`, or `"darwin"` for macOS
 - `"linux"` for Linux systems
@@ -239,13 +239,13 @@ The first time you run this without any files, it will export the current prefer
 Whenever you want them to be exported again, run:
 
 ```bash
-$ dot defaults_test --defaults-export
+$ dot any_app --defaults-export (or -e)
 ```
 
-To import the preferences from the saved file, run:
+To import the preferences from your dotfiles, run:
 
 ```bash
-$ dot defaults_test --defaults-import
+$ dot any_app --defaults-import (or -i)
 ```
 
 By default, `dot` will only alert you that your saved preferences differ from the current ones.

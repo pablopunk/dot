@@ -39,7 +39,11 @@ local function parse_args()
       mock_defaults = true
     elseif arg[i] == "--defaults-export" then
       defaults_export = true
+    elseif arg[i] == "-e" then
+      defaults_export = true
     elseif arg[i] == "--defaults-import" then
+      defaults_import = true
+    elseif arg[i] == "-i" then
       defaults_import = true
     elseif arg[i] == "--hooks" then
       hooks_mode = true
@@ -57,7 +61,9 @@ Options:
   --mock-brew       Mock brew operations (for testing purposes)
   --mock-wget       Mock wget operations (for testing purposes)
   --mock-defaults   Mock defaults operations (for testing purposes)
+  -e                ↙ Short for --defaults-export
   --defaults-export Save app preferences to a plist file
+  -i                ↙ Short for --defaults-import
   --defaults-import Import app preferences from a plist file
   --hooks           Run hooks even if dependencies haven't changed
   --remove-profile  Remove the last used profile
@@ -884,7 +890,7 @@ local function process_defaults(config, module_dir, options)
           else
             import_cmd = string.format('defaults import "%s" "%s"', app, resolved_plist)
           end
-          
+
           local exit_code, import_output = execute(import_cmd)
           if exit_code == 0 then
             print_message("success", "defaults → imported preferences for `" .. app .. "` from dotfiles")
@@ -928,10 +934,10 @@ local function process_module(module_name, options)
   if config.os then
     local current_os = OS_NAME:lower()
     local os_supported = false
-    
+
     for _, os_name in ipairs(config.os) do
       local normalized_os = os_name:lower()
-      
+
       if (normalized_os == "mac" or normalized_os == "macos" or normalized_os == "darwin") and is_macos() then
         os_supported = true
         break
@@ -943,7 +949,7 @@ local function process_module(module_name, options)
         break
       end
     end
-    
+
     if not os_supported then
       print_message("info", "Skipping module: not supported on " .. OS_NAME)
       return
