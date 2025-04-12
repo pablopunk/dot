@@ -860,8 +860,8 @@ local function process_defaults(config, module_dir, options)
               "warning",
               "preferences for `" .. app .. "` differ between the app and the dotfiles. Choose which one matters using:"
             )
-            print_message("log", "dot --defaults-export " .. module_dir_relative .. " # choose app preferences")
-            print_message("log", "dot --defaults-import " .. module_dir_relative .. " # choose dotfiles preferences")
+            print_message("log", "dot -e " .. module_dir_relative .. " # export the app preferences")
+            print_message("log", "dot -i " .. module_dir_relative .. " # import your dotfiles preferences")
 
             -- Display a formatted diff
             format_plist_diff(diff_output)
