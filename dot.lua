@@ -1,6 +1,6 @@
 #!/usr/bin/env lua
 
-local version = "0.6.1"
+local version = "0.7.0"
 
 local MOCK_BREW = false
 local MOCK_WGET = false
@@ -791,7 +791,6 @@ local function format_plist_diff(diff_output)
   for i = 1, #lines - 2 do
     -- Look for patterns that indicate a key and changed values
     if lines[i]:match "<key>([^<]+)</key>" and lines[i + 1]:match "^%-" and lines[i + 2]:match "^%+" then
-
       local key = lines[i]:match "<key>([^<]+)</key>"
       local app_line = lines[i + 1]
       local saved_line = lines[i + 2]
@@ -1202,7 +1201,7 @@ local function main()
   end
 
   local success = true
-  
+
   if tool_name then
     success = process_tool(tool_name, options)
     if success == false then
