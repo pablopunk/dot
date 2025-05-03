@@ -385,14 +385,54 @@ local function get_all_modules()
   local cmd = string.format('find "%s" -type f -name "init.lua"', modules_dir)
   local exit_code, output = execute(cmd)
   if exit_code == 0 then
+    -- First pass: collect all init.lua files
+    local all_init_files = {}
     for file in output:gmatch "[^\n]+" do
+      table.insert(all_init_files, file)
+    end
+
+    -- Sort init.lua files by path length (shortest first) to ensure parent modules are processed first
+    table.sort(all_init_files, function(a, b)
+      return #a < #b
+    end)
+
+    -- Track which directories already have a parent module
+    local has_parent_module = {}
+
+    for _, file in ipairs(all_init_files) do
       -- Extract the module path relative to modules_dir
       local module_path = file:match("^" .. modules_dir .. "/(.+)/init.lua$")
-      local parent = module_path:match "^(.+)/[^/]+$"
-      if not table_string_find(modules, parent) then
-        -- Remove trailing /init.lua from the path
-        module_path = module_path:gsub("/init.lua$", "")
-        table.insert(modules, module_path)
+      if module_path then
+        local is_nested = false
+
+        -- Check if any parent directory already has init.lua
+        local path_parts = {}
+        for part in module_path:gmatch "[^/]+" do
+          table.insert(path_parts, part)
+        end
+
+        -- Build paths from root to check for parent modules
+        local current_path = ""
+        for i = 1, #path_parts - 1 do
+          if current_path ~= "" then
+            current_path = current_path .. "/"
+          end
+          current_path = current_path .. path_parts[i]
+
+          if has_parent_module[current_path] then
+            is_nested = true
+            break
+          end
+        end
+
+        if not is_nested then
+          -- This is a top-level module or one without parent modules
+          local module_name = module_path:gsub("/init.lua$", "")
+          table.insert(modules, module_name)
+
+          -- Mark this path as having a module
+          has_parent_module[module_name] = true
+        end
       end
     end
   end
@@ -944,7 +984,7 @@ local function process_module(module_name, options)
       elseif normalized_os == "linux" and is_linux() then
         os_supported = true
         break
-      elseif normalized_os == "windows" and OS_NAME:lower():match("windows") then
+      elseif normalized_os == "windows" and OS_NAME:lower():match "windows" then
         os_supported = true
         break
       end
@@ -1002,13 +1042,13 @@ local function process_tool(tool_name, options)
     local profile_func, load_err = loadfile(profile_path)
     if not profile_func then
       print_message("error", "Error loading profile: " .. load_err)
-      return
+      return false
     end
 
     local success, profile = pcall(profile_func)
     if not success or not profile or not profile.modules then
       print_message("error", "Error executing profile or invalid profile structure")
-      return
+      return false
     end
 
     local modules_to_process = {}
@@ -1032,13 +1072,49 @@ local function process_tool(tool_name, options)
         process_module(module_name, options)
       end
     end
+
+    return true
   else
     -- Process the single tool module
-    local module_path = "modules/" .. tool_name .. "/init.lua"
-    if is_file(module_path) then
-      process_module(tool_name, options)
+    -- First check if this is a nested path that might be part of a parent module
+    local is_nested_path = false
+
+    if tool_name:find "/" then
+      -- This might be a nested path, check if any parent has an init.lua
+      local parts = {}
+      for part in tool_name:gmatch "[^/]+" do
+        table.insert(parts, part)
+      end
+
+      local current_path = ""
+      for i = 1, #parts - 1 do
+        if i > 1 then
+          current_path = current_path .. "/"
+        end
+        current_path = current_path .. parts[i]
+
+        local parent_init = "modules/" .. current_path .. "/init.lua"
+        if is_file(parent_init) then
+          is_nested_path = true
+          -- Just return nil instead of showing an error
+          -- This indicates the module doesn't exist rather than an error condition
+          print_message("error", "Module not found: " .. tool_name)
+          return nil
+        end
+      end
+    end
+
+    if not is_nested_path then
+      local module_path = "modules/" .. tool_name .. "/init.lua"
+      if is_file(module_path) then
+        process_module(tool_name, options)
+        return true
+      else
+        print_message("error", "Module not found: " .. tool_name)
+        return false
+      end
     else
-      print_message("error", "Module not found: " .. tool_name)
+      return nil
     end
   end
 end
@@ -1125,19 +1201,24 @@ local function main()
     end
   end
 
+  local success = true
+  
   if tool_name then
-    process_tool(tool_name, options)
+    success = process_tool(tool_name, options)
+    if success == false then
+      os.exit(1)
+    end
   else
     local modules_dir = "modules"
     if not is_dir(modules_dir) then
       print_message("error", "modules directory not found")
-      return
+      os.exit(1)
     end
 
     local modules = get_all_modules()
     if #modules == 0 then
       print_message("error", "no modules found")
-      return
+      os.exit(1)
     end
 
     for _, module_name in ipairs(modules) do

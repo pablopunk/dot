@@ -695,4 +695,215 @@ return {
     assert.is_false(path_exists(other_config), "Did not expect symlink for other OS module")
     assert.is_true(is_link(multi_config), "Expected symlink for multi-OS module")
   end)
+
+  it("should respect init.lua file hierarchy in modules", function()
+    -- Set up module with both top-level init.lua and subfolder with init.lua
+    local module_dir = pl_path.join(modules_dir, "nested_module")
+    pl_dir.makepath(module_dir)
+
+    -- Create top-level init.lua
+    local top_init_lua = pl_path.join(module_dir, "init.lua")
+    pl_file.write(
+      top_init_lua,
+      [[
+return {
+  brew = { "top-level-package" },
+  config = {
+    source = "./config",
+    output = "~/.config/top-level",
+  }
+}
+]]
+    )
+
+    -- Create config directory and file for the top-level module
+    pl_dir.makepath(pl_path.join(module_dir, "config"))
+    pl_file.write(pl_path.join(module_dir, "config", "top-config.txt"), "top level config")
+
+    -- Create a config subdirectory with its own init.lua
+    local sub_module_dir = pl_path.join(module_dir, "config", "submodule")
+    pl_dir.makepath(sub_module_dir)
+    local sub_init_lua = pl_path.join(sub_module_dir, "init.lua")
+    pl_file.write(
+      sub_init_lua,
+      [[
+return {
+  brew = { "sub-level-package" },
+  config = {
+    source = "./files",
+    output = "~/.config/sub-level",
+  }
+}
+]]
+    )
+
+    -- Create files directory for the submodule
+    pl_dir.makepath(pl_path.join(sub_module_dir, "files"))
+    pl_file.write(pl_path.join(sub_module_dir, "files", "sub-config.txt"), "sub level config")
+
+    -- Run dot.lua for this module
+    assert.is_true(run_dot "nested_module")
+
+    -- Only the top-level module should be installed
+    local top_level_config = pl_path.join(home_dir, ".config", "top-level")
+    local sub_level_config = pl_path.join(home_dir, ".config", "sub-level")
+
+    assert.is_true(is_link(top_level_config), "Expected symlink for top-level module")
+    assert.is_false(
+      path_exists(sub_level_config),
+      "Did not expect symlink for submodule when top-level init.lua exists"
+    )
+
+    -- Now, set up a module where only the subfolder has init.lua
+    local second_module_dir = pl_path.join(modules_dir, "subonly_module")
+    pl_dir.makepath(second_module_dir)
+
+    -- Create a subfolder with init.lua but no top-level init.lua
+    local second_sub_dir = pl_path.join(second_module_dir, "config")
+    pl_dir.makepath(second_sub_dir)
+    local second_sub_init_lua = pl_path.join(second_sub_dir, "init.lua")
+    pl_file.write(
+      second_sub_init_lua,
+      [[
+return {
+  brew = { "sub-only-package" },
+  config = {
+    source = "./files",
+    output = "~/.config/sub-only",
+  }
+}
+]]
+    )
+
+    -- Create files directory for the submodule
+    pl_dir.makepath(pl_path.join(second_sub_dir, "files"))
+    pl_file.write(pl_path.join(second_sub_dir, "files", "sub-only-config.txt"), "sub only config")
+
+    -- Run dot.lua for this module
+    assert.is_true(run_dot "subonly_module/config")
+
+    -- In this case, the subdirectory module should be installed
+    local sub_only_config = pl_path.join(home_dir, ".config", "sub-only")
+
+    assert.is_true(
+      is_link(sub_only_config),
+      "Expected symlink for subdirectory module when no top-level init.lua exists"
+    )
+  end)
+
+  it("should handle nested init.lua files in config directories", function()
+    -- Set up a realistic module structure similar to sketchybar example
+    local module_dir = pl_path.join(modules_dir, "realistic_module")
+    pl_dir.makepath(module_dir)
+
+    -- Create top-level init.lua (module definition)
+    local top_init_lua = pl_path.join(module_dir, "init.lua")
+    pl_file.write(
+      top_init_lua,
+      [[
+return {
+  brew = { "realistic-package" },
+  config = {
+    source = "./config",
+    output = "~/.config/realistic-module",
+  }
+}
+]]
+    )
+
+    -- Create config directory
+    local config_dir = pl_path.join(module_dir, "config")
+    pl_dir.makepath(config_dir)
+
+    -- Create config/init.lua (NOT a module, just a Lua file for the app config)
+    pl_file.write(
+      pl_path.join(config_dir, "init.lua"),
+      [[
+-- This is just a config file, not a module definition
+local config = {}
+config.items = require("items")
+return config
+]]
+    )
+
+    -- Create config/items directory with its own init.lua
+    local items_dir = pl_path.join(config_dir, "items")
+    pl_dir.makepath(items_dir)
+    pl_file.write(
+      pl_path.join(items_dir, "init.lua"),
+      [[
+-- This is just a component of the config, not a module
+local items = {}
+items.widgets = require("widgets")
+return items
+]]
+    )
+
+    -- Create config/items/widgets directory with its own init.lua
+    local widgets_dir = pl_path.join(items_dir, "widgets")
+    pl_dir.makepath(widgets_dir)
+    pl_file.write(
+      pl_path.join(widgets_dir, "init.lua"),
+      [[
+-- This is the deepest nested init.lua, still just config
+return {
+  clock = function() return os.date() end,
+  battery = function() return "100%" end
+}
+]]
+    )
+
+    -- Run dot.lua for the top-level module
+    assert.is_true(run_dot "realistic_module")
+
+    -- Check that the top-level module is installed
+    local module_config = pl_path.join(home_dir, ".config", "realistic-module")
+    assert.is_true(is_link(module_config), "Expected symlink for realistic-module")
+
+    -- Check that all the nested init.lua files are present in the installed config
+    assert.is_true(pl_path.isfile(pl_path.join(module_config, "init.lua")), "Expected init.lua in the installed config")
+    assert.is_true(
+      pl_path.isfile(pl_path.join(module_config, "items", "init.lua")),
+      "Expected items/init.lua in the installed config"
+    )
+    assert.is_true(
+      pl_path.isfile(pl_path.join(module_config, "items", "widgets", "init.lua")),
+      "Expected items/widgets/init.lua in the installed config"
+    )
+
+    -- Verify we can't try to install the nested components as modules
+    local nested_cmd = string.format(
+      "cd %q && HOME=%q lua %q %s --mock-brew 2>&1",
+      dotfiles_dir,
+      home_dir,
+      dot_executable,
+      "realistic_module/config"
+    )
+    local handle = io.popen(nested_cmd)
+    local output = handle:read "*a"
+    handle:close()
+
+    -- Check that the output indicates the module was not found
+    assert.is_true(
+      output:find("Module not found: realistic_module/config", 1, true) ~= nil,
+      "Should report that nested config directory is not a module"
+    )
+
+    local deeply_nested_cmd = string.format(
+      "cd %q && HOME=%q lua %q %s --mock-brew 2>&1",
+      dotfiles_dir,
+      home_dir,
+      dot_executable,
+      "realistic_module/config/items"
+    )
+    local handle = io.popen(deeply_nested_cmd)
+    local output = handle:read "*a"
+    handle:close()
+
+    -- Check that the output indicates the module was not found
+    assert.is_true(
+      output:find("Module not found: realistic_module/config/items", 1, true) ~= nil,
+      "Should report that deeply nested config directory is not a module"
+    )
+  end)
 end)
