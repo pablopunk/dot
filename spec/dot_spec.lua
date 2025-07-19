@@ -83,8 +83,25 @@ exit 0
   -- Function to run dot.lua with given arguments
   local function run_dot(args)
     args = args or ""
-    -- Put our bin_dir first, but keep essential system paths for lua and basic tools
-    local cmd = string.format("cd %q && HOME=%q PATH=%q:/usr/bin:/bin lua %q %s", dotfiles_dir, home_dir, bin_dir, dot_executable, args)
+    -- Find the correct lua path dynamically
+    local lua_path = "/opt/homebrew/bin/lua" -- macOS Homebrew
+    if not pl_path.isfile(lua_path) then
+      lua_path = "/usr/bin/lua" -- Ubuntu/Debian
+    end
+    if not pl_path.isfile(lua_path) then
+      lua_path = "lua" -- Fallback to PATH
+    end
+
+    -- Use system lua directly, but put our bin_dir in PATH for fake commands
+    local cmd = string.format(
+      "cd %q && HOME=%q PATH=%q:/usr/bin:/bin %s %q %s",
+      dotfiles_dir,
+      home_dir,
+      bin_dir,
+      lua_path,
+      dot_executable,
+      args
+    )
     return os.execute(cmd)
   end
 
@@ -129,28 +146,34 @@ exit 0
     os.execute(string.format("cp %q %q", "./dot.lua", dot_executable))
     -- Ensure dot.lua is executable
     os.execute(string.format("chmod +x %q", dot_executable))
-    
+
     -- Initialize command log file
     pl_file.write(command_log_file, "")
-    
+
     -- Create a smart which command that checks our bin_dir first
-    local which_script = string.format([[#!/bin/sh
+    local which_script = string.format(
+      [[#!/bin/sh
 if [ -f "%s/$1" ]; then
   echo "%s/$1"
   exit 0
 else
   exit 1
 fi
-]], bin_dir, bin_dir)
+]],
+      bin_dir,
+      bin_dir
+    )
     pl_file.write(pl_path.join(bin_dir, "which"), which_script)
     os.execute(string.format("chmod +x %q", pl_path.join(bin_dir, "which")))
-    
-    -- Create essential shell commands that lua might need
-    create_command("uname", 0, "Linux")
-    create_command("mktemp", 0, tmp_dir .. "/tmpfile")
-    create_command("test", 0, "")
+
+    -- Create essential shell commands that lua might need (with unique names)
+    create_command("fake_uname", 0, "Linux")
+    create_command("fake_mktemp", 0, tmp_dir .. "/tmpfile")
+    create_command("fake_test", 0, "")
+
     -- Create a functional bash command that can execute scripts
-    local bash_script = string.format([[#!/bin/sh
+    local bash_script = string.format(
+      [[#!/bin/sh
 echo "COMMAND_EXECUTED: bash $@" >> %q
 if command -v bash >/dev/null 2>&1; then
   bash "$@"
@@ -159,14 +182,16 @@ elif command -v sh >/dev/null 2>&1; then
 else
   sh "$@"
 fi
-]], command_log_file)
+]],
+      command_log_file
+    )
     pl_file.write(pl_path.join(bin_dir, "bash"), bash_script)
     os.execute(string.format("chmod +x %q", pl_path.join(bin_dir, "bash")))
-    
-    -- Create commands that actually do filesystem operations (using portable paths)
+
+    -- Create filesystem operation commands with unique names
     local function find_command(cmd_name)
       -- Try to find the actual command location
-      local common_paths = {"/bin/" .. cmd_name, "/usr/bin/" .. cmd_name}
+      local common_paths = { "/bin/" .. cmd_name, "/usr/bin/" .. cmd_name }
       for _, path in ipairs(common_paths) do
         local check = os.execute(string.format("test -x %q", path))
         if check == 0 then
@@ -175,62 +200,94 @@ fi
       end
       return cmd_name -- fallback to just the command name
     end
-    
-    local mkdir_script = string.format([[#!/bin/sh
+
+    local mkdir_script = string.format(
+      [[#!/bin/sh
 echo "COMMAND_EXECUTED: mkdir $@" >> %q
 %s "$@"
-]], command_log_file, find_command("mkdir"))
-    pl_file.write(pl_path.join(bin_dir, "mkdir"), mkdir_script)
-    os.execute(string.format("chmod +x %q", pl_path.join(bin_dir, "mkdir")))
-    
-    local ln_script = string.format([[#!/bin/sh
+]],
+      command_log_file,
+      find_command "mkdir"
+    )
+    pl_file.write(pl_path.join(bin_dir, "fake_mkdir"), mkdir_script)
+    os.execute(string.format("chmod +x %q", pl_path.join(bin_dir, "fake_mkdir")))
+
+    local ln_script = string.format(
+      [[#!/bin/sh
 echo "COMMAND_EXECUTED: ln $@" >> %q
 %s "$@"
-]], command_log_file, find_command("ln"))
-    pl_file.write(pl_path.join(bin_dir, "ln"), ln_script)
-    os.execute(string.format("chmod +x %q", pl_path.join(bin_dir, "ln")))
-    
-    local echo_script = string.format([[#!/bin/sh
+]],
+      command_log_file,
+      find_command "ln"
+    )
+    pl_file.write(pl_path.join(bin_dir, "fake_ln"), ln_script)
+    os.execute(string.format("chmod +x %q", pl_path.join(bin_dir, "fake_ln")))
+
+    local echo_script = string.format(
+      [[#!/bin/sh
 echo "COMMAND_EXECUTED: echo $@" >> %q
 %s "$@"
-]], command_log_file, find_command("echo"))
-    pl_file.write(pl_path.join(bin_dir, "echo"), echo_script)
-    os.execute(string.format("chmod +x %q", pl_path.join(bin_dir, "echo")))
-    
-    local touch_script = string.format([[#!/bin/sh
+]],
+      command_log_file,
+      find_command "echo"
+    )
+    pl_file.write(pl_path.join(bin_dir, "fake_echo"), echo_script)
+    os.execute(string.format("chmod +x %q", pl_path.join(bin_dir, "fake_echo")))
+
+    local touch_script = string.format(
+      [[#!/bin/sh
 echo "COMMAND_EXECUTED: touch $@" >> %q
 %s "$@"
-]], command_log_file, find_command("touch"))
-    pl_file.write(pl_path.join(bin_dir, "touch"), touch_script)
-    os.execute(string.format("chmod +x %q", pl_path.join(bin_dir, "touch")))
-    
-    local cp_script = string.format([[#!/bin/sh
+]],
+      command_log_file,
+      find_command "touch"
+    )
+    pl_file.write(pl_path.join(bin_dir, "fake_touch"), touch_script)
+    os.execute(string.format("chmod +x %q", pl_path.join(bin_dir, "fake_touch")))
+
+    local cp_script = string.format(
+      [[#!/bin/sh
 echo "COMMAND_EXECUTED: cp $@" >> %q
 %s "$@"
-]], command_log_file, find_command("cp"))
-    pl_file.write(pl_path.join(bin_dir, "cp"), cp_script)
-    os.execute(string.format("chmod +x %q", pl_path.join(bin_dir, "cp")))
-    
-    local rm_script = string.format([[#!/bin/sh
+]],
+      command_log_file,
+      find_command "cp"
+    )
+    pl_file.write(pl_path.join(bin_dir, "fake_cp"), cp_script)
+    os.execute(string.format("chmod +x %q", pl_path.join(bin_dir, "fake_cp")))
+
+    local rm_script = string.format(
+      [[#!/bin/sh
 echo "COMMAND_EXECUTED: rm $@" >> %q
 %s "$@"
-]], command_log_file, find_command("rm"))
-    pl_file.write(pl_path.join(bin_dir, "rm"), rm_script)
-    os.execute(string.format("chmod +x %q", pl_path.join(bin_dir, "rm")))
-    
-    local mv_script = string.format([[#!/bin/sh
+]],
+      command_log_file,
+      find_command "rm"
+    )
+    pl_file.write(pl_path.join(bin_dir, "fake_rm"), rm_script)
+    os.execute(string.format("chmod +x %q", pl_path.join(bin_dir, "fake_rm")))
+
+    local mv_script = string.format(
+      [[#!/bin/sh
 echo "COMMAND_EXECUTED: mv $@" >> %q
 %s "$@"
-]], command_log_file, find_command("mv"))
-    pl_file.write(pl_path.join(bin_dir, "mv"), mv_script)
-    os.execute(string.format("chmod +x %q", pl_path.join(bin_dir, "mv")))
-    
-    local find_script = string.format([[#!/bin/sh
+]],
+      command_log_file,
+      find_command "mv"
+    )
+    pl_file.write(pl_path.join(bin_dir, "fake_mv"), mv_script)
+    os.execute(string.format("chmod +x %q", pl_path.join(bin_dir, "fake_mv")))
+
+    local find_script = string.format(
+      [[#!/bin/sh
 echo "COMMAND_EXECUTED: find $@" >> %q
 %s "$@"
-]], command_log_file, find_command("find"))
-    pl_file.write(pl_path.join(bin_dir, "find"), find_script)
-    os.execute(string.format("chmod +x %q", pl_path.join(bin_dir, "find")))
+]],
+      command_log_file,
+      find_command "find"
+    )
+    pl_file.write(pl_path.join(bin_dir, "fake_find"), find_script)
+    os.execute(string.format("chmod +x %q", pl_path.join(bin_dir, "fake_find")))
   end)
 
   after_each(function()
@@ -242,8 +299,8 @@ echo "COMMAND_EXECUTED: find $@" >> %q
 
   it("should install all modules using real commands", function()
     -- Create fake package managers
-    create_command("apt", 0, "Package neovim installed successfully")
-    create_command("brew", 0, "Package zsh installed successfully")
+    create_command("fake_apt", 0, "Package neovim installed successfully")
+    create_command("fake_brew", 0, "Package zsh installed successfully")
 
     -- Set up 'neovim' module that only uses apt
     setup_module(
@@ -251,7 +308,7 @@ echo "COMMAND_EXECUTED: find $@" >> %q
       [[
 return {
   install = {
-    apt = "apt install -y neovim",
+    fake_apt = "fake_apt install -y neovim",
   },
   link = {
     ["./config"] = "$HOME/.config/nvim",
@@ -266,7 +323,7 @@ return {
       [[
 return {
   install = {
-    brew = "brew install zsh",
+    fake_brew = "fake_brew install zsh",
   },
   link = {
     ["./zshrc"] = "$HOME/.zshrc",
@@ -284,8 +341,8 @@ return {
     assert.is_true(run_dot())
 
     -- Check if commands were actually executed
-    assert.is_true(was_command_executed("apt"), "apt command should have been executed")
-    assert.is_true(was_command_executed("brew"), "brew command should have been executed")
+    assert.is_true(was_command_executed "fake_apt", "fake_apt command should have been executed")
+    assert.is_true(was_command_executed "fake_brew", "fake_brew command should have been executed")
 
     -- Check if symlinks are created
     local nvim_config = pl_path.join(home_dir, ".config", "nvim")
@@ -296,8 +353,8 @@ return {
 
   it("should use the first available package manager", function()
     -- Create both apt and brew commands
-    create_command("apt", 0, "Package installed via apt")
-    create_command("brew", 0, "Package installed via brew")
+    create_command("fake_apt", 0, "Package installed via apt")
+    create_command("fake_brew", 0, "Package installed via brew")
 
     -- Set up module with multiple package managers
     setup_module(
@@ -306,8 +363,8 @@ return {
 return {
   install = {
     nonexistent = "nonexistent install test-package",
-    apt = "apt install -y test-package",
-    brew = "brew install test-package",
+    fake_apt = "fake_apt install -y test-package",
+    fake_brew = "fake_brew install test-package",
   },
   link = {
     ["./config"] = "$HOME/.config/test",
@@ -324,18 +381,18 @@ return {
     assert.is_true(run_dot "test_priority")
 
     -- Check that one of the available commands was executed (since pairs order is not guaranteed)
-    local apt_executed = was_command_executed("apt")
-    local brew_executed = was_command_executed("brew")
-    local nonexistent_executed = was_command_executed("nonexistent")
-    
+    local apt_executed = was_command_executed "fake_apt"
+    local brew_executed = was_command_executed "fake_brew"
+    local nonexistent_executed = was_command_executed "nonexistent"
+
     assert.is_false(nonexistent_executed, "nonexistent should NOT have been executed")
-    assert.is_true(apt_executed or brew_executed, "either apt or brew should have been executed")
+    assert.is_true(apt_executed or brew_executed, "either fake_apt or fake_brew should have been executed")
     assert.is_false(apt_executed and brew_executed, "only one package manager should be executed")
   end)
 
   it("should use fallback commands when preferred is not available", function()
     -- Only create brew command (not apt)
-    create_command("brew", 0, "Package installed via brew")
+    create_command("fake_brew", 0, "Package installed via brew")
 
     -- Set up module that prefers apt but falls back to brew
     setup_module(
@@ -343,8 +400,8 @@ return {
       [[
 return {
   install = {
-    apt = "apt install -y test-package",
-    brew = "brew install test-package",
+    fake_apt = "fake_apt install -y test-package",
+    fake_brew = "fake_brew install test-package",
   },
   link = {
     ["./config"] = "$HOME/.config/test",
@@ -361,13 +418,13 @@ return {
     assert.is_true(run_dot "test_fallback")
 
     -- Check that brew was used as fallback
-    assert.is_false(was_command_executed("apt"), "apt should NOT have been executed (doesn't exist)")
-    assert.is_true(was_command_executed("brew"), "brew should have been executed as fallback")
+    assert.is_false(was_command_executed "fake_apt", "fake_apt should NOT have been executed (doesn't exist)")
+    assert.is_true(was_command_executed "fake_brew", "fake_brew should have been executed as fallback")
   end)
 
   it("should handle custom package managers", function()
     -- Create a custom package manager
-    create_command("pacman", 0, "Package installed via pacman")
+    create_command("fake_pacman", 0, "Package installed via pacman")
 
     -- Set up module with custom package manager
     setup_module(
@@ -375,7 +432,7 @@ return {
       [[
 return {
   install = {
-    pacman = "pacman -S test-package",
+    fake_pacman = "fake_pacman -S test-package",
   },
   link = {
     ["./config"] = "$HOME/.config/test",
@@ -392,23 +449,26 @@ return {
     assert.is_true(run_dot "test_custom")
 
     -- Check that pacman was executed
-    assert.is_true(was_command_executed("pacman"), "pacman should have been executed")
+    assert.is_true(was_command_executed "fake_pacman", "fake_pacman should have been executed")
   end)
 
   it("should handle bash commands", function()
-    -- Set up module with bash installation that calls touch (which we can track)
+    -- Set up module with bash installation that calls echo (which we can track)
     setup_module(
       "test_bash",
-      string.format([[
+      string.format(
+        [[
 return {
   install = {
-    bash = "touch %s/bash_install_marker.txt",
+    bash = "echo 'bash command executed' > %s/bash_install_marker.txt",
   },
   link = {
     ["./config"] = "$HOME/.config/test",
   }
 }
-]], home_dir)
+]],
+        home_dir
+      )
     )
 
     -- Create config
@@ -418,17 +478,18 @@ return {
     -- Run dot.lua
     assert.is_true(run_dot "test_bash")
 
-    -- Check that touch was executed (since the bash command actually calls touch)
-    assert.is_true(was_command_executed("touch"), "touch should have been executed as part of the bash command")
-    
-    -- Check that the marker file was created (this proves the command worked)
+    -- Check that the marker file was created (this proves the bash command worked)
     local marker_file = pl_path.join(home_dir, "bash_install_marker.txt")
     assert.is_true(path_exists(marker_file), "Bash command should have created marker file")
+    
+    -- Check the content of the marker file
+    local content = pl_file.read(marker_file)
+    assert.are.equal("bash command executed\n", content, "Bash command should have written correct content")
   end)
 
   it("should handle command failures gracefully", function()
     -- Create a command that fails
-    create_command("failing_cmd", 1, "Installation failed")
+    create_command("fake_failing_cmd", 1, "Installation failed")
 
     -- Set up module with failing command
     setup_module(
@@ -436,7 +497,7 @@ return {
       [[
 return {
   install = {
-    failing_cmd = "failing_cmd install test-package",
+    fake_failing_cmd = "fake_failing_cmd install test-package",
   },
   link = {
     ["./config"] = "$HOME/.config/test",
@@ -453,7 +514,7 @@ return {
     assert.is_true(run_dot "test_failure")
 
     -- Check that the failing command was attempted
-    assert.is_true(was_command_executed("failing_cmd"), "failing_cmd should have been executed")
+    assert.is_true(was_command_executed "fake_failing_cmd", "fake_failing_cmd should have been executed")
 
     -- Links should still be created despite install failure
     local test_config = pl_path.join(home_dir, ".config", "test")
@@ -463,22 +524,25 @@ return {
   it("should run postinstall hooks when installation happens", function()
     -- Create package manager
     local marker_file = pl_path.join(home_dir, "package_installed.marker")
-    create_marker_command("apt", marker_file)
+    create_marker_command("fake_apt", marker_file)
 
     -- Set up module with postinstall hook
     setup_module(
       "test_hooks",
-      string.format([[
+      string.format(
+        [[
 return {
   install = {
-    apt = "apt install -y test-package",
+    fake_apt = "fake_apt install -y test-package",
   },
   link = {
     ["./config"] = "$HOME/.config/test",
   },
   postinstall = "touch %s/postinstall_executed.marker",
 }
-]], home_dir)
+]],
+        home_dir
+      )
     )
 
     -- Create config
@@ -489,7 +553,7 @@ return {
     assert.is_true(run_dot "test_hooks")
 
     -- Check that install happened
-    assert.is_true(was_command_executed("apt"), "apt should have been executed")
+    assert.is_true(was_command_executed "fake_apt", "fake_apt should have been executed")
     assert.is_true(path_exists(marker_file), "Package should have been installed")
 
     -- Check that postinstall hook ran
@@ -501,14 +565,17 @@ return {
     -- Set up module without any install commands
     setup_module(
       "test_no_install",
-      string.format([[
+      string.format(
+        [[
 return {
   link = {
     ["./config"] = "$HOME/.config/test",
   },
   postinstall = "touch %s/postinstall_executed.marker",
 }
-]], home_dir)
+]],
+        home_dir
+      )
     )
 
     -- Create config
@@ -525,7 +592,7 @@ return {
 
   it("should run install commands on every run (realistic behavior)", function()
     -- Create package manager that succeeds
-    create_command("apt", 0, "Package installed successfully")
+    create_command("fake_apt", 0, "Package installed successfully")
 
     -- Set up module
     setup_module(
@@ -533,7 +600,7 @@ return {
       [[
 return {
   install = {
-    apt = "apt install -y test-package",
+    fake_apt = "fake_apt install -y test-package",
   },
   link = {
     ["./config"] = "$HOME/.config/test",
@@ -551,13 +618,13 @@ return {
     assert.is_true(run_dot "test_repeated")
 
     -- Check that apt was executed both times (realistic behavior - package managers handle idempotency)
-    assert.are.equal(2, get_command_execution_count("apt"), "apt should be executed on every run")
+    assert.are.equal(2, get_command_execution_count "fake_apt", "fake_apt should be executed on every run")
   end)
 
   it("should handle profiles correctly", function()
     -- Create package managers
-    create_command("apt", 0, "Package installed via apt")
-    create_command("brew", 0, "Package installed via brew")
+    create_command("fake_apt", 0, "Package installed via apt")
+    create_command("fake_brew", 0, "Package installed via brew")
 
     -- Set up multiple modules
     setup_module(
@@ -565,7 +632,7 @@ return {
       [[
 return {
   install = {
-    apt = "apt install -y neovim",
+    fake_apt = "fake_apt install -y neovim",
   },
   link = {
     ["./config"] = "$HOME/.config/nvim",
@@ -579,7 +646,7 @@ return {
       [[
 return {
   install = {
-    brew = "brew install zsh",
+    fake_brew = "fake_brew install zsh",
   },
   link = {
     ["./zshrc"] = "$HOME/.zshrc",
@@ -609,8 +676,8 @@ return {
     assert.is_true(run_dot "work")
 
     -- Check that only apt was executed (neovim), not brew (zsh)
-    assert.is_true(was_command_executed("apt"), "apt should have been executed for neovim")
-    assert.is_false(was_command_executed("brew"), "brew should NOT have been executed (zsh not in profile)")
+    assert.is_true(was_command_executed "fake_apt", "fake_apt should have been executed for neovim")
+    assert.is_false(was_command_executed "fake_brew", "fake_brew should NOT have been executed (zsh not in profile)")
 
     -- Check that only neovim symlink was created
     local nvim_config = pl_path.join(home_dir, ".config", "nvim")
@@ -621,7 +688,7 @@ return {
 
   it("should save and use last profile", function()
     -- Create package manager
-    create_command("apt", 0, "Package installed via apt")
+    create_command("fake_apt", 0, "Package installed via apt")
 
     -- Set up module
     setup_module(
@@ -629,7 +696,7 @@ return {
       [[
 return {
   install = {
-    apt = "apt install -y neovim",
+    fake_apt = "fake_apt install -y neovim",
   },
   link = {
     ["./config"] = "$HOME/.config/nvim",
@@ -664,7 +731,7 @@ return {
     assert.is_true(run_dot())
 
     -- Check that the profile was used (apt command executed again)
-    assert.is_true(was_command_executed("apt"), "apt should have been executed using saved profile")
+    assert.is_true(was_command_executed "fake_apt", "fake_apt should have been executed using saved profile")
 
     -- Check that .dot file was created with correct profile
     local dot_file_path = pl_path.join(dotfiles_dir, ".dot")
