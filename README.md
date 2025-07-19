@@ -46,16 +46,16 @@ profiles/
 ├── linux-server.lua
 modules/
 ├── neovim/
-│   ├── init.lua
+│   ├── dot.lua
 │   └── config/
 ├── zsh/
-│   ├── init.lua
+│   ├── dot.lua
 │   └── zshrc
 └── apps/
     ├── work/
-    │   └── init.lua
+    │   └── dot.lua
     └── personal/
-        └── init.lua
+        └── dot.lua
 
 $ dot          # Link all dotfiles and install dependencies
 $ dot neovim   # Only process the 'neovim' module
@@ -66,14 +66,14 @@ $ dot work     # Only process the 'work' profile
 
 ### Modules
 
-Each module under the `modules/` folder needs to have at least an `init.lua`. If not, it will be ignored. **Modules can be recursive**, meaning you can have nested directories within the `modules/` folder, and each can contain its own `init.lua` to define configurations and dependencies.
+Each module under the `modules/` folder needs to have at least a `dot.lua`. If not, it will be ignored. **Modules can be recursive**, meaning you can have nested directories within the `modules/` folder, and each can contain its own `dot.lua` to define configurations and dependencies.
 
-#### `init.lua`
+#### `dot.lua`
 
 Example for neovim:
 
 ```lua
--- modules/neovim/init.lua
+-- modules/neovim/dot.lua
 return {
   brew = {
     { name = "neovim", options = "--HEAD" },
@@ -93,7 +93,7 @@ return {
 As you can see, you can declare dependencies as [Homebrew](https://brew.sh) packages, which makes it possible to also use `dot` to install GUI apps (Homebrew casks). You can create a module without any config to use it as an installer for your apps:
 
 ```lua
--- modules/apps/init.lua
+-- modules/apps/dot.lua
 return {
   brew = { "whatsapp", "spotify", "slack", "vscode" }
 }
@@ -101,12 +101,12 @@ return {
 
 #### Wget
 
-`dot` now supports downloading files using `wget`. This can be useful for fetching binaries or other resources that are not available through Homebrew. You can specify a `wget` configuration in your module's `init.lua` file.
+`dot` now supports downloading files using `wget`. This can be useful for fetching binaries or other resources that are not available through Homebrew. You can specify a `wget` configuration in your module's `dot.lua` file.
 
 Example:
 
 ```lua
--- modules/apps/init.lua
+-- modules/apps/dot.lua
 return {
   wget = {
     {
@@ -137,7 +137,7 @@ The config will be linked to the home folder with a soft link. In this case:
 You can also specify multiple configurations for a single module:
 
 ```lua
--- modules/multi-config/init.lua
+-- modules/multi-config/dot.lua
 return {
   brew = { "cursor" },
   config = {
@@ -161,10 +161,10 @@ This will create two symlinks:
 ```
 ### OS Restrictions
 
-You can restrict modules to specific operating systems using the `os` field in your module's `init.lua`:
+You can restrict modules to specific operating systems using the `os` field in your module's `dot.lua`:
 
 ```lua
--- modules/macos-only/init.lua
+-- modules/macos-only/dot.lua
 return {
   os = { "mac" },  -- This module will only run on macOS
   brew = { "mac-specific-app" },
@@ -201,7 +201,7 @@ You can manage macOS application preferences using the `defaults` field in your 
 Example:
 
 ```lua
--- modules/swiftshift/init.lua
+-- modules/swiftshift/dot.lua
 return {
   defaults = {
     {
@@ -349,7 +349,7 @@ $ dot --purge neovim
 
 This command will:
 
-- Uninstall the Homebrew dependencies listed in the module's `init.lua`.
+- Uninstall the Homebrew dependencies listed in the module's `dot.lua`.
 - Remove the symlink or config file/directory specified in `config.output`.
 - Run any `post_purge` hooks if defined in the module.
 
@@ -358,7 +358,7 @@ This command will:
 
 ### Hooks
 
-You can define `post_install` and `post_purge` hooks in your module's `init.lua` to run arbitrary commands after the module has been installed or purged.
+You can define `post_install` and `post_purge` hooks in your module's `dot.lua` to run arbitrary commands after the module has been installed or purged.
 
 ```lua
 return {

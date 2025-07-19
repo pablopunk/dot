@@ -33,8 +33,8 @@ describe("dot.lua", function()
   local function setup_module(name, content)
     local module_dir = pl_path.join(modules_dir, name)
     pl_dir.makepath(module_dir)
-    local init_lua = pl_path.join(module_dir, "init.lua")
-    pl_file.write(init_lua, content)
+    local dot_lua = pl_path.join(module_dir, "dot.lua")
+    pl_file.write(dot_lua, content)
   end
 
   -- Function to set up a profile with given name and content

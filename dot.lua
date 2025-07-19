@@ -367,17 +367,17 @@ end
 local function get_all_modules()
   local modules = {}
   local modules_dir = "modules"
-  -- Find all init.lua files within modules directory
-  local cmd = string.format('find "%s" -type f -name "init.lua"', modules_dir)
+  -- Find all dot.lua files within modules directory
+  local cmd = string.format('find "%s" -type f -name "dot.lua"', modules_dir)
   local exit_code, output = execute(cmd)
   if exit_code == 0 then
-    -- First pass: collect all init.lua files
+    -- First pass: collect all dot.lua files
     local all_init_files = {}
     for file in output:gmatch "[^\n]+" do
       table.insert(all_init_files, file)
     end
 
-    -- Sort init.lua files by path length (shortest first) to ensure parent modules are processed first
+    -- Sort dot.lua files by path length (shortest first) to ensure parent modules are processed first
     table.sort(all_init_files, function(a, b)
       return #a < #b
     end)
@@ -387,11 +387,11 @@ local function get_all_modules()
 
     for _, file in ipairs(all_init_files) do
       -- Extract the module path relative to modules_dir
-      local module_path = file:match("^" .. modules_dir .. "/(.+)/init.lua$")
+      local module_path = file:match("^" .. modules_dir .. "/(.+)/dot.lua$")
       if module_path then
         local is_nested = false
 
-        -- Check if any parent directory already has init.lua
+        -- Check if any parent directory already has dot.lua
         local path_parts = {}
         for part in module_path:gmatch "[^/]+" do
           table.insert(path_parts, part)
@@ -413,7 +413,7 @@ local function get_all_modules()
 
         if not is_nested then
           -- This is a top-level module or one without parent modules
-          local module_name = module_path:gsub("/init.lua$", "")
+          local module_name = module_path
           table.insert(modules, module_name)
 
           -- Mark this path as having a module
@@ -678,10 +678,10 @@ local function process_module(module_name, options)
   print_section(module_name)
 
   local module_dir = "modules/" .. module_name
-  local init_file = module_dir .. "/init.lua"
+  local dot_file = module_dir .. "/dot.lua"
 
-  -- Load the init.lua file
-  local config_func, load_err = loadfile(init_file)
+  -- Load the dot.lua file
+  local config_func, load_err = loadfile(dot_file)
   if not config_func then
     print_message("error", "Error loading configuration: " .. load_err)
     return
@@ -817,7 +817,7 @@ local function process_tool(tool_name, options)
       return false
     else
       -- Check for exact module path
-      local module_path = "modules/" .. tool_name .. "/init.lua"
+      local module_path = "modules/" .. tool_name .. "/dot.lua"
       if is_file(module_path) then
         process_module(tool_name, options)
         return true
