@@ -519,15 +519,7 @@ local function process_install(config, purge_mode)
   else
     -- Find the first available command and run it
     for cmd_name, cmd_line in pairs(config.install) do
-      -- For bash, always execute. For package managers, check if they exist
-      local should_execute = false
-      if cmd_name == "bash" then
-        should_execute = true
-      else
-        should_execute = command_exists(cmd_name)
-      end
-      
-      if should_execute then
+      if command_exists(cmd_name) then
         print_message("info", "install → using " .. cmd_name)
         local exit_code, output = execute(cmd_line)
         if exit_code == 0 then
