@@ -1440,4 +1440,194 @@ return {
     local config_path = pl_path.join(home_dir, ".config", "test")
     assert.is_true(is_link(config_path), "Symlink should have been created")
   end)
+
+  it("should handle multi-line install commands successfully", function()
+    -- Create multiple fake commands for multi-line test
+    create_command("fake_step1", 0, "Step 1 completed")
+    create_command("fake_step2", 0, "Step 2 completed")
+    create_command("fake_step3", 0, "Step 3 completed")
+    create_command("fake_apt", 0, "Package installed successfully")
+
+    -- Set up module with multi-line install command
+    setup_module(
+      "test_multiline_success",
+      [[
+return {
+  install = {
+    fake_apt = "fake_step1 install package1\nfake_step2 install package2\nfake_step3 install package3",
+  },
+  link = {
+    ["./config"] = "$HOME/.config/test",
+  }
+}
+]]
+    )
+
+    -- Create config
+    pl_dir.makepath(pl_path.join(dotfiles_dir, "test_multiline_success", "config"))
+    pl_file.write(pl_path.join(dotfiles_dir, "test_multiline_success", "config", "test.conf"), "test config")
+
+    -- Run dot.lua
+    assert.is_true(run_dot "test_multiline_success")
+
+    -- Check that all steps were executed
+    assert.is_true(was_command_executed "fake_step1", "Step 1 should have been executed")
+    assert.is_true(was_command_executed "fake_step2", "Step 2 should have been executed")
+    assert.is_true(was_command_executed "fake_step3", "Step 3 should have been executed")
+
+    -- Check that symlink was created
+    local config_path = pl_path.join(home_dir, ".config", "test")
+    assert.is_true(is_link(config_path), "Symlink should have been created")
+  end)
+
+  it("should handle multi-line install commands with failure", function()
+    -- Create commands where one will fail
+    create_command("fake_step1", 0, "Step 1 completed")
+    create_command("fake_step2", 1, "Step 2 failed") -- This will fail
+    create_command("fake_step3", 0, "Step 3 completed")
+    create_command("fake_apt", 0, "Package installed successfully")
+
+    -- Set up module with multi-line install command that will fail
+    setup_module(
+      "test_multiline_failure",
+      [[
+return {
+  install = {
+    fake_apt = "fake_step1 install package1\nfake_step2 install package2\nfake_step3 install package3",
+  },
+  link = {
+    ["./config"] = "$HOME/.config/test",
+  }
+}
+]]
+    )
+
+    -- Create config
+    pl_dir.makepath(pl_path.join(dotfiles_dir, "test_multiline_failure", "config"))
+    pl_file.write(pl_path.join(dotfiles_dir, "test_multiline_failure", "config", "test.conf"), "test config")
+
+    -- Run dot.lua
+    assert.is_true(run_dot "test_multiline_failure")
+
+    -- Check that first step was executed
+    assert.is_true(was_command_executed "fake_step1", "Step 1 should have been executed")
+
+    -- Check that second step was executed (and failed)
+    assert.is_true(was_command_executed "fake_step2", "Step 2 should have been executed")
+
+    -- Check that third step was NOT executed (due to failure)
+    assert.is_false(was_command_executed "fake_step3", "Step 3 should NOT have been executed due to failure")
+
+    -- Check that symlink was still created (installation failure doesn't stop linking)
+    local config_path = pl_path.join(home_dir, ".config", "test")
+    assert.is_true(is_link(config_path), "Symlink should have been created despite install failure")
+  end)
+
+  it("should handle multi-line commands with empty lines", function()
+    -- Create fake commands
+    create_command("fake_step1", 0, "Step 1 completed")
+    create_command("fake_step2", 0, "Step 2 completed")
+    create_command("fake_apt", 0, "Package installed successfully")
+
+    -- Set up module with multi-line install command containing empty lines
+    setup_module(
+      "test_multiline_empty",
+      [[
+return {
+  install = {
+    fake_apt = "fake_step1 install package1\n\nfake_step2 install package2",
+  },
+  link = {
+    ["./config"] = "$HOME/.config/test",
+  }
+}
+]]
+    )
+
+    -- Create config
+    pl_dir.makepath(pl_path.join(dotfiles_dir, "test_multiline_empty", "config"))
+    pl_file.write(pl_path.join(dotfiles_dir, "test_multiline_empty", "config", "test.conf"), "test config")
+
+    -- Run dot.lua
+    assert.is_true(run_dot "test_multiline_empty")
+
+    -- Check that both steps were executed (empty lines should be ignored)
+    assert.is_true(was_command_executed "fake_step1", "Step 1 should have been executed")
+    assert.is_true(was_command_executed "fake_step2", "Step 2 should have been executed")
+
+    -- Check that symlink was created
+    local config_path = pl_path.join(home_dir, ".config", "test")
+    assert.is_true(is_link(config_path), "Symlink should have been created")
+  end)
+
+  it("should handle multi-line commands with leading/trailing whitespace", function()
+    -- Create fake commands
+    create_command("fake_step1", 0, "Step 1 completed")
+    create_command("fake_step2", 0, "Step 2 completed")
+    create_command("fake_apt", 0, "Package installed successfully")
+
+    -- Set up module with multi-line install command containing whitespace
+    setup_module(
+      "test_multiline_whitespace",
+      [[
+return {
+  install = {
+    fake_apt = "fake_step1 install package1\n  fake_step2 install package2",
+  },
+  link = {
+    ["./config"] = "$HOME/.config/test",
+  }
+}
+]]
+    )
+
+    -- Create config
+    pl_dir.makepath(pl_path.join(dotfiles_dir, "test_multiline_whitespace", "config"))
+    pl_file.write(pl_path.join(dotfiles_dir, "test_multiline_whitespace", "config", "test.conf"), "test config")
+
+    -- Run dot.lua
+    assert.is_true(run_dot "test_multiline_whitespace")
+
+    -- Check that both steps were executed (whitespace should be trimmed)
+    assert.is_true(was_command_executed "fake_step1", "Step 1 should have been executed")
+    assert.is_true(was_command_executed "fake_step2", "Step 2 should have been executed")
+
+    -- Check that symlink was created
+    local config_path = pl_path.join(home_dir, ".config", "test")
+    assert.is_true(is_link(config_path), "Symlink should have been created")
+  end)
+
+  it("should handle single-line commands (backward compatibility)", function()
+    -- Create package manager
+    create_command("fake_apt", 0, "Package installed successfully")
+
+    -- Set up module with single-line install command
+    setup_module(
+      "test_single_line",
+      [[
+return {
+  install = {
+    fake_apt = "fake_apt install -y test-package",
+  },
+  link = {
+    ["./config"] = "$HOME/.config/test",
+  }
+}
+]]
+    )
+
+    -- Create config
+    pl_dir.makepath(pl_path.join(dotfiles_dir, "test_single_line", "config"))
+    pl_file.write(pl_path.join(dotfiles_dir, "test_single_line", "config", "test.conf"), "test config")
+
+    -- Run dot.lua
+    assert.is_true(run_dot "test_single_line")
+
+    -- Check that install command was executed
+    assert.is_true(was_command_executed "fake_apt", "install command should have been executed")
+
+    -- Check that symlink was created
+    local config_path = pl_path.join(home_dir, ".config", "test")
+    assert.is_true(is_link(config_path), "Symlink should have been created")
+  end)
 end)

@@ -441,14 +441,27 @@ local function process_install(config)
   for cmd_name, cmd_line in pairs(config.install) do
     if command_exists(cmd_name) then
       print_message("info", "install → using " .. cmd_name)
-      local exit_code, output = execute(cmd_line)
-      if exit_code == 0 then
-        if output and output ~= "" then
-          print_message("success", "install → completed")
+
+      -- Handle multi-line commands
+      local cmd_lines = str_split(cmd_line, "\n")
+      cmd_lines = table_remove_empty(cmd_lines)
+
+      local all_succeeded = true
+      for _, line in ipairs(cmd_lines) do
+        local trimmed_line = str_trim(line)
+        if trimmed_line ~= "" then
+          local exit_code, output = execute(trimmed_line)
+          if exit_code ~= 0 then
+            print_message("error", "install → failed: " .. (output or "unknown error"))
+            all_succeeded = false
+            break
+          end
         end
+      end
+      
+      if all_succeeded then
+        print_message("success", "install → completed")
         install_happened = true
-      else
-        print_message("error", "install → failed: " .. (output or "unknown error"))
       end
       break -- Only use the first available package manager
     end

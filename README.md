@@ -23,7 +23,6 @@
 - [Examples](#examples)
 
 ## Installation
-
 ```bash
 $ brew install pablopunk/brew/dot
 ```
@@ -330,3 +329,4 @@ $ dot -h                  # Show help
 ## Examples
 
 - [pablopunk/dotfiles](https://github.com/pablopunk/dotfiles): my own dotfiles, using `dot` to manage them.
+
