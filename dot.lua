@@ -307,6 +307,24 @@ local function command_exists(cmd)
   return exit_code == 0
 end
 
+-- OS detection functions
+local function os_name()
+  local handle = io.popen "uname"
+  local result = handle:read "*l"
+  handle:close()
+  return result or "Unknown"
+end
+
+local OS_NAME = os_name()
+
+local function is_macos()
+  return OS_NAME == "Darwin"
+end
+
+local function is_linux()
+  return OS_NAME == "Linux" or OS_NAME == "GNU/Linux"
+end
+
 -- File operation functions
 local function ensure_parent_directory(path)
   local parent = path:match "(.+)/[^/]*$"
@@ -546,6 +564,106 @@ local function process_install(config, purge_mode)
   return install_happened
 end
 
+-- Process macOS defaults
+local function process_defaults(config, options)
+  if not config.defaults then
+    return false
+  end
+
+  -- Only process defaults on macOS
+  if not is_macos() then
+    print_message("warning", "defaults → skipping (only available on macOS)")
+    return false
+  end
+
+  local defaults_processed = false
+
+  for _, default_config in ipairs(config.defaults) do
+    local app = default_config.app
+    local plist = default_config.plist
+    
+    if not app or not plist then
+      print_message("error", "defaults → missing app or plist field")
+      goto continue
+    end
+
+    local plist_path = plist
+    if not plist_path:match("^/") then
+      -- Relative path, make it relative to module directory
+      plist_path = os.getenv("PWD") .. "/" .. plist_path:gsub("^./", "")
+    end
+
+    if options.defaults_export then
+      -- Export defaults to plist file
+      print_message("info", "defaults → exporting " .. app .. " to " .. plist_path)
+      
+      -- Ensure parent directory exists
+      local success, err = ensure_parent_directory(plist_path)
+      if not success then
+        print_message("error", "defaults → " .. err)
+        goto continue
+      end
+
+      -- Determine output format based on file extension
+      local format_flag = ""
+      if plist_path:match("%.xml$") then
+        format_flag = " -format xml1"
+      end
+
+      local export_cmd = string.format('defaults export "%s" "%s"%s', app, plist_path, format_flag)
+      local exit_code, output = execute(export_cmd)
+      
+      if exit_code == 0 then
+        print_message("success", "defaults → exported " .. app)
+        defaults_processed = true
+      else
+        print_message("error", "defaults → export failed: " .. (output or "unknown error"))
+      end
+
+    elseif options.defaults_import then
+      -- Import defaults from plist file
+      if not is_file(plist_path) then
+        print_message("error", "defaults → plist file not found: " .. plist_path)
+        goto continue
+      end
+
+      print_message("info", "defaults → importing " .. app .. " from " .. plist_path)
+      
+      local import_cmd = string.format('defaults import "%s" "%s"', app, plist_path)
+      local exit_code, output = execute(import_cmd)
+      
+      if exit_code == 0 then
+        print_message("success", "defaults → imported " .. app)
+        defaults_processed = true
+      else
+        print_message("error", "defaults → import failed: " .. (output or "unknown error"))
+      end
+
+    else
+      -- Regular processing (import during normal dot run)
+      if is_file(plist_path) then
+        print_message("info", "defaults → importing " .. app .. " from " .. plist_path)
+        
+        local import_cmd = string.format('defaults import "%s" "%s"', app, plist_path)
+        local exit_code, output = execute(import_cmd)
+        
+        if exit_code == 0 then
+          print_message("success", "defaults → imported " .. app)
+          defaults_processed = true
+        else
+          print_message("error", "defaults → import failed: " .. (output or "unknown error"))
+        end
+      else
+        print_message("warning", "defaults → plist file not found: " .. plist_path .. " (use -e to export)")
+      end
+    end
+
+    ::continue::
+  end
+
+  return defaults_processed
+end
+
 -- Handle new link system
 local function handle_links(config, module_dir, options)
   if not config.link then
@@ -663,16 +781,6 @@ function os_name()
   return osname or "Windows"
 end
 
-local OS_NAME = os_name()
-
-local function is_macos()
-  return OS_NAME == "Darwin"
-end
-
-local function is_linux()
-  return OS_NAME == "Linux" or OS_NAME == "GNU/Linux"
-end
-
 -- Process each module by installing dependencies and managing symlinks
 local function process_module(module_name, options)
   print_section(module_name)
@@ -721,6 +829,7 @@ local function process_module(module_name, options)
 
   local install_happened = false
   local link_happened = false
+  local defaults_happened = false
 
   -- Process installation
   if process_install(config, options.purge_mode) then
@@ -730,6 +839,11 @@ local function process_module(module_name, options)
   -- Process links
   if handle_links(config, module_dir, options) then
     link_happened = true
+  end
+
+  -- Process defaults
+  if process_defaults(config, options) then
+    defaults_happened = true
   end
 
   -- Run new hook system
