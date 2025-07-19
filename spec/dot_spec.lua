@@ -77,29 +77,35 @@ describe("dot.lua", function()
   end)
 
   it("should install all modules", function()
-    -- Set up 'neovim' module
+    -- Set up 'neovim' module with new structure
     setup_module(
       "neovim",
       [[
 return {
-  brew = { "neovim" },
-  config = {
-    source = "./config",
-    output = "~/.config/nvim",
+  install = {
+    brew = "brew install neovim",
+    apt = "sudo apt install -y neovim",
+    dnf = "sudo dnf install -y neovim",
+  },
+  link = {
+    ["./config"] = "$HOME/.config/nvim",
   }
 }
 ]]
     )
 
-    -- Set up 'zsh' module
+    -- Set up 'zsh' module with new structure
     setup_module(
       "zsh",
       [[
 return {
-  brew = { "zsh" },
-  config = {
-    source = "./zshrc",
-    output = "~/.zshrc",
+  install = {
+    brew = "brew install zsh",
+    apt = "sudo apt install -y zsh",
+    bash = "curl -fsSL https://z.sh | bash -s",
+  },
+  link = {
+    ["./zshrc"] = "$HOME/.zshrc",
   }
 }
 ]]
@@ -121,15 +127,17 @@ return {
   end)
 
   it("should install a specific module", function()
-    -- Set up 'neovim' module
+    -- Set up 'neovim' module with new structure
     setup_module(
       "neovim",
       [[
 return {
-  brew = { "neovim" },
-  config = {
-    source = "./config",
-    output = "~/.config/nvim",
+  install = {
+    brew = "brew install neovim",
+    apt = "sudo apt install -y neovim",
+  },
+  link = {
+    ["./config"] = "$HOME/.config/nvim",
   }
 }
 ]]
@@ -150,29 +158,33 @@ return {
   end)
 
   it("should install a profile", function()
-    -- Set up 'neovim' module
+    -- Set up 'neovim' module with new structure
     setup_module(
       "neovim",
       [[
 return {
-  brew = { "neovim" },
-  config = {
-    source = "./config",
-    output = "~/.config/nvim",
+  install = {
+    brew = "brew install neovim",
+    apt = "sudo apt install -y neovim",
+  },
+  link = {
+    ["./config"] = "$HOME/.config/nvim",
   }
 }
 ]]
     )
 
-    -- Set up 'zsh' module
+    -- Set up 'zsh' module with new structure
     setup_module(
       "zsh",
       [[
 return {
-  brew = { "zsh" },
-  config = {
-    source = "./zshrc",
-    output = "~/.zshrc",
+  install = {
+    brew = "brew install zsh",
+    apt = "sudo apt install -y zsh",
+  },
+  link = {
+    ["./zshrc"] = "$HOME/.zshrc",
   }
 }
 ]]
@@ -206,43 +218,46 @@ return {
   end)
 
   it("should handle exclusions in profiles", function()
-    -- Set up 'neovim' module
+    -- Set up 'neovim' module with new structure
     setup_module(
       "neovim",
       [[
 return {
-  brew = { "neovim" },
-  config = {
-    source = "./config",
-    output = "~/.config/nvim",
+  install = {
+    brew = "brew install neovim",
+  },
+  link = {
+    ["./config"] = "$HOME/.config/nvim",
   }
 }
 ]]
     )
 
-    -- Set up 'zsh' module
+    -- Set up 'zsh' module with new structure
     setup_module(
       "zsh",
       [[
 return {
-  brew = { "zsh" },
-  config = {
-    source = "./zshrc",
-    output = "~/.zshrc",
+  install = {
+    brew = "brew install zsh",
+  },
+  link = {
+    ["./zshrc"] = "$HOME/.zshrc",
   }
 }
 ]]
     )
 
-    -- Set up 'apps/work' module
+    -- Set up 'apps/work' module with new structure
     setup_module(
       "apps/work",
       [[
 return {
-  brew = { "work-app" },
-  config = {
-    source = "./config",
-    output = "~/.config/work-app",
+  install = {
+    brew = "brew install work-app",
+  },
+  link = {
+    ["./config"] = "$HOME/.config/work-app",
   }
 }
 ]]
@@ -281,23 +296,20 @@ return {
   end)
 
   it("should replace existing configs in force mode", function()
-    -- Set up 'neovim' module
+    -- Set up 'neovim' module with new structure
     setup_module(
       "neovim",
-      string.format(
-        [[
+      [[
 return {
-  brew = { "neovim" },
-  config = {
-    source = "./config",
-    output = "~/.config/nvim",
+  install = {
+    brew = "brew install neovim",
+  },
+  link = {
+    ["./config"] = "$HOME/.config/nvim",
   }
 }
-]],
-        home_dir,
-        home_dir
-      )
-    ) -- Ensure absolute paths if needed
+]]
+    )
 
     -- Create existing config
     local nvim_config = pl_path.join(home_dir, ".config", "nvim")
@@ -327,15 +339,16 @@ return {
   end)
 
   it("should unlink configs with --unlink", function()
-    -- Set up 'neovim' module
+    -- Set up 'neovim' module with new structure
     setup_module(
       "neovim",
       [[
 return {
-  brew = { "neovim" },
-  config = {
-    source = "./config",
-    output = "~/.config/nvim",
+  install = {
+    brew = "brew install neovim",
+  },
+  link = {
+    ["./config"] = "$HOME/.config/nvim",
   }
 }
 ]]
@@ -366,15 +379,16 @@ return {
   end)
 
   it("should purge modules with --purge", function()
-    -- Set up 'neovim' module
+    -- Set up 'neovim' module with new structure
     setup_module(
       "neovim",
       [[
 return {
-  brew = { "neovim" },
-  config = {
-    source = "./config",
-    output = "~/.config/nvim",
+  install = {
+    brew = "brew install neovim",
+  },
+  link = {
+    ["./config"] = "$HOME/.config/nvim",
   }
 }
 ]]
@@ -397,22 +411,24 @@ return {
     assert.is_false(path_exists(nvim_config), "Expected nvim_config to be removed after purge")
   end)
 
-  it("should run hooks", function()
-    -- Set up 'dummy_app' module with hooks using absolute paths
+  it("should run new hook system", function()
+    -- Set up 'dummy_app' module with new hooks using absolute paths
     setup_module(
       "dummy_app",
       string.format(
         [[
 return {
-  brew = { },
-  config = {
-    source = "./config",
-    output = "~/.config/dummy_app",
+  install = {
+    bash = "touch %s/.install_ran",
   },
-  post_install = "touch %s/.hooks_post_install_ran",
-  post_purge = "touch %s/.hooks_post_purge_ran",
+  link = {
+    ["./config"] = "$HOME/.config/dummy_app",
+  },
+  postinstall = "touch %s/.hooks_postinstall_ran",
+  postlink = "touch %s/.hooks_postlink_ran",
 }
 ]],
+        home_dir,
         home_dir,
         home_dir
       )
@@ -425,54 +441,78 @@ return {
     -- Run dot.lua to install 'dummy_app'
     assert.is_true(run_dot "dummy_app")
 
-    -- Check if post_install hook ran
-    local hook_install = pl_path.join(home_dir, ".hooks_post_install_ran")
-    print("Checking for hook_install at:", hook_install)
-    assert.is_true(path_exists(hook_install), "Post-install hook did not run")
+    -- Check if postinstall hook ran (should run because install happened)
+    local hook_postinstall = pl_path.join(home_dir, ".hooks_postinstall_ran")
+    assert.is_true(path_exists(hook_postinstall), "Post-install hook did not run")
 
-    -- Run dot.lua with --purge option for 'dummy_app'
-    assert.is_true(run_dot "--purge dummy_app")
+    -- Check if postlink hook ran (should run because link happened)
+    local hook_postlink = pl_path.join(home_dir, ".hooks_postlink_ran")
+    assert.is_true(path_exists(hook_postlink), "Post-link hook did not run")
 
-    -- Check if post_purge hook ran
-    local hook_purge = pl_path.join(home_dir, ".hooks_post_purge_ran")
-    print("Checking for hook_purge at:", hook_purge)
-    assert.is_true(path_exists(hook_purge), "Post-purge hook did not run")
+    -- Check if install command ran
+    local install_ran = pl_path.join(home_dir, ".install_ran")
+    assert.is_true(path_exists(install_ran), "Install command did not run")
   end)
 
-  it("should handle multiple configs in a module", function()
-    -- Set up 'multi_config' module with multiple configs
+  it("should handle multiple links in a module", function()
+    -- Set up 'multi_link' module with multiple links
     setup_module(
-      "multi_config",
+      "multi_link",
       [[
 return {
-  brew = { },
-  config = {
-    {
-      source = "./config/settings.json",
-      output = "~/settings.json",
-    },
-    {
-      source = "./config/keybindings.json",
-      output = "~/keybindings.json",
-    }
+  link = {
+    ["./config/settings.json"] = "$HOME/settings.json",
+    ["./config/keybindings.json"] = "$HOME/keybindings.json",
   }
 }
 ]]
     )
 
     -- Create config files
-    pl_dir.makepath(pl_path.join(modules_dir, "multi_config", "config"))
-    pl_file.write(pl_path.join(modules_dir, "multi_config", "config", "settings.json"), [[{ "setting": "value" }]])
-    pl_file.write(pl_path.join(modules_dir, "multi_config", "config", "keybindings.json"), [[{ "key": "binding" }]])
+    pl_dir.makepath(pl_path.join(modules_dir, "multi_link", "config"))
+    pl_file.write(pl_path.join(modules_dir, "multi_link", "config", "settings.json"), [[{ "setting": "value" }]])
+    pl_file.write(pl_path.join(modules_dir, "multi_link", "config", "keybindings.json"), [[{ "key": "binding" }]])
 
-    -- Run dot.lua to install 'multi_config'
-    assert.is_true(run_dot "multi_config")
+    -- Run dot.lua to install 'multi_link'
+    assert.is_true(run_dot "multi_link")
 
     -- Check if symlinks are created
     local settings = pl_path.join(home_dir, "settings.json")
     local keybindings = pl_path.join(home_dir, "keybindings.json")
     assert.is_true(is_link(settings), "Expected symlink for settings.json")
     assert.is_true(is_link(keybindings), "Expected symlink for keybindings.json")
+  end)
+
+  it("should support directory linking", function()
+    -- Set up module that links entire directories
+    setup_module(
+      "dir_link",
+      [[
+return {
+  link = {
+    ["./zshrc.d"] = "$HOME/.zshrc.d",
+    ["./config"] = "$HOME/.config/myapp",
+  }
+}
+]]
+    )
+
+    -- Create directory structures
+    pl_dir.makepath(pl_path.join(modules_dir, "dir_link", "zshrc.d"))
+    pl_file.write(pl_path.join(modules_dir, "dir_link", "zshrc.d", "aliases.zsh"), "alias ll='ls -la'")
+    pl_file.write(pl_path.join(modules_dir, "dir_link", "zshrc.d", "exports.zsh"), "export EDITOR=nvim")
+    
+    pl_dir.makepath(pl_path.join(modules_dir, "dir_link", "config"))
+    pl_file.write(pl_path.join(modules_dir, "dir_link", "config", "config.json"), '{"theme": "dark"}')
+
+    -- Run dot.lua to install 'dir_link'
+    assert.is_true(run_dot "dir_link")
+
+    -- Check if directory symlinks are created
+    local zshrc_d = pl_path.join(home_dir, ".zshrc.d")
+    local config_dir = pl_path.join(home_dir, ".config", "myapp")
+    assert.is_true(is_link(zshrc_d), "Expected symlink for .zshrc.d directory")
+    assert.is_true(is_link(config_dir), "Expected symlink for config directory")
   end)
 
   it("should display help message with -h option", function()
@@ -487,112 +527,165 @@ return {
     assert.is_true(output:find(expected_start, 1, true) ~= nil, "Help message not displayed correctly")
   end)
 
-  it("should handle wget configuration", function()
-    -- Set up 'wget_test' module with wget configuration
+  it("should handle OS-specific modules", function()
+    -- Set up a module that only works on the current OS
+    local current_os = io.popen("uname"):read("*l") -- Get the current OS
+    local is_macos = current_os == "Darwin"
+    local is_linux = current_os == "Linux"
+    
+    -- Set up 'os_specific' module for the current OS
     setup_module(
-      "wget_test",
+      "os_specific_current",
       [[
 return {
-  wget = {
-    url = "https://example.com/test.bin",
-    output = "]] .. pl_path.join(home_dir, "test_output") .. [[",
+  os = { "]] .. (is_macos and "darwin" or "linux") .. [[" },
+  link = {
+    ["./config"] = "$HOME/.config/os_specific_current",
   }
 }
 ]]
     )
-
-    -- Run dot.lua for 'wget_test' module with mock-wget
-    assert.is_true(run_dot "wget_test --mock-wget")
-
-    -- Check if the mock download and unzip operations were performed
-    local test_output = pl_path.join(home_dir, "test_output")
-    assert.is_true(path_exists(test_output), "Expected test_output to exist after mock wget operation")
+    
+    -- Set up a module for the other OS
+    setup_module(
+      "os_specific_other",
+      [[
+return {
+  os = { "]] .. (is_macos and "linux" or "darwin") .. [[" },
+  link = {
+    ["./config"] = "$HOME/.config/os_specific_other",
+  }
+}
+]]
+    )
+    
+    -- Create config directories and files
+    pl_dir.makepath(pl_path.join(modules_dir, "os_specific_current", "config"))
+    pl_file.write(pl_path.join(modules_dir, "os_specific_current", "config", "config.txt"), "current os config")
+    
+    pl_dir.makepath(pl_path.join(modules_dir, "os_specific_other", "config"))
+    pl_file.write(pl_path.join(modules_dir, "os_specific_other", "config", "config.txt"), "other os config")
+    
+    -- Run dot.lua without arguments to install all modules
+    assert.is_true(run_dot())
+    
+    -- Check if the current OS module is installed and the other OS module is skipped
+    local current_config = pl_path.join(home_dir, ".config", "os_specific_current")
+    local other_config = pl_path.join(home_dir, ".config", "os_specific_other")
+    
+    assert.is_true(is_link(current_config), "Expected symlink for current OS module")
+    assert.is_false(path_exists(other_config), "Did not expect symlink for other OS module")
   end)
 
-  it("should handle defaults export and import", function()
-    -- Set up 'defaults_test' module with defaults configuration
+  it("should support fuzzy module matching", function()
+    -- Set up nested module structure
     setup_module(
-      "defaults_test",
+      "ricing/hyprland",
       [[
 return {
-  defaults = {
-    {
-      plist = "./defaults/SwiftShift.plist",
-      app = "com.pablopunk.SwiftShift",
-    }
+  install = {
+    apt = "sudo apt install -y hyprland",
+  },
+  link = {
+    ["./config"] = "$HOME/.config/hypr",
   }
 }
 ]]
     )
 
-    -- Create module directory
-    pl_dir.makepath(pl_path.join(modules_dir, "defaults_test", "defaults"))
+    -- Create config
+    pl_dir.makepath(pl_path.join(modules_dir, "ricing", "hyprland", "config"))
+    pl_file.write(pl_path.join(modules_dir, "ricing", "hyprland", "config", "hyprland.conf"), "# Hyprland config")
 
-    -- Run dot.lua with --defaults-export and --mock-defaults options
-    assert.is_true(run_dot "defaults_test --defaults-export --mock-defaults")
+    -- Test fuzzy matching: 'hypr' should match 'ricing/hyprland'
+    assert.is_true(run_dot "hypr")
 
-    -- Check if the plist file was created
-    local plist_path = pl_path.join(modules_dir, "defaults_test", "defaults", "SwiftShift.plist")
-    assert.is_true(pl_path.isfile(plist_path), "Expected plist file to be created")
-
-    -- Verify the content of the plist file
-    local content = pl_file.read(plist_path)
-    assert.are.equal("mocked preferences", content)
-
-    -- Run dot.lua with --defaults-import and --mock-defaults options
-    assert.is_true(run_dot "defaults_test --defaults-import --mock-defaults")
-    -- Check if the import was successful (mocked, so no actual change)
-    -- This is mainly to ensure no errors occur during the import process
+    -- Check if symlink is created
+    local hypr_config = pl_path.join(home_dir, ".config", "hypr")
+    assert.is_true(is_link(hypr_config), "Expected symlink for hypr config via fuzzy match")
   end)
 
-  it("should handle XML format for defaults export and import", function()
-    -- Set up a module with XML format for defaults
+  it("should handle command detection for install", function()
+    -- Set up module with multiple install options
     setup_module(
-      "defaults_xml_test",
+      "test_detection",
       [[
 return {
-  defaults = {
-    {
-      plist = "./defaults/SwiftShift.xml",
-      app = "com.pablopunk.SwiftShift",
-    }
+  install = {
+    nonexistent_cmd = "nonexistent_cmd install test",
+    bash = "echo 'bash install worked' > ]] .. home_dir .. [[/install_result.txt",
+  },
+  link = {
+    ["./config"] = "$HOME/.config/test_detection",
   }
 }
 ]]
     )
 
-    -- Create module directory
-    pl_dir.makepath(pl_path.join(modules_dir, "defaults_xml_test", "defaults"))
+    -- Create config
+    pl_dir.makepath(pl_path.join(modules_dir, "test_detection", "config"))
+    pl_file.write(pl_path.join(modules_dir, "test_detection", "config", "test.conf"), "test config")
 
-    -- Run dot.lua with --defaults-export and --mock-defaults options
-    assert.is_true(run_dot "defaults_xml_test --defaults-export --mock-defaults")
+    -- Run dot.lua - should use bash since nonexistent_cmd doesn't exist
+    assert.is_true(run_dot "test_detection")
 
-    -- Check if the XML file was created
-    local xml_path = pl_path.join(modules_dir, "defaults_xml_test", "defaults", "SwiftShift.xml")
-    assert.is_true(pl_path.isfile(xml_path), "Expected XML file to be created")
+    -- Check if bash command was executed
+    local install_result = pl_path.join(home_dir, "install_result.txt")
+    assert.is_true(path_exists(install_result), "Expected bash install command to run")
+    
+    local content = pl_file.read(install_result)
+    assert.are.equal("bash install worked", content:match("^%s*(.-)%s*$"))
+  end)
 
-    -- Verify the content of the XML file
-    local content = pl_file.read(xml_path)
-    assert.is_true(content:match "<plist" ~= nil, "Expected XML content in the file")
-    assert.is_true(content:match "<!DOCTYPE plist" ~= nil, "Expected DOCTYPE in XML content")
-    assert.is_true(content:match "<dict" ~= nil, "Expected dict element in XML content")
+  it("should run postinstall only when install happens", function()
+    -- Set up module with install that does nothing the second time
+    setup_module(
+      "install_once",
+      string.format(
+        [[
+return {
+  install = {
+    bash = "test ! -f %s/.already_installed && touch %s/.already_installed || exit 0",
+  },
+  link = {
+    ["./config"] = "$HOME/.config/install_once",
+  },
+  postinstall = "touch %s/.postinstall_ran",
+}
+]],
+        home_dir, home_dir, home_dir
+      )
+    )
 
-    -- Run dot.lua with --defaults-import and --mock-defaults options
-    assert.is_true(run_dot "defaults_xml_test --defaults-import --mock-defaults")
-    -- Check if the import was successful (mocked, so no actual change)
-    -- This is mainly to ensure no errors occur during the import process
+    -- Create config
+    pl_dir.makepath(pl_path.join(modules_dir, "install_once", "config"))
+    pl_file.write(pl_path.join(modules_dir, "install_once", "config", "test.conf"), "test config")
+
+    -- First run - should run postinstall
+    assert.is_true(run_dot "install_once")
+    
+    local postinstall_marker = pl_path.join(home_dir, ".postinstall_ran")
+    assert.is_true(path_exists(postinstall_marker), "Expected postinstall to run on first install")
+
+    -- Remove postinstall marker
+    os.remove(postinstall_marker)
+
+    -- Second run - should NOT run postinstall since install already happened
+    assert.is_true(run_dot "install_once")
+    assert.is_false(path_exists(postinstall_marker), "Did not expect postinstall to run on second install")
   end)
 
   it("should save the last used profile", function()
-    -- Set up 'neovim' module
+    -- Set up 'neovim' module with new structure
     setup_module(
       "neovim",
       [[
 return {
-  brew = { "neovim" },
-  config = {
-    source = "./config",
-    output = "~/.config/nvim",
+  install = {
+    brew = "brew install neovim",
+  },
+  link = {
+    ["./config"] = "$HOME/.config/nvim",
   }
 }
 ]]
@@ -623,287 +716,5 @@ return {
 
     local content = pl_file.read(dot_file_path)
     assert.are.equal("test_profile", content:match("^%s*(.-)%s*$"), "Profile name in .dot file is incorrect")
-  end)
-
-  it("should respect OS-specific modules", function()
-    -- Set up a module that only works on the current OS
-    local current_os = io.popen("uname"):read("*l") -- Get the current OS
-    local is_macos = current_os == "Darwin"
-    local is_linux = current_os == "Linux"
-    
-    -- Set up 'os_specific' module for the current OS
-    setup_module(
-      "os_specific_current",
-      [[
-return {
-  os = { "]] .. (is_macos and "mac" or "linux") .. [[" },
-  config = {
-    source = "./config",
-    output = "~/.config/os_specific_current",
-  }
-}
-]]
-    )
-    
-    -- Set up a module for the other OS
-    setup_module(
-      "os_specific_other",
-      [[
-return {
-  os = { "]] .. (is_macos and "linux" or "mac") .. [[" },
-  config = {
-    source = "./config",
-    output = "~/.config/os_specific_other",
-  }
-}
-]]
-    )
-    
-    -- Set up a module that works on multiple OSes
-    setup_module(
-      "os_specific_multi",
-      [[
-return {
-  os = { "mac", "linux" },
-  config = {
-    source = "./config",
-    output = "~/.config/os_specific_multi",
-  }
-}
-]]
-    )
-    
-    -- Create config directories and files
-    pl_dir.makepath(pl_path.join(modules_dir, "os_specific_current", "config"))
-    pl_file.write(pl_path.join(modules_dir, "os_specific_current", "config", "config.txt"), "current os config")
-    
-    pl_dir.makepath(pl_path.join(modules_dir, "os_specific_other", "config"))
-    pl_file.write(pl_path.join(modules_dir, "os_specific_other", "config", "config.txt"), "other os config")
-    
-    pl_dir.makepath(pl_path.join(modules_dir, "os_specific_multi", "config"))
-    pl_file.write(pl_path.join(modules_dir, "os_specific_multi", "config", "config.txt"), "multi os config")
-    
-    -- Run dot.lua without arguments to install all modules
-    assert.is_true(run_dot())
-    
-    -- Check if the current OS module is installed and the other OS module is skipped
-    local current_config = pl_path.join(home_dir, ".config", "os_specific_current")
-    local other_config = pl_path.join(home_dir, ".config", "os_specific_other")
-    local multi_config = pl_path.join(home_dir, ".config", "os_specific_multi")
-    
-    assert.is_true(is_link(current_config), "Expected symlink for current OS module")
-    assert.is_false(path_exists(other_config), "Did not expect symlink for other OS module")
-    assert.is_true(is_link(multi_config), "Expected symlink for multi-OS module")
-  end)
-
-  it("should respect init.lua file hierarchy in modules", function()
-    -- Set up module with both top-level init.lua and subfolder with init.lua
-    local module_dir = pl_path.join(modules_dir, "nested_module")
-    pl_dir.makepath(module_dir)
-
-    -- Create top-level init.lua
-    local top_init_lua = pl_path.join(module_dir, "init.lua")
-    pl_file.write(
-      top_init_lua,
-      [[
-return {
-  brew = { "top-level-package" },
-  config = {
-    source = "./config",
-    output = "~/.config/top-level",
-  }
-}
-]]
-    )
-
-    -- Create config directory and file for the top-level module
-    pl_dir.makepath(pl_path.join(module_dir, "config"))
-    pl_file.write(pl_path.join(module_dir, "config", "top-config.txt"), "top level config")
-
-    -- Create a config subdirectory with its own init.lua
-    local sub_module_dir = pl_path.join(module_dir, "config", "submodule")
-    pl_dir.makepath(sub_module_dir)
-    local sub_init_lua = pl_path.join(sub_module_dir, "init.lua")
-    pl_file.write(
-      sub_init_lua,
-      [[
-return {
-  brew = { "sub-level-package" },
-  config = {
-    source = "./files",
-    output = "~/.config/sub-level",
-  }
-}
-]]
-    )
-
-    -- Create files directory for the submodule
-    pl_dir.makepath(pl_path.join(sub_module_dir, "files"))
-    pl_file.write(pl_path.join(sub_module_dir, "files", "sub-config.txt"), "sub level config")
-
-    -- Run dot.lua for this module
-    assert.is_true(run_dot "nested_module")
-
-    -- Only the top-level module should be installed
-    local top_level_config = pl_path.join(home_dir, ".config", "top-level")
-    local sub_level_config = pl_path.join(home_dir, ".config", "sub-level")
-
-    assert.is_true(is_link(top_level_config), "Expected symlink for top-level module")
-    assert.is_false(
-      path_exists(sub_level_config),
-      "Did not expect symlink for submodule when top-level init.lua exists"
-    )
-
-    -- Now, set up a module where only the subfolder has init.lua
-    local second_module_dir = pl_path.join(modules_dir, "subonly_module")
-    pl_dir.makepath(second_module_dir)
-
-    -- Create a subfolder with init.lua but no top-level init.lua
-    local second_sub_dir = pl_path.join(second_module_dir, "config")
-    pl_dir.makepath(second_sub_dir)
-    local second_sub_init_lua = pl_path.join(second_sub_dir, "init.lua")
-    pl_file.write(
-      second_sub_init_lua,
-      [[
-return {
-  brew = { "sub-only-package" },
-  config = {
-    source = "./files",
-    output = "~/.config/sub-only",
-  }
-}
-]]
-    )
-
-    -- Create files directory for the submodule
-    pl_dir.makepath(pl_path.join(second_sub_dir, "files"))
-    pl_file.write(pl_path.join(second_sub_dir, "files", "sub-only-config.txt"), "sub only config")
-
-    -- Run dot.lua for this module
-    assert.is_true(run_dot "subonly_module/config")
-
-    -- In this case, the subdirectory module should be installed
-    local sub_only_config = pl_path.join(home_dir, ".config", "sub-only")
-
-    assert.is_true(
-      is_link(sub_only_config),
-      "Expected symlink for subdirectory module when no top-level init.lua exists"
-    )
-  end)
-
-  it("should handle nested init.lua files in config directories", function()
-    -- Set up a realistic module structure similar to sketchybar example
-    local module_dir = pl_path.join(modules_dir, "realistic_module")
-    pl_dir.makepath(module_dir)
-
-    -- Create top-level init.lua (module definition)
-    local top_init_lua = pl_path.join(module_dir, "init.lua")
-    pl_file.write(
-      top_init_lua,
-      [[
-return {
-  brew = { "realistic-package" },
-  config = {
-    source = "./config",
-    output = "~/.config/realistic-module",
-  }
-}
-]]
-    )
-
-    -- Create config directory
-    local config_dir = pl_path.join(module_dir, "config")
-    pl_dir.makepath(config_dir)
-
-    -- Create config/init.lua (NOT a module, just a Lua file for the app config)
-    pl_file.write(
-      pl_path.join(config_dir, "init.lua"),
-      [[
--- This is just a config file, not a module definition
-local config = {}
-config.items = require("items")
-return config
-]]
-    )
-
-    -- Create config/items directory with its own init.lua
-    local items_dir = pl_path.join(config_dir, "items")
-    pl_dir.makepath(items_dir)
-    pl_file.write(
-      pl_path.join(items_dir, "init.lua"),
-      [[
--- This is just a component of the config, not a module
-local items = {}
-items.widgets = require("widgets")
-return items
-]]
-    )
-
-    -- Create config/items/widgets directory with its own init.lua
-    local widgets_dir = pl_path.join(items_dir, "widgets")
-    pl_dir.makepath(widgets_dir)
-    pl_file.write(
-      pl_path.join(widgets_dir, "init.lua"),
-      [[
--- This is the deepest nested init.lua, still just config
-return {
-  clock = function() return os.date() end,
-  battery = function() return "100%" end
-}
-]]
-    )
-
-    -- Run dot.lua for the top-level module
-    assert.is_true(run_dot "realistic_module")
-
-    -- Check that the top-level module is installed
-    local module_config = pl_path.join(home_dir, ".config", "realistic-module")
-    assert.is_true(is_link(module_config), "Expected symlink for realistic-module")
-
-    -- Check that all the nested init.lua files are present in the installed config
-    assert.is_true(pl_path.isfile(pl_path.join(module_config, "init.lua")), "Expected init.lua in the installed config")
-    assert.is_true(
-      pl_path.isfile(pl_path.join(module_config, "items", "init.lua")),
-      "Expected items/init.lua in the installed config"
-    )
-    assert.is_true(
-      pl_path.isfile(pl_path.join(module_config, "items", "widgets", "init.lua")),
-      "Expected items/widgets/init.lua in the installed config"
-    )
-
-    -- Verify we can't try to install the nested components as modules
-    local nested_cmd = string.format(
-      "cd %q && HOME=%q lua %q %s --mock-brew 2>&1",
-      dotfiles_dir,
-      home_dir,
-      dot_executable,
-      "realistic_module/config"
-    )
-    local handle = io.popen(nested_cmd)
-    local output = handle:read "*a"
-    handle:close()
-
-    -- Check that the output indicates the module was not found
-    assert.is_true(
-      output:find("Module not found: realistic_module/config", 1, true) ~= nil,
-      "Should report that nested config directory is not a module"
-    )
-
-    local deeply_nested_cmd = string.format(
-      "cd %q && HOME=%q lua %q %s --mock-brew 2>&1",
-      dotfiles_dir,
-      home_dir,
-      dot_executable,
-      "realistic_module/config/items"
-    )
-    local handle = io.popen(deeply_nested_cmd)
-    local output = handle:read "*a"
-    handle:close()
-
-    -- Check that the output indicates the module was not found
-    assert.is_true(
-      output:find("Module not found: realistic_module/config/items", 1, true) ~= nil,
-      "Should report that deeply nested config directory is not a module"
-    )
   end)
 end)

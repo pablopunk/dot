@@ -1,6 +1,6 @@
 #!/usr/bin/env lua
 
-local version = "0.7.0"
+local version = "1.0.0"
 
 local MOCK_BREW = false
 local MOCK_WGET = false
@@ -118,14 +118,14 @@ local function print_message(message_type, message)
     color, symbol = colors.yellow, "!"
   elseif message_type == "info" then
     color, symbol = colors.blue, "•"
+  elseif message_type == "log" then
+    color, symbol = colors.cyan, ">"
   else
     color, symbol = colors.reset, ">"
   end
 
   print(color .. symbol .. " " .. message .. colors.reset)
 end
-
-local installed_brew_packages = {}
 
 -- Execute an OS command and return exit code and output
 local function execute(cmd)
@@ -212,7 +212,7 @@ local function execute(cmd)
     end
   end
 
-  local handle = io.popen(cmd .. " ; echo $?")
+  local handle = io.popen(cmd .. " 2>&1; echo $?")
   local result = handle:read "*a"
   handle:close()
   local lines = {}
@@ -221,13 +221,22 @@ local function execute(cmd)
   end
   local exit_code = tonumber(lines[#lines])
   table.remove(lines)
-  return exit_code, table.concat(lines, "\n")
+  local output = table.concat(lines, "\n")
+  
+  -- Show output transparently if there's any
+  if output ~= "" and not cmd:match("^test ") and not cmd:match("^which ") then
+    print(output)
+  end
+  
+  return exit_code, output
 end
 
 -- Expand '~' to the user's home directory in the given path
 local function expand_path(path)
   if path:sub(1, 1) == "~" then
     return os.getenv "HOME" .. path:sub(2)
+  elseif path:sub(1, 5) == "$HOME" then
+    return os.getenv "HOME" .. path:sub(6)
   else
     return path
   end
@@ -292,33 +301,10 @@ local function is_symlink_correct(source, output)
   return false
 end
 
--- Brew utility functions
-local function get_installed_brew_packages()
-  if MOCK_BREW then
-    installed_brew_packages = {
-      neovim = true,
-      zsh = true,
-    }
-    return
-  end
-
-  local function add_packages(cmd)
-    local exit_code, output = execute(cmd)
-    if exit_code == 0 then
-      for package in output:gmatch "[^\r\n]+" do
-        installed_brew_packages[package] = true
-      end
-    else
-      print_message("error", "Failed to get list of installed brew packages")
-    end
-  end
-  add_packages "brew list --formula"
-  add_packages "brew list --cask"
-end
-
-local function is_brew_package_installed(package_name)
-  package_name = package_name:gsub("^.*/", "")
-  return installed_brew_packages[package_name] == true
+-- Check if a command exists
+local function command_exists(cmd)
+  local exit_code, _ = execute(string.format('which "%s" >/dev/null 2>&1', cmd))
+  return exit_code == 0
 end
 
 -- File operation functions
@@ -326,9 +312,9 @@ local function ensure_parent_directory(path)
   local parent = path:match "(.+)/[^/]*$"
   if parent then
     local cmd = string.format('mkdir -p "%s"', parent)
-    local exit_code, _ = execute(cmd)
+    local exit_code, output = execute(cmd)
     if exit_code ~= 0 then
-      return false, "Failed to create parent directory"
+      return false, "Failed to create parent directory: " .. output
     end
   end
   return true
@@ -439,6 +425,46 @@ local function get_all_modules()
   return modules
 end
 
+-- Fuzzy find modules
+local function find_modules_fuzzy(query)
+  local all_modules = get_all_modules()
+  local matches = {}
+  
+  -- First, try exact match
+  for _, module in ipairs(all_modules) do
+    if module == query then
+      return { module }
+    end
+  end
+  
+  -- Then try partial matches
+  for _, module in ipairs(all_modules) do
+    if module:find(query, 1, true) then
+      table.insert(matches, module)
+    end
+  end
+  
+  -- If no direct substring matches, try fuzzy matching
+  if #matches == 0 then
+    for _, module in ipairs(all_modules) do
+      local module_parts = {}
+      for part in module:gmatch "[^/]+" do
+        table.insert(module_parts, part)
+      end
+      
+      -- Check if query matches any part of the module path
+      for _, part in ipairs(module_parts) do
+        if part:find(query, 1, true) then
+          table.insert(matches, module)
+          break
+        end
+      end
+    end
+  end
+  
+  return matches
+end
+
 local function str_split(str, delimiter)
   local result = {}
   for match in (str .. delimiter):gmatch("(.-)" .. delimiter) do
@@ -470,89 +496,68 @@ local function run_hook(hook_script, hook_type)
     local exit_code, output = execute(line)
     if exit_code ~= 0 then
       print_message("error", hook_type .. " → failed: " .. output)
-      return
+      return false
     end
   end
   print_message("success", hook_type .. " → completed successfully")
+  return true
 end
 
-local function process_brew_dependencies(config, purge_mode)
-  local dependencies_changed = false
-  if not config.brew then
-    return dependencies_changed
+-- Process new install system
+local function process_install(config, purge_mode)
+  if not config.install then
+    return false
   end
 
-  if MOCK_BREW then
-    -- When mocking brew, just print what would happen
-    for _, brew_entry in ipairs(config.brew) do
-      local package_name = type(brew_entry) == "string" and brew_entry or brew_entry.name
-      if purge_mode then
-        print_message("info", "MOCK: Would uninstall " .. package_name)
-      else
-        print_message("info", "MOCK: Would install " .. package_name)
-      end
-    end
-    return true -- Simulate that dependencies changed
-  end
-
+  local install_happened = false
+  
   if purge_mode then
-    -- Uninstall dependencies
-    for _, brew_entry in ipairs(config.brew) do
-      local package_name = type(brew_entry) == "string" and brew_entry or brew_entry.name
-
-      if is_brew_package_installed(package_name) then
-        local cmd = "brew uninstall " .. package_name
-        local exit_code, output = execute(cmd)
-        if exit_code ~= 0 then
-          print_message("error", "dependencies → could not uninstall `" .. package_name .. "`: " .. output)
-        else
-          print_message("success", "dependencies → uninstalled `" .. package_name .. "`")
-          installed_brew_packages[package_name] = nil
-          dependencies_changed = true
-        end
-      else
-        print_message("info", "dependencies → `" .. package_name .. "` is not installed")
-      end
-    end
+    -- For purge mode, we don't actually uninstall packages as that's complex
+    -- and dangerous. We just report what would be uninstalled.
+    print_message("info", "install → purge mode (packages not actually uninstalled for safety)")
+    return false
   else
-    -- Install dependencies
-    local all_deps_installed = true
-    for _, brew_entry in ipairs(config.brew) do
-      local package_name = type(brew_entry) == "string" and brew_entry or brew_entry.name
-      local install_options = type(brew_entry) == "table" and brew_entry.options or ""
-      if not is_brew_package_installed(package_name) then
-        all_deps_installed = false
-        dependencies_changed = true
-        local cmd = "brew install " .. package_name .. " " .. install_options
-        local exit_code, output = execute(cmd)
-        if exit_code ~= 0 then
-          print_message("error", "dependencies → could not install `" .. package_name .. "`: " .. output)
+    -- Find the first available command and run it
+    for cmd_name, cmd_line in pairs(config.install) do
+      if cmd_name == "bash" or command_exists(cmd_name) then
+        print_message("info", "install → using " .. cmd_name)
+        local exit_code, output = execute(cmd_line)
+        if exit_code == 0 then
+          if output and output ~= "" then
+            print_message("success", "install → completed")
+          end
+          install_happened = true
         else
-          print_message("success", "dependencies → installed `" .. package_name .. "`")
-          installed_brew_packages[package_name] = true
+          print_message("error", "install → failed: " .. (output or "unknown error"))
         end
-      else
-        -- print_message("success", "dependencies → `" .. package_name .. "` already installed")
+        break
       end
     end
-    if all_deps_installed then
-      print_message("success", "all dependencies installed")
+    
+    if not install_happened then
+      local available_cmds = {}
+      for cmd_name, _ in pairs(config.install) do
+        table.insert(available_cmds, cmd_name)
+      end
+      print_message("warning", "install → no available commands from: " .. table.concat(available_cmds, ", "))
     end
   end
-  return dependencies_changed
+  
+  return install_happened
 end
 
-local function handle_config_symlink(config, module_dir, options)
-  if not config.config then
-    return
+-- Handle new link system
+local function handle_links(config, module_dir, options)
+  if not config.link then
+    return false
   end
 
-  local configs = type(config.config) == "table" and config.config[1] and config.config or { config.config }
-  local all_configs_linked = true
+  local link_happened = false
+  local all_links_correct = true
 
-  for _, cfg in ipairs(configs) do
-    local source = os.getenv "PWD" .. "/" .. module_dir:gsub("^./", "") .. "/" .. cfg.source:gsub("^./", "")
-    local output = expand_path(cfg.output)
+  for source_rel, output_pattern in pairs(config.link) do
+    local source = os.getenv "PWD" .. "/" .. module_dir:gsub("^./", "") .. "/" .. source_rel:gsub("^./", "")
+    local output = expand_path(output_pattern)
     local attr = get_file_info(output)
 
     if options.purge_mode then
@@ -560,188 +565,85 @@ local function handle_config_symlink(config, module_dir, options)
       if attr then
         local success, err = delete_path(output)
         if success then
-          print_message("success", "config → removed " .. output)
+          print_message("success", "link → removed " .. output)
         else
-          print_message("error", "config → " .. err)
+          print_message("error", "link → " .. err)
         end
       else
-        print_message("info", "config → " .. output .. " does not exist")
+        print_message("info", "link → " .. output .. " does not exist")
       end
     elseif options.unlink_mode then
       -- Remove symlink and copy source to output
       if attr and attr.is_symlink then
         local success, err = delete_path(output)
         if success then
-          print_message("success", "config → symlink removed")
+          print_message("success", "link → symlink removed")
 
           -- Ensure parent directory exists
           local success, err = ensure_parent_directory(output)
           if not success then
-            print_message("error", "config → " .. err)
-            return
+            print_message("error", "link → " .. err)
+            return false
           end
 
           -- Copy source to output
           local success, err = copy_path(source, output)
           if success then
-            print_message("success", "config → copied " .. source .. " to " .. output)
+            print_message("success", "link → copied " .. source .. " to " .. output)
           else
-            print_message("error", "config → " .. err)
+            print_message("error", "link → " .. err)
           end
         else
-          print_message("error", "config → failed to remove symlink: " .. err)
+          print_message("error", "link → failed to remove symlink: " .. err)
         end
       else
-        print_message("info", "config → " .. output .. " is not a symlink or does not exist")
+        print_message("info", "link → " .. output .. " is not a symlink or does not exist")
       end
     else
       -- Normal installation: create symlink
       if is_symlink_correct(source, output) then
-        -- print_message("success", "config → symlink correct for " .. output)
+        -- Link is already correct, do nothing (minimal output)
       else
-        all_configs_linked = false
+        all_links_correct = false
         if attr then
           if options.force_mode then
             local success, result = create_backup(output)
             if success then
-              print_message("warning", "config → existing config backed up to " .. result)
+              print_message("warning", "link → existing config backed up to " .. result)
             else
-              print_message("error", "config → " .. result)
-              return
+              print_message("error", "link → " .. result)
+              return false
             end
           else
-            print_message("error", "config → file already exists at " .. output .. ". Use -f to force.")
-            return
+            print_message("error", "link → file already exists at " .. output .. ". Use -f to force.")
+            return false
           end
         end
 
         -- Ensure parent directory exists
         local success, err = ensure_parent_directory(output)
         if not success then
-          print_message("error", "config → " .. err)
-          return
+          print_message("error", "link → " .. err)
+          return false
         end
 
         local cmd = string.format('ln -sf "%s" "%s"', source, output)
         local exit_code, error_output = execute(cmd)
         if exit_code ~= 0 then
-          print_message("error", "config → failed to create symlink: " .. error_output)
+          print_message("error", "link → failed to create symlink: " .. error_output)
         else
-          print_message("success", "config → symlink created for " .. output)
+          print_message("success", "link → created symlink " .. output)
+          link_happened = true
         end
       end
     end
   end
 
-  if all_configs_linked and not options.unlink_mode and not options.purge_mode then
-    print_message("success", "all configurations are linked")
-  elseif all_configs_linked and options.purge_mode then
-    print_message("success", "all configurations are removed")
-  elseif all_configs_linked and options.unlink_mode then
-    print_message("success", "all configurations are unlinked")
-  end
-end
-
--- Process wget dependencies
-local function process_wget(config)
-  if not config.wget then
-    return false
+  if all_links_correct and not options.unlink_mode and not options.purge_mode then
+    -- Don't print anything for minimal output when nothing changed
   end
 
-  local wget_entries = type(config.wget) == "table" and config.wget[1] and config.wget or { config.wget }
-  local dependencies_changed = false
-
-  for _, wget_entry in ipairs(wget_entries) do
-    local url = wget_entry.url
-    local output = expand_path(wget_entry.output)
-    local is_zip = wget_entry.zip == true
-
-    -- Check if the output already exists
-    if is_file(output) or is_dir(output) then
-      -- print_message("info", "wget → dependency already exists at " .. output)
-    else
-      dependencies_changed = true
-      -- Create a temporary directory for downloading
-      local temp_dir = "/tmp/dot_wget_temp"
-      local mkdir_cmd = string.format('mkdir -p "%s"', temp_dir)
-      local exit_code, mkdir_output = execute(mkdir_cmd)
-      if exit_code ~= 0 then
-        print_message("error", "wget → failed to create temporary directory: " .. mkdir_output)
-        return false
-      end
-
-      -- Extract the file name from the output path
-      local file_name = output:match "^.+/(.+)$"
-      if not file_name then
-        print_message("error", "wget → failed to extract file name from output path")
-        return false
-      end
-
-      -- Mock wget if MOCK_WGET is true
-      if MOCK_WGET then
-        print_message("info", "wget → mock download to " .. temp_dir .. "/" .. file_name)
-        local mock_file_path = temp_dir .. "/" .. file_name
-        -- Simulate the presence of files in the temp directory
-        local touch_cmd = string.format('touch "%s"', mock_file_path)
-        execute(touch_cmd)
-      else
-        -- Download the file using wget to the temporary directory
-        local temp_file = temp_dir .. "/" .. file_name .. (is_zip and ".zip" or "")
-        local download_cmd = string.format('wget -O "%s" "%s"', temp_file, url)
-        exit_code, download_output = execute(download_cmd)
-        if exit_code ~= 0 then
-          print_message("error", "wget → failed to download: " .. download_output)
-          return false
-        end
-        print_message("success", "wget →  to " .. temp_file)
-
-        -- If the file is a zip, unzip it
-        if is_zip then
-          local unzip_cmd = string.format('unzip -o "%s" -d "%s"', temp_file, temp_dir)
-          exit_code, unzip_output = execute(unzip_cmd)
-          if exit_code ~= 0 then
-            print_message("error", "wget → failed to unzip: " .. unzip_output)
-            return false
-          end
-
-          -- Remove the zip file
-          local remove_cmd = string.format('rm "%s"', temp_file)
-          exit_code, remove_output = execute(remove_cmd)
-          if exit_code ~= 0 then
-            print_message("error", "wget → failed to remove zip file: " .. remove_output)
-            return false
-          end
-        end
-      end
-
-      -- Move the contents to the output directory
-      local move_cmd = string.format('mv "%s" "%s"', temp_dir .. "/" .. file_name, output)
-      local exit_code, move_output = execute(move_cmd)
-      if exit_code ~= 0 then
-        print_message("error", "wget → failed to move files to output: " .. move_output)
-        return false
-      end
-      print_message("success", "wget → installed file at " .. output)
-
-      -- Clean up the temporary directory
-      local cleanup_cmd = string.format('rm -rf "%s"', temp_dir)
-      execute(cleanup_cmd)
-    end
-  end
-
-  return dependencies_changed
-end
-
--- Compare two files and return true if they are the same, otherwise print differences
-local function files_are_equal(file1, file2)
-  -- Use diff with unified format (-U1) to show 1 line of context before and after each change
-  local cmd = string.format('diff -U1 "%s" "%s"', file1, file2)
-  local exit_code, output = execute(cmd)
-  if exit_code == 0 then
-    return true
-  else
-    return false, output
-  end
+  return link_happened
 end
 
 function os_name()
@@ -771,185 +673,7 @@ local function is_linux()
   return OS_NAME == "Linux" or OS_NAME == "GNU/Linux"
 end
 
--- Format and display differences between plist files
-local function format_plist_diff(diff_output)
-  if not diff_output then
-    return
-  end
-
-  local indent = "  "
-  print ""
-
-  -- Use a simpler approach by directly parsing the formatted diff lines
-  local lines = {}
-  for line in diff_output:gmatch "[^\r\n]+" do
-    table.insert(lines, line)
-  end
-
-  local settings_found = 0
-
-  for i = 1, #lines - 2 do
-    -- Look for patterns that indicate a key and changed values
-    if lines[i]:match "<key>([^<]+)</key>" and lines[i + 1]:match "^%-" and lines[i + 2]:match "^%+" then
-      local key = lines[i]:match "<key>([^<]+)</key>"
-      local app_line = lines[i + 1]
-      local saved_line = lines[i + 2]
-
-      -- Extract values
-      local app_value = app_line:gsub("^%- +", "")
-      local saved_value = saved_line:gsub("^%+ +", "")
-
-      -- Extract content from XML tags
-      local app_content = app_value:match "<[^>]+>([^<]*)</" or app_value:match "<([^/]+)/>" or app_value
-      local saved_content = saved_value:match "<[^>]+>([^<]*)</" or saved_value:match "<([^/]+)/>" or saved_value
-
-      print(colors.cyan .. indent .. key .. ":" .. colors.reset)
-      print(colors.red .. indent .. "App: " .. app_content .. colors.reset)
-      print(colors.green .. indent .. "Dotfiles: " .. saved_content .. colors.reset)
-
-      settings_found = settings_found + 1
-    end
-  end
-
-  if settings_found == 0 then
-    -- If parsing failed, show the standard diff
-    print_message("info", "Differences between current app preferences and saved dotfiles:")
-    for line in diff_output:gmatch "[^\r\n]+" do
-      if line:match "^@@" then
-        print(colors.blue .. indent .. line .. colors.reset)
-      elseif line:match "^%-%-%-" or line:match "^%+%+%+" then
-        -- Skip file headers
-      elseif line:match "^%-" and not line:match "^%-%-%-" then
-        print(colors.red .. indent .. line .. colors.reset)
-      elseif line:match "^%+" and not line:match "^%+%+%+" then
-        print(colors.green .. indent .. line .. colors.reset)
-      else
-        print(colors.cyan .. indent .. line .. colors.reset)
-      end
-    end
-  end
-
-  return settings_found > 0
-end
-
--- Process defaults configurations
-local function process_defaults(config, module_dir, options)
-  if not config.defaults then
-    return false
-  end
-
-  -- Only run on macOS unless mocking is enabled
-  -- When mocking, we'll create the necessary files regardless of OS
-  if not is_macos() and not MOCK_DEFAULTS then
-    return false
-  end
-
-  local defaults_entries = type(config.defaults) == "table" and config.defaults[1] and config.defaults
-    or { config.defaults }
-  local defaults_changed = false
-
-  for _, defaults_entry in ipairs(defaults_entries) do
-    local plist = defaults_entry.plist
-    local app = defaults_entry.app
-
-    if plist and app then
-      -- Resolve plist path relative to the module directory
-      local resolved_plist = os.getenv "PWD" .. "/" .. module_dir:gsub("^./", "") .. "/" .. plist:gsub("^./", "")
-      local tmp_file = os.tmpname()
-
-      -- Export current preferences to a temporary file in XML format for better readability
-      local export_cmd
-      if plist:match "%.xml$" then
-        -- Use XML format for better readability
-        export_cmd = string.format('defaults export "%s" - | plutil -convert xml1 -o "%s" -', app, tmp_file)
-      else
-        -- Default to binary plist
-        export_cmd = string.format('defaults export "%s" "%s"', app, tmp_file)
-      end
-
-      local exit_code, export_output = execute(export_cmd)
-      if exit_code ~= 0 then
-        print_message("error", "defaults → could not export preferences for app `" .. app .. "`: " .. export_output)
-        os.remove(tmp_file)
-        return false
-      end
-
-      -- Check if resolved_plist exists
-      if not is_file(resolved_plist) then
-        -- If resolved_plist does not exist, export current preferences to it
-        local move_cmd = string.format('mv "%s" "%s"', tmp_file, resolved_plist)
-        local exit_code, move_output = execute(move_cmd)
-        if exit_code == 0 then
-          print_message(
-            "success",
-            "exported current preferences for `" .. app .. "` to dotfiles as `" .. resolved_plist .. "` did not exist"
-          )
-        else
-          print_message("error", "defaults → failed to export preferences: " .. move_output)
-        end
-      else
-        -- Compare the exported preferences with the module's plist
-        if not options.defaults_export and not options.defaults_import then
-          local files_equal, diff_output = files_are_equal(tmp_file, resolved_plist)
-          if files_equal then
-            -- print_message("info", "defaults → preferences for `" .. app .. "` are already up-to-date")
-          else
-            local module_dir_relative = module_dir:gsub("^modules/", "")
-            print_message(
-              "warning",
-              "preferences for `" .. app .. "` differ between the app and the dotfiles. Choose which one matters using:"
-            )
-            print_message("log", "dot -e " .. module_dir_relative .. " # export the app preferences")
-            print_message("log", "dot -i " .. module_dir_relative .. " # import your dotfiles preferences")
-
-            -- Display a formatted diff
-            format_plist_diff(diff_output)
-          end
-        end
-
-        -- Handle --defaults-export option
-        if options.defaults_export then
-          local move_cmd = string.format('mv "%s" "%s"', tmp_file, resolved_plist)
-          local exit_code, move_output = execute(move_cmd)
-          if exit_code == 0 then
-            print_message("success", "defaults → exported current preferences for `" .. app .. "` to dotfiles")
-          else
-            print_message("error", "defaults → failed to export preferences: " .. move_output)
-          end
-        end
-
-        -- Handle --defaults-import option
-        if options.defaults_import then
-          -- Import the preferences from the plist file
-          local import_cmd
-          if plist:match "%.xml$" then
-            -- For XML, convert back to binary format for import
-            import_cmd =
-              string.format('plutil -convert binary1 -o - "%s" | defaults import "%s" -', resolved_plist, app)
-          else
-            import_cmd = string.format('defaults import "%s" "%s"', app, resolved_plist)
-          end
-
-          local exit_code, import_output = execute(import_cmd)
-          if exit_code == 0 then
-            print_message("success", "defaults → imported preferences for `" .. app .. "` from dotfiles")
-            defaults_changed = true
-          else
-            print_message("error", "defaults → could not import preferences: " .. import_output)
-          end
-        end
-      end
-
-      os.remove(tmp_file)
-    else
-      print_message("error", "defaults → missing plist or app in entry")
-    end
-  end
-
-  return defaults_changed
-end
-
--- Process each module by installing/uninstalling dependencies and managing symlinks
+-- Process each module by installing dependencies and managing symlinks
 local function process_module(module_name, options)
   print_section(module_name)
 
@@ -995,27 +719,31 @@ local function process_module(module_name, options)
     end
   end
 
-  local dependencies_changed = false
-  if process_wget(config) then
-    dependencies_changed = true
+  local install_happened = false
+  local link_happened = false
+
+  -- Process installation
+  if process_install(config, options.purge_mode) then
+    install_happened = true
   end
 
-  if process_brew_dependencies(config, options.purge_mode) then
-    dependencies_changed = true
+  -- Process links
+  if handle_links(config, module_dir, options) then
+    link_happened = true
   end
 
-  if process_defaults(config, module_dir, options) then
-    dependencies_changed = true
+  -- Run new hook system
+  if install_happened or options.hooks_mode then
+    if options.purge_mode and config.postpurge then
+      run_hook(config.postpurge, "post-purge")
+    elseif not options.purge_mode and config.postinstall then
+      run_hook(config.postinstall, "postinstall")
+    end
   end
 
-  handle_config_symlink(config, module_dir, options)
-
-  -- Run post_install or post_purge hooks
-  if dependencies_changed or options.hooks_mode then
-    if options.purge_mode and config.post_purge then
-      run_hook(config.post_purge, "post-purge")
-    elseif not options.purge_mode and config.post_install then
-      run_hook(config.post_install, "post-install")
+  if link_happened or options.hooks_mode then
+    if not options.purge_mode and not options.unlink_mode and config.postlink then
+      run_hook(config.postlink, "postlink")
     end
   end
 
@@ -1074,36 +802,21 @@ local function process_tool(tool_name, options)
 
     return true
   else
-    -- Process the single tool module
-    -- First check if this is a nested path that might be part of a parent module
-    local is_nested_path = false
-
-    if tool_name:find "/" then
-      -- This might be a nested path, check if any parent has an init.lua
-      local parts = {}
-      for part in tool_name:gmatch "[^/]+" do
-        table.insert(parts, part)
+    -- Try fuzzy matching for module
+    local matches = find_modules_fuzzy(tool_name)
+    
+    if #matches == 1 then
+      -- Exact fuzzy match found
+      process_module(matches[1], options)
+      return true
+    elseif #matches > 1 then
+      print_message("error", "Multiple modules match '" .. tool_name .. "':")
+      for _, match in ipairs(matches) do
+        print_message("info", "  " .. match)
       end
-
-      local current_path = ""
-      for i = 1, #parts - 1 do
-        if i > 1 then
-          current_path = current_path .. "/"
-        end
-        current_path = current_path .. parts[i]
-
-        local parent_init = "modules/" .. current_path .. "/init.lua"
-        if is_file(parent_init) then
-          is_nested_path = true
-          -- Just return nil instead of showing an error
-          -- This indicates the module doesn't exist rather than an error condition
-          print_message("error", "Module not found: " .. tool_name)
-          return nil
-        end
-      end
-    end
-
-    if not is_nested_path then
+      return false
+    else
+      -- Check for exact module path
       local module_path = "modules/" .. tool_name .. "/init.lua"
       if is_file(module_path) then
         process_module(tool_name, options)
@@ -1112,8 +825,6 @@ local function process_tool(tool_name, options)
         print_message("error", "Module not found: " .. tool_name)
         return false
       end
-    else
-      return nil
     end
   end
 end
@@ -1175,8 +886,6 @@ local function main()
   if options.mock_defaults then
     MOCK_DEFAULTS = true
   end
-
-  get_installed_brew_packages()
 
   if options.remove_profile then
     remove_last_profile()
