@@ -36,7 +36,7 @@ $ brew install pablopunk/brew/dot
 $ cd /path/to/dotfiles
 $ tree
 
-profiles.lua
+profiles.lua # work, personal, server...
 neovim/
 ├── dot.lua
 └── config/
