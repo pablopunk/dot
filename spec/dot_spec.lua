@@ -721,9 +721,7 @@ return {
       "work",
       [[
 {
-  modules = {
-    "neovim"
-  }
+  "neovim"
 }
 ]]
     )
@@ -771,9 +769,7 @@ return {
       "test_profile",
       [[
 {
-  modules = {
-    "neovim"
-  }
+  "neovim"
 }
 ]]
     )
@@ -1059,9 +1055,7 @@ return {
       "test_profile",
       [[
 {
-  modules = {
-    "neovim"
-  }
+  "neovim"
 }
 ]]
     )

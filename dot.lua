@@ -771,15 +771,15 @@ local function process_tool(tool_name, options)
     end
 
     local profile = profiles[tool_name]
-    if not profile.modules then
-      print_message("error", "Invalid profile structure: missing modules field")
+    if not profile then
+      print_message("error", "Invalid profile structure: profile should be a list of modules")
       return false
     end
 
     local modules_to_process = {}
     local exclusions = {}
 
-    for _, module_name in ipairs(profile.modules) do
+    for _, module_name in ipairs(profile) do
       if module_name:sub(1, 1) == "!" then
         table.insert(exclusions, module_name:sub(2))
       elseif module_name == "*" then

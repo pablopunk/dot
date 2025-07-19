@@ -69,10 +69,10 @@ Example for neovim:
 return {
   install = {
     brew = "brew install neovim ripgrep",
-    apt = "apt install neovim ripgrep"
+    apt = "sudo apt install -y neovim ripgrep"
   },
   link = {
-    ["./config"] = "~/.config/nvim"
+    ["./config"] = "~/.config/nvim" -- link the whole directory or just one file, your choice
   }
 }
 ```
@@ -86,7 +86,7 @@ The `install` system dynamically detects available package managers and uses the
 return {
   install = {
     brew = "brew install whatsapp spotify slack vscode",
-    apt = "apt install vim git curl",
+    apt = "sudo apt install -y vim git curl",
     yum = "yum install vim git curl"
   }
 }
@@ -189,25 +189,19 @@ Profiles let you manage different setups for different machines. Create a single
 -- profiles.lua
 return {
   personal = {
-    modules = {
-      "*",           -- Include all modules
-      "!apps/work"   -- Exclude work apps
-    }
+    "*",           -- Include all modules
+    "!apps/work"   -- Exclude work apps
   },
   work = {
-    modules = {
-      "apps/work",
-      "slack",
-      "neovim",
-      "zsh"
-    }
+    "apps/work",
+    "slack",
+    "neovim",
+    "zsh"
   },
   linux_server = {
-    modules = {
-      "zsh",
-      "neovim",
-      "tmux"
-    }
+    "zsh",
+    "neovim",
+    "tmux"
   }
 }
 ```
