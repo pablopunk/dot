@@ -80,6 +80,15 @@ exit 0
     return count
   end
 
+  -- Function to detect current OS
+  local function detect_os()
+    local handle = io.popen "uname"
+    local os_name = handle:read "*a"
+    handle:close()
+    os_name = os_name:gsub("%s+$", "") -- Remove trailing whitespace
+    return os_name
+  end
+
   -- Function to run dot.lua with given arguments
   local function run_dot(args)
     args = args or ""
@@ -489,7 +498,7 @@ return {
     -- Check that the marker file was created (this proves the bash command worked)
     local marker_file = pl_path.join(home_dir, "bash_install_marker.txt")
     assert.is_true(path_exists(marker_file), "Bash command should have created marker file")
-    
+
     -- Check the content of the marker file
     local content = pl_file.read(marker_file)
     assert.are.equal("bash command executed\n", content, "Bash command should have written correct content")
@@ -745,7 +754,7 @@ return {
     local dot_file_path = pl_path.join(dotfiles_dir, ".dot")
     assert.is_true(pl_path.isfile(dot_file_path), ".dot file should exist")
     local content = pl_file.read(dot_file_path)
-    assert.are.equal("test_profile", content:match("^%s*(.-)%s*$"), "Profile name should be saved correctly")
+    assert.are.equal("test_profile", content:match "^%s*(.-)%s*$", "Profile name should be saved correctly")
   end)
 
   -- NEW TESTS FOR MISSING FEATURES
@@ -919,7 +928,10 @@ return {
     -- Create package manager
     create_command("fake_apt", 0, "Package installed successfully")
 
-    -- Set up module restricted to macOS (since we're running on macOS)
+    local current_os = detect_os()
+    local is_macos = current_os == "Darwin"
+
+    -- Set up module restricted to macOS
     setup_module(
       "test_macos_only",
       [[
@@ -939,15 +951,26 @@ return {
     pl_dir.makepath(pl_path.join(modules_dir, "test_macos_only", "config"))
     pl_file.write(pl_path.join(modules_dir, "test_macos_only", "config", "test.conf"), "test config")
 
-    -- Run dot.lua (should work on macOS)
-    assert.is_true(run_dot "test_macos_only")
+    -- Run dot.lua
+    local success = run_dot "test_macos_only"
 
-    -- Check that commands were executed (macOS restriction should pass)
-    assert.is_true(was_command_executed "fake_apt", "fake_apt should have been executed on macOS")
+    if is_macos then
+      -- On macOS, the module should run and commands should be executed
+      assert.is_true(success, "dot.lua should succeed on macOS")
+      assert.is_true(was_command_executed "fake_apt", "fake_apt should have been executed on macOS")
 
-    -- Check that symlink was created
-    local config_path = pl_path.join(home_dir, ".config", "test")
-    assert.is_true(is_link(config_path), "Symlink should have been created")
+      -- Check that symlink was created
+      local config_path = pl_path.join(home_dir, ".config", "test")
+      assert.is_true(is_link(config_path), "Symlink should have been created on macOS")
+    else
+      -- On non-macOS, the module should be skipped
+      assert.is_true(success, "dot.lua should succeed even when skipping modules")
+      assert.is_false(was_command_executed "fake_apt", "fake_apt should NOT have been executed on " .. current_os)
+
+      -- Check that symlink was NOT created
+      local config_path = pl_path.join(home_dir, ".config", "test")
+      assert.is_false(is_link(config_path), "Symlink should NOT have been created on " .. current_os)
+    end
   end)
 
   it("should handle fuzzy module matching", function()
@@ -1034,126 +1057,176 @@ return {
   end)
 
   it("should handle macOS defaults export", function()
-    -- Create fake defaults command that actually creates files
-    local defaults_script = "#!/bin/sh\n"
-      .. 'echo "COMMAND_EXECUTED: defaults $@" >> '
-      .. command_log_file
-      .. "\n"
-      .. "# Parse the command to extract the output file\n"
-      .. 'output_file=""\n'
-      .. 'for arg in "$@"; do\n'
-      .. '  if [[ "$arg" == *".xml" ]]; then\n'
-      .. '    output_file="$arg"\n'
-      .. "    break\n"
-      .. "  fi\n"
-      .. "done\n"
-      .. 'echo "DEBUG: output_file = $output_file" >> '
-      .. command_log_file
-      .. "\n"
-      .. 'if [[ -n "$output_file" ]]; then\n'
-      .. '  echo "DEBUG: creating directory $(dirname "$output_file")" >> '
-      .. command_log_file
-      .. "\n"
-      .. '  mkdir -p "$(dirname "$output_file")"\n'
-      .. '  echo "DEBUG: writing file $output_file" >> '
-      .. command_log_file
-      .. "\n"
-      .. '  echo \'<?xml version="1.0" encoding="UTF-8"?><plist version="1.0"><dict><key>TestKey</key><string>test value</string></dict></plist>\' > "$output_file"\n'
-      .. '  echo "DEBUG: file created, checking if exists" >> '
-      .. command_log_file
-      .. "\n"
-      .. '  if [[ -f "$output_file" ]]; then\n'
-      .. '    echo "DEBUG: file exists" >> '
-      .. command_log_file
-      .. "\n"
-      .. "  else\n"
-      .. '    echo "DEBUG: file does not exist" >> '
-      .. command_log_file
-      .. "\n"
-      .. "  fi\n"
-      .. '  echo "Preferences exported successfully"\n'
-      .. "  exit 0\n"
-      .. "else\n"
-      .. '  echo "No output file specified"\n'
-      .. "  exit 1\n"
-      .. "fi\n"
+    local current_os = detect_os()
+    local is_macos = current_os == "Darwin"
 
-    pl_file.write(pl_path.join(bin_dir, "defaults"), defaults_script)
-    os.execute(string.format("chmod +x %q", pl_path.join(bin_dir, "defaults")))
+    if is_macos then
+      -- Create fake defaults command that actually creates files
+      local defaults_script = "#!/bin/sh\n"
+        .. 'echo "COMMAND_EXECUTED: defaults $@" >> '
+        .. command_log_file
+        .. "\n"
+        .. "# Parse the command to extract the output file\n"
+        .. 'output_file=""\n'
+        .. 'for arg in "$@"; do\n'
+        .. '  if [[ "$arg" == *".xml" ]]; then\n'
+        .. '    output_file="$arg"\n'
+        .. "    break\n"
+        .. "  fi\n"
+        .. "done\n"
+        .. 'echo "DEBUG: output_file = $output_file" >> '
+        .. command_log_file
+        .. "\n"
+        .. 'if [[ -n "$output_file" ]]; then\n'
+        .. '  echo "DEBUG: creating directory $(dirname "$output_file")" >> '
+        .. command_log_file
+        .. "\n"
+        .. '  mkdir -p "$(dirname "$output_file")"\n'
+        .. '  echo "DEBUG: writing file $output_file" >> '
+        .. command_log_file
+        .. "\n"
+        .. '  echo \'<?xml version="1.0" encoding="UTF-8"?><plist version="1.0"><dict><key>TestKey</key><string>test value</string></dict></plist>\' > "$output_file"\n'
+        .. '  echo "DEBUG: file created, checking if exists" >> '
+        .. command_log_file
+        .. "\n"
+        .. '  if [[ -f "$output_file" ]]; then\n'
+        .. '    echo "DEBUG: file exists" >> '
+        .. command_log_file
+        .. "\n"
+        .. "  else\n"
+        .. '    echo "DEBUG: file does not exist" >> '
+        .. command_log_file
+        .. "\n"
+        .. "  fi\n"
+        .. '  echo "Preferences exported successfully"\n'
+        .. "  exit 0\n"
+        .. "else\n"
+        .. '  echo "No output file specified"\n'
+        .. "  exit 1\n"
+        .. "fi\n"
 
-    -- Set up module with defaults
-    setup_module(
-      "test_defaults",
-      [[
+      pl_file.write(pl_path.join(bin_dir, "defaults"), defaults_script)
+      os.execute(string.format("chmod +x %q", pl_path.join(bin_dir, "defaults")))
+
+      -- Set up module with defaults
+      setup_module(
+        "test_defaults",
+        [[
 return {
   defaults = {
     ["com.test.app"] = "./defaults/test.xml",
   }
 }
 ]]
-    )
+      )
 
-    -- Create defaults directory
-    pl_dir.makepath(pl_path.join(modules_dir, "test_defaults", "defaults"))
+      -- Create defaults directory
+      pl_dir.makepath(pl_path.join(modules_dir, "test_defaults", "defaults"))
 
-    -- Run dot.lua with defaults export
-    assert.is_true(run_dot "-e test_defaults")
+      -- Run dot.lua with defaults export
+      assert.is_true(run_dot "-e test_defaults")
 
-    -- Check that defaults export was executed
-    assert.is_true(was_command_executed "defaults", "defaults export should have been executed")
+      -- Check that defaults export was executed
+      assert.is_true(was_command_executed "defaults", "defaults export should have been executed")
 
-    -- Check that defaults file was created (in the correct location based on dot.lua path construction)
-    local defaults_file = pl_path.join(dotfiles_dir, "defaults", "test.xml")
-    assert.is_true(path_exists(defaults_file), "Defaults file should have been created")
+      -- Check that defaults file was created (in the correct location based on dot.lua path construction)
+      local defaults_file = pl_path.join(dotfiles_dir, "defaults", "test.xml")
+      assert.is_true(path_exists(defaults_file), "Defaults file should have been created")
+    else
+      -- On non-macOS, defaults should be skipped
+      setup_module(
+        "test_defaults",
+        [[
+return {
+  defaults = {
+    ["com.test.app"] = "./defaults/test.xml",
+  }
+}
+]]
+      )
+
+      -- Run dot.lua with defaults export (should be skipped)
+      assert.is_true(run_dot "-e test_defaults")
+
+      -- Check that defaults was NOT executed
+      assert.is_false(was_command_executed "defaults", "defaults should NOT be executed on " .. current_os)
+
+      -- Check that defaults file was NOT created
+      local defaults_file = pl_path.join(dotfiles_dir, "defaults", "test.xml")
+      assert.is_false(path_exists(defaults_file), "Defaults file should NOT be created on " .. current_os)
+    end
   end)
 
   it("should handle macOS defaults import", function()
-    -- Create fake defaults command that actually works
-    local defaults_script = "#!/bin/sh\n"
-      .. 'echo "COMMAND_EXECUTED: defaults $@" >> '
-      .. command_log_file
-      .. "\n"
-      .. "# Parse the command to extract the input file\n"
-      .. 'input_file=""\n'
-      .. 'for arg in "$@"; do\n'
-      .. '  if [[ "$arg" == *".xml" ]]; then\n'
-      .. '    input_file="$arg"\n'
-      .. "    break\n"
-      .. "  fi\n"
-      .. "done\n"
-      .. 'if [[ -f "$input_file" ]]; then\n'
-      .. '  echo "Preferences imported successfully"\n'
-      .. "  exit 0\n"
-      .. "else\n"
-      .. '  echo "File not found: $input_file"\n'
-      .. "  exit 1\n"
-      .. "fi\n"
+    local current_os = detect_os()
+    local is_macos = current_os == "Darwin"
 
-    pl_file.write(pl_path.join(bin_dir, "defaults"), defaults_script)
-    os.execute(string.format("chmod +x %q", pl_path.join(bin_dir, "defaults")))
+    if is_macos then
+      -- Create fake defaults command that actually works
+      local defaults_script = "#!/bin/sh\n"
+        .. 'echo "COMMAND_EXECUTED: defaults $@" >> '
+        .. command_log_file
+        .. "\n"
+        .. "# Parse the command to extract the input file\n"
+        .. 'input_file=""\n'
+        .. 'for arg in "$@"; do\n'
+        .. '  if [[ "$arg" == *".xml" ]]; then\n'
+        .. '    input_file="$arg"\n'
+        .. "    break\n"
+        .. "  fi\n"
+        .. "done\n"
+        .. 'if [[ -f "$input_file" ]]; then\n'
+        .. '  echo "Preferences imported successfully"\n'
+        .. "  exit 0\n"
+        .. "else\n"
+        .. '  echo "File not found: $input_file"\n'
+        .. "  exit 1\n"
+        .. "fi\n"
 
-    -- Set up module with defaults
-    setup_module(
-      "test_defaults",
-      [[
+      pl_file.write(pl_path.join(bin_dir, "defaults"), defaults_script)
+      os.execute(string.format("chmod +x %q", pl_path.join(bin_dir, "defaults")))
+
+      -- Set up module with defaults
+      setup_module(
+        "test_defaults",
+        [[
 return {
   defaults = {
     ["com.test.app"] = "./defaults/test.xml",
   }
 }
 ]]
-    )
+      )
 
-    -- Create defaults file in the correct location (same as export test)
-    local defaults_file = pl_path.join(dotfiles_dir, "defaults", "test.xml")
-    pl_dir.makepath(pl_path.dirname(defaults_file))
-    pl_file.write(defaults_file, "test preferences")
+      -- Create defaults file in the correct location (same as export test)
+      local defaults_file = pl_path.join(dotfiles_dir, "defaults", "test.xml")
+      pl_dir.makepath(pl_path.dirname(defaults_file))
+      pl_file.write(defaults_file, "test preferences")
 
-    -- Run dot.lua with defaults import
-    assert.is_true(run_dot "-i test_defaults")
+      -- Run dot.lua with defaults import
+      assert.is_true(run_dot "-i test_defaults")
 
-    -- Check that defaults import was executed
-    assert.is_true(was_command_executed "defaults", "defaults import should have been executed")
+      -- Check that defaults import was executed
+      assert.is_true(was_command_executed "defaults", "defaults import should have been executed")
+    else
+      -- On non-macOS, defaults should be skipped
+      setup_module(
+        "test_defaults",
+        [[
+return {
+  defaults = {
+    ["com.test.app"] = "./defaults/test.xml",
+  }
+}
+]]
+      )
+
+      -- Run dot.lua with defaults import (should be skipped)
+      assert.is_true(run_dot "-i test_defaults")
+
+      -- Check that defaults was NOT executed
+      assert.is_false(was_command_executed "defaults", "defaults should NOT be executed on " .. current_os)
+    end
   end)
 
   it("should handle multiple package managers in install system", function()
