@@ -134,7 +134,7 @@ exit 0
     pl_file.write(command_log_file, "")
     
     -- Create a smart which command that checks our bin_dir first
-    local which_script = string.format([[#!/bin/bash
+    local which_script = string.format([[#!/bin/sh
 if [ -f "%s/$1" ]; then
   echo "%s/$1"
   exit 0
@@ -150,67 +150,85 @@ fi
     create_command("mktemp", 0, tmp_dir .. "/tmpfile")
     create_command("test", 0, "")
     -- Create a functional bash command that can execute scripts
-    local bash_script = string.format([[#!/bin/bash
+    local bash_script = string.format([[#!/bin/sh
 echo "COMMAND_EXECUTED: bash $@" >> %q
-/bin/bash "$@"
+if command -v bash >/dev/null 2>&1; then
+  bash "$@"
+elif command -v sh >/dev/null 2>&1; then
+  sh "$@"
+else
+  sh "$@"
+fi
 ]], command_log_file)
     pl_file.write(pl_path.join(bin_dir, "bash"), bash_script)
     os.execute(string.format("chmod +x %q", pl_path.join(bin_dir, "bash")))
     
-    -- Create commands that actually do filesystem operations
-    local mkdir_script = string.format([[#!/bin/bash
+    -- Create commands that actually do filesystem operations (using portable paths)
+    local function find_command(cmd_name)
+      -- Try to find the actual command location
+      local common_paths = {"/bin/" .. cmd_name, "/usr/bin/" .. cmd_name}
+      for _, path in ipairs(common_paths) do
+        local check = os.execute(string.format("test -x %q", path))
+        if check == 0 then
+          return path
+        end
+      end
+      return cmd_name -- fallback to just the command name
+    end
+    
+    local mkdir_script = string.format([[#!/bin/sh
 echo "COMMAND_EXECUTED: mkdir $@" >> %q
-/bin/mkdir "$@"
-]], command_log_file)
+%s "$@"
+]], command_log_file, find_command("mkdir"))
     pl_file.write(pl_path.join(bin_dir, "mkdir"), mkdir_script)
     os.execute(string.format("chmod +x %q", pl_path.join(bin_dir, "mkdir")))
     
-    local ln_script = string.format([[#!/bin/bash
+    local ln_script = string.format([[#!/bin/sh
 echo "COMMAND_EXECUTED: ln $@" >> %q
-/bin/ln "$@"
-]], command_log_file)
+%s "$@"
+]], command_log_file, find_command("ln"))
     pl_file.write(pl_path.join(bin_dir, "ln"), ln_script)
     os.execute(string.format("chmod +x %q", pl_path.join(bin_dir, "ln")))
     
-    local echo_script = string.format([[#!/bin/bash
+    local echo_script = string.format([[#!/bin/sh
 echo "COMMAND_EXECUTED: echo $@" >> %q
-/bin/echo "$@"
-]], command_log_file)
+%s "$@"
+]], command_log_file, find_command("echo"))
     pl_file.write(pl_path.join(bin_dir, "echo"), echo_script)
     os.execute(string.format("chmod +x %q", pl_path.join(bin_dir, "echo")))
     
-    local touch_script = string.format([[#!/bin/bash
+    local touch_script = string.format([[#!/bin/sh
 echo "COMMAND_EXECUTED: touch $@" >> %q
-/usr/bin/touch "$@"
-]], command_log_file)
+%s "$@"
+]], command_log_file, find_command("touch"))
     pl_file.write(pl_path.join(bin_dir, "touch"), touch_script)
     os.execute(string.format("chmod +x %q", pl_path.join(bin_dir, "touch")))
     
-    local cp_script = string.format([[#!/bin/bash
+    local cp_script = string.format([[#!/bin/sh
 echo "COMMAND_EXECUTED: cp $@" >> %q
-/bin/cp "$@"
-]], command_log_file)
+%s "$@"
+]], command_log_file, find_command("cp"))
     pl_file.write(pl_path.join(bin_dir, "cp"), cp_script)
     os.execute(string.format("chmod +x %q", pl_path.join(bin_dir, "cp")))
     
-    local rm_script = string.format([[#!/bin/bash
+    local rm_script = string.format([[#!/bin/sh
 echo "COMMAND_EXECUTED: rm $@" >> %q
-/bin/rm "$@"
-]], command_log_file)
+%s "$@"
+]], command_log_file, find_command("rm"))
     pl_file.write(pl_path.join(bin_dir, "rm"), rm_script)
     os.execute(string.format("chmod +x %q", pl_path.join(bin_dir, "rm")))
     
-    local mv_script = string.format([[#!/bin/bash
+    local mv_script = string.format([[#!/bin/sh
 echo "COMMAND_EXECUTED: mv $@" >> %q
-/bin/mv "$@"
-]], command_log_file)
+%s "$@"
+]], command_log_file, find_command("mv"))
     pl_file.write(pl_path.join(bin_dir, "mv"), mv_script)
     os.execute(string.format("chmod +x %q", pl_path.join(bin_dir, "mv")))
     
-    local find_script = string.format([[#!/bin/bash
+    local find_script = string.format([[#!/bin/sh
 echo "COMMAND_EXECUTED: find $@" >> %q
-/usr/bin/find "$@"
-]], command_log_file)
+%s "$@"
+]], command_log_file, find_command("find"))
     pl_file.write(pl_path.join(bin_dir, "find"), find_script)
     os.execute(string.format("chmod +x %q", pl_path.join(bin_dir, "find")))
   end)
