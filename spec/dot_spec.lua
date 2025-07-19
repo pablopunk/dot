@@ -21,7 +21,7 @@ describe("dot.lua", function()
   -- Function to check if a path is a symbolic link
   local function is_link(path)
     local attr = lfs.symlinkattributes(path)
-    return attr and attr.mode == "link"
+    return attr and attr.mode == "link" or false
   end
 
   -- Function to create a fake command that logs when it's called
