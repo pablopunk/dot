@@ -847,49 +847,7 @@ return {
     end
   end)
 
-  it("should handle purge mode", function()
-    -- Create package manager
-    create_command("fake_apt", 0, "Package installed successfully")
 
-    -- Set up module with postpurge hook
-    setup_module(
-      "test_purge",
-      string.format(
-        [[
-return {
-  install = {
-    fake_apt = "fake_apt install -y test-package",
-  },
-  link = {
-    ["./config"] = "$HOME/.config/test",
-  },
-  postpurge = "touch %s/postpurge_executed.marker",
-}
-]],
-        home_dir
-      )
-    )
-
-    -- Create config
-    pl_file.write(pl_path.join(modules_dir, "test_purge", "config"), "test config")
-
-    -- First run to create symlink
-    assert.is_true(run_dot "test_purge")
-
-    -- Verify symlink exists
-    local config_path = pl_path.join(home_dir, ".config", "test")
-    assert.is_true(is_link(config_path), "Symlink should exist after first run")
-
-    -- Run with purge mode and hooks to force postpurge hook execution
-    assert.is_true(run_dot "--purge --hooks test_purge")
-
-    -- Check that symlink was removed
-    assert.is_false(path_exists(config_path), "Symlink should have been removed")
-
-    -- Check that postpurge hook ran (using --hooks to force execution)
-    local postpurge_marker = pl_path.join(home_dir, "postpurge_executed.marker")
-    assert.is_true(path_exists(postpurge_marker), "postpurge hook should have executed")
-  end)
 
   it("should run postlink hooks when linking happens", function()
     -- Set up module with postlink hook

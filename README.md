@@ -236,7 +236,7 @@ $ dot --remove-profile
 
 ### Hooks
 
-Run commands after installation, linking, or purging:
+Run commands after installation or linking:
 
 ```lua
 return {
@@ -263,7 +263,6 @@ return {
 Available hooks:
 - `postinstall`: Runs after dependencies are installed
 - `postlink`: Runs after files are linked
-- `postpurge`: Runs after module is purged
 
 ## Command-Line Options
 
@@ -287,11 +286,7 @@ Remove symlinks but keep config files:
 $ dot --unlink neovim
 ```
 
-### Purge Mode
-Uninstall dependencies and remove configurations:
-```bash
-$ dot --purge neovim
-```
+
 
 ### Defaults Management
 ```bash

@@ -5,7 +5,6 @@ local version = "1.0.0"
 -- Parse command-line arguments
 local function parse_args()
   local force_mode = false
-  local purge_mode = false
   local unlink_mode = false
   local hooks_mode = false
   local defaults_export = false
@@ -20,8 +19,6 @@ local function parse_args()
     elseif arg[i] == "--version" or arg[i] == "-v" then
       print("dot version " .. version)
       os.exit(0)
-    elseif arg[i] == "--purge" then
-      purge_mode = true
     elseif arg[i] == "--unlink" then
       unlink_mode = true
     elseif arg[i] == "--defaults-export" then
@@ -43,7 +40,7 @@ Usage: dot [options] [module/profile]
 Options:
   -f                Force mode: replace existing configurations, backing them up to <config>.before-dot
   --version         Display the version of dot
-  --purge           Purge mode: uninstall dependencies and remove configurations
+
   --unlink          Unlink mode: remove symlinks but keep the config files in their destination
   -e                ↙ Short for --defaults-export
   --defaults-export Save app preferences to a plist file
@@ -62,7 +59,7 @@ Options:
 
   return {
     force_mode = force_mode,
-    purge_mode = purge_mode,
+
     unlink_mode = unlink_mode,
     defaults_export = defaults_export,
     defaults_import = defaults_import,
@@ -420,43 +417,36 @@ local function run_hook(hook_script, hook_type)
 end
 
 -- Process new install system
-local function process_install(config, purge_mode)
+local function process_install(config)
   if not config.install then
     return false
   end
 
   local install_happened = false
 
-  if purge_mode then
-    -- For purge mode, we don't actually uninstall packages as that's complex
-    -- and dangerous. We just report what would be uninstalled.
-    print_message("info", "install → purge mode (packages not actually uninstalled for safety)")
-    return false
-  else
-    -- Find the first available command and run it
-    for cmd_name, cmd_line in pairs(config.install) do
-      if command_exists(cmd_name) then
-        print_message("info", "install → using " .. cmd_name)
-        local exit_code, output = execute(cmd_line)
-        if exit_code == 0 then
-          if output and output ~= "" then
-            print_message("success", "install → completed")
-          end
-          install_happened = true
-        else
-          print_message("error", "install → failed: " .. (output or "unknown error"))
+  -- Find the first available command and run it
+  for cmd_name, cmd_line in pairs(config.install) do
+    if command_exists(cmd_name) then
+      print_message("info", "install → using " .. cmd_name)
+      local exit_code, output = execute(cmd_line)
+      if exit_code == 0 then
+        if output and output ~= "" then
+          print_message("success", "install → completed")
         end
-        break -- Only use the first available package manager
+        install_happened = true
+      else
+        print_message("error", "install → failed: " .. (output or "unknown error"))
       end
+      break -- Only use the first available package manager
     end
+  end
 
-    if not install_happened then
-      local available_cmds = {}
-      for cmd_name, _ in pairs(config.install) do
-        table.insert(available_cmds, cmd_name)
-      end
-      print_message("warning", "install → no available commands from: " .. table.concat(available_cmds, ", "))
+  if not install_happened then
+    local available_cmds = {}
+    for cmd_name, _ in pairs(config.install) do
+      table.insert(available_cmds, cmd_name)
     end
+    print_message("warning", "install → no available commands from: " .. table.concat(available_cmds, ", "))
   end
 
   return install_happened
@@ -566,19 +556,7 @@ local function handle_links(config, module_dir, options)
     local output = expand_path(output_pattern)
     local attr = get_file_info(output)
 
-    if options.purge_mode then
-      -- Remove symlink or config file/directory
-      if attr then
-        local success, err = delete_path(output)
-        if success then
-          print_message("success", "link → removed " .. output)
-        else
-          print_message("error", "link → " .. err)
-        end
-      else
-        print_message("info", "link → " .. output .. " does not exist")
-      end
-    elseif options.unlink_mode then
+    if options.unlink_mode then
       -- Remove symlink and copy source to output
       if attr and attr.is_symlink then
         local success, err = delete_path(output)
@@ -645,7 +623,7 @@ local function handle_links(config, module_dir, options)
     end
   end
 
-  if all_links_correct and not options.unlink_mode and not options.purge_mode then
+  if all_links_correct and not options.unlink_mode then
     -- Don't print anything for minimal output when nothing changed
   end
 
@@ -720,7 +698,7 @@ local function process_module(module_name, options)
   local defaults_happened = false
 
   -- Process installation
-  if process_install(config, options.purge_mode) then
+  if process_install(config) then
     install_happened = true
   end
 
@@ -736,15 +714,13 @@ local function process_module(module_name, options)
 
   -- Run new hook system
   if install_happened or options.hooks_mode then
-    if options.purge_mode and config.postpurge then
-      run_hook(config.postpurge, "post-purge")
-    elseif not options.purge_mode and config.postinstall then
+    if config.postinstall then
       run_hook(config.postinstall, "postinstall")
     end
   end
 
   if link_happened or options.hooks_mode then
-    if not options.purge_mode and not options.unlink_mode and config.postlink then
+    if not options.unlink_mode and config.postlink then
       run_hook(config.postlink, "postlink")
     end
   end
