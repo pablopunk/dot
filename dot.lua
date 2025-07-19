@@ -2,19 +2,12 @@
 
 local version = "1.0.0"
 
-local MOCK_BREW = false
-local MOCK_WGET = false
-local MOCK_DEFAULTS = false
-
 -- Parse command-line arguments
 local function parse_args()
   local force_mode = false
   local purge_mode = false
   local unlink_mode = false
-  local mock_brew = false
-  local mock_wget = false
   local hooks_mode = false
-  local mock_defaults = false
   local defaults_export = false
   local defaults_import = false
   local remove_profile = false
@@ -31,12 +24,6 @@ local function parse_args()
       purge_mode = true
     elseif arg[i] == "--unlink" then
       unlink_mode = true
-    elseif arg[i] == "--mock-brew" then
-      mock_brew = true
-    elseif arg[i] == "--mock-wget" then
-      mock_wget = true
-    elseif arg[i] == "--mock-defaults" then
-      mock_defaults = true
     elseif arg[i] == "--defaults-export" then
       defaults_export = true
     elseif arg[i] == "-e" then
@@ -58,9 +45,6 @@ Options:
   --version         Display the version of dot
   --purge           Purge mode: uninstall dependencies and remove configurations
   --unlink          Unlink mode: remove symlinks but keep the config files in their destination
-  --mock-brew       Mock brew operations (for testing purposes)
-  --mock-wget       Mock wget operations (for testing purposes)
-  --mock-defaults   Mock defaults operations (for testing purposes)
   -e                ↙ Short for --defaults-export
   --defaults-export Save app preferences to a plist file
   -i                ↙ Short for --defaults-import
@@ -80,9 +64,6 @@ Options:
     force_mode = force_mode,
     purge_mode = purge_mode,
     unlink_mode = unlink_mode,
-    mock_brew = mock_brew,
-    mock_wget = mock_wget,
-    mock_defaults = mock_defaults,
     defaults_export = defaults_export,
     defaults_import = defaults_import,
     hooks_mode = hooks_mode,
@@ -129,89 +110,6 @@ end
 
 -- Execute an OS command and return exit code and output
 local function execute(cmd)
-  -- Special handling for macOS-specific commands when mocking is enabled
-  if MOCK_DEFAULTS then
-    -- Handle defaults export command
-    if cmd:match "^defaults export" then
-      local app = cmd:match 'defaults export "([^"]+)"'
-      local output_file = cmd:match 'defaults export "[^"]+" "([^"]+)"'
-
-      -- Also match plutil command pattern that often follows defaults export
-      if not output_file and cmd:match "plutil" then
-        output_file = cmd:match 'plutil .-o "([^"]+)"'
-      end
-
-      if output_file then
-        -- Ensure the parent directory exists
-        local parent_dir = output_file:match "(.+)/[^/]*$"
-        if parent_dir then
-          -- Create parent directory directly instead of calling ensure_parent_directory
-          os.execute('mkdir -p "' .. parent_dir .. '"')
-        end
-
-        local file = io.open(output_file, "w")
-        if file then
-          if output_file:match "%.xml$" or cmd:match "xml1" then
-            -- XML format
-            file:write [[<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>MockedKey</key>
-  <string>mocked preferences</string>
-</dict>
-</plist>]]
-          else
-            -- Binary or other format
-            file:write "mocked preferences"
-          end
-          file:close()
-          return 0, ""
-        end
-      end
-      return 0, ""
-    end
-
-    -- Handle defaults import command
-    if cmd:match "^defaults import" then
-      return 0, ""
-    end
-
-    -- Handle plutil command on its own
-    if cmd:match "^plutil" then
-      -- If there's an output file specified
-      local output_file = cmd:match '-o "([^"]+)"' or cmd:match "-o ([^ ]+)"
-      if output_file and output_file ~= "-" then
-        -- Ensure the parent directory exists
-        local parent_dir = output_file:match "(.+)/[^/]*$"
-        if parent_dir then
-          -- Create parent directory directly instead of calling ensure_parent_directory
-          os.execute('mkdir -p "' .. parent_dir .. '"')
-        end
-
-        local file = io.open(output_file, "w")
-        if file then
-          if output_file:match "%.xml$" or cmd:match "xml1" then
-            -- XML format
-            file:write [[<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>MockedKey</key>
-  <string>mocked preferences</string>
-</dict>
-</plist>]]
-          else
-            -- Binary format
-            file:write "mocked binary plist"
-          end
-          file:close()
-        end
-      end
-      return 0, ""
-    end
-  end
-
   local handle = io.popen(cmd .. " 2>&1; echo $?")
   local result = handle:read "*a"
   handle:close()
@@ -222,12 +120,12 @@ local function execute(cmd)
   local exit_code = tonumber(lines[#lines])
   table.remove(lines)
   local output = table.concat(lines, "\n")
-  
+
   -- Show output transparently if there's any
-  if output ~= "" and not cmd:match("^test ") and not cmd:match("^which ") then
+  if output ~= "" and not cmd:match "^test " and not cmd:match "^which " then
     print(output)
   end
-  
+
   return exit_code, output
 end
 
@@ -447,21 +345,21 @@ end
 local function find_modules_fuzzy(query)
   local all_modules = get_all_modules()
   local matches = {}
-  
+
   -- First, try exact match
   for _, module in ipairs(all_modules) do
     if module == query then
       return { module }
     end
   end
-  
+
   -- Then try partial matches
   for _, module in ipairs(all_modules) do
     if module:find(query, 1, true) then
       table.insert(matches, module)
     end
   end
-  
+
   -- If no direct substring matches, try fuzzy matching
   if #matches == 0 then
     for _, module in ipairs(all_modules) do
@@ -469,7 +367,7 @@ local function find_modules_fuzzy(query)
       for part in module:gmatch "[^/]+" do
         table.insert(module_parts, part)
       end
-      
+
       -- Check if query matches any part of the module path
       for _, part in ipairs(module_parts) do
         if part:find(query, 1, true) then
@@ -479,7 +377,7 @@ local function find_modules_fuzzy(query)
       end
     end
   end
-  
+
   return matches
 end
 
@@ -528,7 +426,7 @@ local function process_install(config, purge_mode)
   end
 
   local install_happened = false
-  
+
   if purge_mode then
     -- For purge mode, we don't actually uninstall packages as that's complex
     -- and dangerous. We just report what would be uninstalled.
@@ -548,10 +446,10 @@ local function process_install(config, purge_mode)
         else
           print_message("error", "install → failed: " .. (output or "unknown error"))
         end
-        break  -- Only use the first available package manager
+        break -- Only use the first available package manager
       end
     end
-    
+
     if not install_happened then
       local available_cmds = {}
       for cmd_name, _ in pairs(config.install) do
@@ -560,7 +458,7 @@ local function process_install(config, purge_mode)
       print_message("warning", "install → no available commands from: " .. table.concat(available_cmds, ", "))
     end
   end
-  
+
   return install_happened
 end
 
@@ -581,14 +479,14 @@ local function process_defaults(config, options)
   for app_id, plist_path in pairs(config.defaults) do
     -- Make relative paths relative to current working directory
     local full_plist_path = plist_path
-    if not full_plist_path:match("^/") then
-      full_plist_path = os.getenv("PWD") .. "/" .. plist_path:gsub("^./", "")
+    if not full_plist_path:match "^/" then
+      full_plist_path = os.getenv "PWD" .. "/" .. plist_path:gsub("^./", "")
     end
 
     if options.defaults_export then
       -- Export defaults to plist file
       print_message("info", "defaults → exporting " .. app_id .. " to " .. full_plist_path)
-      
+
       -- Ensure parent directory exists
       local success, err = ensure_parent_directory(full_plist_path)
       if not success then
@@ -598,20 +496,19 @@ local function process_defaults(config, options)
 
       -- Determine output format based on file extension
       local format_flag = ""
-      if full_plist_path:match("%.xml$") then
+      if full_plist_path:match "%.xml$" then
         format_flag = " -format xml1"
       end
 
       local export_cmd = string.format('defaults export "%s" "%s"%s', app_id, full_plist_path, format_flag)
       local exit_code, output = execute(export_cmd)
-      
+
       if exit_code == 0 then
         print_message("success", "defaults → exported " .. app_id)
         defaults_processed = true
       else
         print_message("error", "defaults → export failed: " .. (output or "unknown error"))
       end
-
     elseif options.defaults_import then
       -- Import defaults from plist file
       if not is_file(full_plist_path) then
@@ -620,25 +517,24 @@ local function process_defaults(config, options)
       end
 
       print_message("info", "defaults → importing " .. app_id .. " from " .. full_plist_path)
-      
+
       local import_cmd = string.format('defaults import "%s" "%s"', app_id, full_plist_path)
       local exit_code, output = execute(import_cmd)
-      
+
       if exit_code == 0 then
         print_message("success", "defaults → imported " .. app_id)
         defaults_processed = true
       else
         print_message("error", "defaults → import failed: " .. (output or "unknown error"))
       end
-
     else
       -- Regular processing (import during normal dot run)
       if is_file(full_plist_path) then
         print_message("info", "defaults → importing " .. app_id .. " from " .. full_plist_path)
-        
+
         local import_cmd = string.format('defaults import "%s" "%s"', app_id, full_plist_path)
         local exit_code, output = execute(import_cmd)
-        
+
         if exit_code == 0 then
           print_message("success", "defaults → imported " .. app_id)
           defaults_processed = true
@@ -910,7 +806,7 @@ local function process_tool(tool_name, options)
   else
     -- Try fuzzy matching for module
     local matches = find_modules_fuzzy(tool_name)
-    
+
     if #matches == 1 then
       -- Exact fuzzy match found
       process_module(matches[1], options)
@@ -980,18 +876,6 @@ end
 -- Main function
 local function main()
   local options = parse_args()
-
-  if options.mock_brew then
-    MOCK_BREW = true
-  end
-
-  if options.mock_wget then
-    MOCK_WGET = true
-  end
-
-  if options.mock_defaults then
-    MOCK_DEFAULTS = true
-  end
 
   if options.remove_profile then
     remove_last_profile()
