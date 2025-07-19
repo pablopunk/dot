@@ -13,18 +13,14 @@
 - [Quick Start](#quick-start)
 - [Usage](#usage)
   - [Modules](#modules)
-  - [Dependencies](#dependencies)
-  - [Dotfiles](#dotfiles)
-  - [OS Restrictions](#os-restrictions)
+  - [Installation System](#installation-system)
+  - [Linking Files](#linking-files)
   - [macOS Preferences (defaults)](#macos-preferences-defaults)
+  - [OS Restrictions](#os-restrictions)
   - [Profiles](#profiles)
-  - [Force Mode `-f`](#force-mode--f)
-  - [Unlinking Configs `--unlink`](#unlinking-configs---unlink)
-  - [Purging Modules `--purge`](#purging-modules---purge)
   - [Hooks](#hooks)
-- [Summary of Command-Line Options](#summary-of-command-line-options)
+- [Command-Line Options](#command-line-options)
 - [Examples](#examples)
-- [To do](#to-do)
 
 ## Installation
 
@@ -66,7 +62,7 @@ $ dot work     # Only process the 'work' profile
 
 ### Modules
 
-Each module under the `modules/` folder needs to have at least a `dot.lua`. If not, it will be ignored. **Modules can be recursive**, meaning you can have nested directories within the `modules/` folder, and each can contain its own `dot.lua` to define configurations and dependencies.
+Each module under the `modules/` folder needs to have a `dot.lua` file. **Modules can be nested** - you can have directories within the `modules/` folder, and each can contain its own `dot.lua` to define configurations and dependencies.
 
 #### `dot.lua`
 
@@ -75,204 +71,133 @@ Example for neovim:
 ```lua
 -- modules/neovim/dot.lua
 return {
-  brew = {
-    { name = "neovim", options = "--HEAD" },
-    "ripgrep"
+  install = {
+    brew = "brew install neovim ripgrep",
+    apt = "apt install neovim ripgrep"
   },
-  config = {
-    source = "./config",       -- Our config directory within the module
-    output = "~/.config/nvim", -- Where the config will be linked to
+  link = {
+    ["./config"] = "~/.config/nvim"
   }
 }
 ```
 
-### Dependencies
+### Installation System
 
-#### Brew
-
-As you can see, you can declare dependencies as [Homebrew](https://brew.sh) packages, which makes it possible to also use `dot` to install GUI apps (Homebrew casks). You can create a module without any config to use it as an installer for your apps:
+The `install` system dynamically detects available package managers and uses the first one found. You can specify multiple package managers, and `dot` will use the first available one.
 
 ```lua
 -- modules/apps/dot.lua
 return {
-  brew = { "whatsapp", "spotify", "slack", "vscode" }
+  install = {
+    brew = "brew install whatsapp spotify slack vscode",
+    apt = "apt install vim git curl",
+    yum = "yum install vim git curl"
+  }
 }
 ```
 
-#### Wget
+In this example, if `brew` is available, it will use that. If not, it will try `apt`, then `yum`.
 
-`dot` now supports downloading files using `wget`. This can be useful for fetching binaries or other resources that are not available through Homebrew. You can specify a `wget` configuration in your module's `dot.lua` file.
+### Linking Files
 
-Example:
-
-```lua
--- modules/apps/dot.lua
-return {
-  wget = {
-    {
-      url = "https://app1piece.com/1Piece-4.2.1.zip",
-      output = "/Applications/1Piece.app",
-      zip = true,
-    },
-    {
-      url = "https://fakedomain.com/fake.app",
-      output = "/Applications/Fake.app",
-    },
-  },
-}
-```
-
-> [!NOTE]
-> When using `zip = true`, make sure the output file name matches the unzipped file name. In the example above, the output is `/Applications/1Piece.app` because the zip file contains a file named `1Piece.app`.
-
-
-### Dotfiles
-
-The config will be linked to the home folder with a soft link. In this case:
-
-```bash
-~/.config/nvim → ~/dotfiles/modules/neovim/config
-```
-
-You can also specify multiple configurations for a single module:
+The `link` system creates symlinks from your dotfiles to their destinations. Use the new key-value format:
 
 ```lua
 -- modules/multi-config/dot.lua
 return {
-  brew = { "cursor" },
-  config = {
-    {
-      source = "./config/settings.json",
-      output = "~/Library/Application Support/Cursor/User/settings.json",
-    },
-    {
-      source = "./config/keybindings.json",
-      output = "~/Library/Application Support/Cursor/User/keybindings.json",
-    }
+  install = {
+    brew = "brew install cursor"
+  },
+  link = {
+    ["./config/settings.json"] = "~/Library/Application Support/Cursor/User/settings.json",
+    ["./config/keybindings.json"] = "~/Library/Application Support/Cursor/User/keybindings.json"
   }
 }
 ```
 
-This will create two symlinks:
-
+This creates symlinks:
 ```bash
 ~/Library/Application Support/Cursor/User/settings.json → ~/dotfiles/modules/multi-config/config/settings.json
 ~/Library/Application Support/Cursor/User/keybindings.json → ~/dotfiles/modules/multi-config/config/keybindings.json
 ```
-### OS Restrictions
-
-You can restrict modules to specific operating systems using the `os` field in your module's `dot.lua`:
-
-```lua
--- modules/macos-only/dot.lua
-return {
-  os = { "mac" },  -- This module will only run on macOS
-  brew = { "mac-specific-app" },
-  config = {
-    source = "./config",
-    output = "~/.config/mac-specific-app",
-  }
-}
-```
-
-You can also specify multiple operating systems for a module:
-
-```lua
-return {
-  os = { "mac", "linux" },  -- This module will run on both macOS and Linux
-  config = {
-    source = "./config",
-    output = "~/.config/cross-platform-app",
-  }
-}
-```
-
-The module will be automatically skipped when run on non-matching operating systems.
-Supported OS values:
-- `"mac"`, `"macos"`, or `"darwin"` for macOS
-- `"linux"` for Linux systems
-- `"windows"` for Windows systems
-
 
 ### macOS Preferences (defaults)
 
-You can manage macOS application preferences using the `defaults` field in your module's `init.lua`. This allows you to export and import application preferences to and from plist files. Since macOS `defaults` don't play nice with symlinks, you'll need to run `dot` every time you want to update/import the preferences. But don't worry, it's easy:
-
-Example:
+Manage macOS application preferences using the `defaults` field:
 
 ```lua
 -- modules/swiftshift/dot.lua
 return {
   defaults = {
-    ["com.pablopunk.Swift-Shift"] = "./defaults/SwiftShift.plist", -- Info on how to get app id below
+    ["com.pablopunk.Swift-Shift"] = "./defaults/SwiftShift.xml"
   }
 }
 ```
 
 > [!NOTE]
-> To find the app id, you can run `defaults domains | tr ', ' '\n' | grep -i <app-name>`.
+> To find the app id, run: `defaults domains | tr ', ' '\n' | grep -i <app-name>`
 
-#### Human-readable format
+#### XML Format (Recommended)
 
-`dot` now supports human-readable XML format for preferences by using a `.xml` extension:
+Use `.xml` extension for human-readable preferences:
 
 ```lua
 return {
   defaults = {
-    ["com.pablopunk.Swift-Shift"] = "./defaults/SwiftShift.xml",
+    ["com.pablopunk.Swift-Shift"] = "./defaults/SwiftShift.xml"
   }
 }
 ```
 
-XML files are much easier to read, compare, and track changes with version control compared to binary plist files.
+XML files are easier to read, compare, and track with version control.
 
-![CleanShot 2025-04-11 at 21 33 46](https://github.com/user-attachments/assets/2396b7c5-bdb9-4f0e-9de8-348f7c49a6f2)
+#### Export/Import Commands
 
-The first time you run this without any files, it will export the current preferences to the plist file.
-
-Whenever you want them to be exported again, run:
-
+Export current preferences:
 ```bash
-$ dot any_app --defaults-export (or -e)
+$ dot swiftshift --defaults-export  # or -e
 ```
 
-To import the preferences from your dotfiles, run:
-
+Import preferences from your dotfiles:
 ```bash
-$ dot any_app --defaults-import (or -i)
+$ dot swiftshift --defaults-import  # or -i
 ```
 
-By default, `dot` will only alert you that your saved preferences differ from the current ones.
-It's up to you to choose which one you want to keep.
+### OS Restrictions
+
+Restrict modules to specific operating systems:
+
+```lua
+-- modules/macos-only/dot.lua
+return {
+  os = { "mac" },  -- Only runs on macOS
+  install = {
+    brew = "brew install mac-specific-app"
+  },
+  link = {
+    ["./config"] = "~/.config/mac-specific-app"
+  }
+}
+```
+
+Supported OS values:
+- `"mac"`, `"macos"`, or `"darwin"` for macOS
+- `"linux"` for Linux systems
+- `"windows"` for Windows systems
 
 ### Profiles
 
-If you have several machines, you might not want to install all tools on every computer. That's why `dot` allows **profiles**.
-
-Let's create a new "personal" profile:
+Profiles let you manage different setups for different machines:
 
 ```lua
 -- profiles/personal.lua
 return {
   modules = {
-    "*",
-    "!apps/work",
+    "*",           -- Include all modules
+    "!apps/work"   -- Exclude work apps
   }
 }
 ```
-
-In this example, running `dot personal` will:
-
-- `*`: Install everything under `modules/`, including nested directories.
-- `!apps/work`: Exclude the `apps/work` module and its submodules.
-
-You can use the following patterns in your profile:
-
-- `"*"`: Include all modules recursively.
-- `"!module_name"`: Exclude a specific module and its submodules.
-- `"module_name"`: Include a specific module.
-
-For example, a work profile might look like this:
 
 ```lua
 -- profiles/work.lua
@@ -286,12 +211,15 @@ return {
 }
 ```
 
-> [!NOTE]
-> If your profile is named just like a module (e.g., `profiles/neovim` and `modules/neovim`), running `dot neovim` will default to the profile.
+#### Profile Patterns
 
-#### Profiles are persistent
+- `"*"`: Include all modules recursively
+- `"!module_name"`: Exclude a specific module and its submodules
+- `"module_name"`: Include a specific module
 
-When you run `dot <profile-name>`, it will remember it, so next time you only need to run `dot` to use the same profile.
+#### Persistent Profiles
+
+Profiles are remembered between runs:
 
 ```bash
 $ dot work
@@ -301,141 +229,84 @@ $ dot
 ...installing work profile again...
 ```
 
-To get rid of the last profile used, select any other profile or run:
-
+Remove the current profile:
 ```bash
 $ dot --remove-profile
 ```
 
-### Force Mode `-f`
+### Hooks
 
-By default, `dot` won't touch your existing dotfiles if the destination already exists. If you still want to replace them, you can use the `-f` flag:
+Run commands after installation, linking, or purging:
 
-```bash
-$ dot -f neovim
+```lua
+return {
+  install = {
+    brew = "brew install gh"
+  },
+  postinstall = "gh auth login"
+}
 ```
 
-> [!NOTE]
-> It won't remove the existing config but will move it to a new path: `<path-to-config>.before-dot`.
+Multi-line hooks:
+```lua
+return {
+  install = {
+    brew = "brew install gh"
+  },
+  postinstall = [[
+    gh auth status | grep 'Logged in to github.com account' > /dev/null || gh auth login --web -h github.com
+    gh extension list | grep gh-copilot > /dev/null || gh extension install github/gh-copilot
+  ]]
+}
+```
 
-### Unlinking Configs `--unlink`
+Available hooks:
+- `postinstall`: Runs after dependencies are installed
+- `postlink`: Runs after files are linked
+- `postpurge`: Runs after module is purged
 
-If you want to remove the symlinks created by `dot` for a specific module but keep your configuration, you can use the `--unlink` option:
+## Command-Line Options
 
+### Basic Usage
+```bash
+$ dot             # Install all modules
+$ dot neovim      # Install only the 'neovim' module
+$ dot work        # Install only the 'work' profile
+```
+
+### Force Mode
+Replace existing configurations (backs up to `<config>.before-dot`):
+```bash
+$ dot -f          # Force install all modules
+$ dot -f neovim   # Force install the 'neovim' module
+```
+
+### Unlink Mode
+Remove symlinks but keep config files:
 ```bash
 $ dot --unlink neovim
 ```
 
-This command will:
-
-- Remove the symlink at the destination specified in `config.output`.
-- Copy the config source from `config.source` to the output location.
-
-This is useful if you want to maintain your configuration files without `dot` managing them anymore.
-
-### Purging Modules `--purge`
-
-To completely remove a module, including uninstalling its dependencies and removing its configuration, use the `--purge` option:
-
+### Purge Mode
+Uninstall dependencies and remove configurations:
 ```bash
 $ dot --purge neovim
 ```
 
-This command will:
-
-- Uninstall the Homebrew dependencies listed in the module's `dot.lua`.
-- Remove the symlink or config file/directory specified in `config.output`.
-- Run any `post_purge` hooks if defined in the module.
-
-> [!WARNING]
-> `--purge` will uninstall packages from your system and remove configuration files. Use with caution.
-
-### Hooks
-
-You can define `post_install` and `post_purge` hooks in your module's `dot.lua` to run arbitrary commands after the module has been installed or purged.
-
-```lua
-return {
-  brew = { "gh" },
-  post_install = "gh auth login"
-}
+### Defaults Management
+```bash
+$ dot app -e              # Export app preferences to plist
+$ dot app -i              # Import app preferences from plist
 ```
 
-You can also define multi-line hooks:
-
-```lua
-return {
-  brew = { "gh" },
-  post_install = [[
-    gh auth status | grep 'Logged in to github.com account' > /dev/null || gh auth login --web -h github.com
-    gh extension list | grep gh-copilot > /dev/null || gh extension install github/gh-copilot
-  ]],
-}
+### Other Options
+```bash
+$ dot --hooks             # Run hooks even if nothing changed
+$ dot --remove-profile    # Remove the last used profile
+$ dot --version           # Show version
+$ dot -h                  # Show help
 ```
-
-## Summary of Command-Line Options
-
-- **Install Modules**: Install dependencies and link configurations.
-
-  ```bash
-  $ dot             # Install all modules
-  $ dot neovim      # Install only the 'neovim' module
-  $ dot work        # Install only the 'work' profile
-  ```
-
-- **Force Mode**: Replace existing configurations, backing them up to `<config>.before-dot`.
-
-  ```bash
-  $ dot -f          # Force install all modules
-  $ dot -f neovim   # Force install the 'neovim' module
-  ```
-
-- **Unlink Configs**: Remove symlinks but keep the config files in their destination.
-
-  ```bash
-  $ dot --unlink neovim
-  ```
-
-- **Purge Modules**: Uninstall dependencies and remove configurations.
-
-  ```bash
-  $ dot --purge neovim
-  ```
-
-- **Defaults Export/Import**: Manage macOS application preferences.
-
-  ```bash
-  $ dot app [-e,--defaults-export]  # Export app preferences to plist
-  $ dot app [-i,--defaults-import]  # Import app preferences from plist
-  ```
 
 ## Examples
 
 - [pablopunk/dotfiles](https://github.com/pablopunk/dotfiles): my own dotfiles, using `dot` to manage them.
-
-## To do
-
-- [x] `dot` will install dependencies and link files.
-- [x] Support Homebrew dependencies.
-- [x] `dot -f` will remove the existing configs if they exist (moves config to `*.before-dot`).
-- [x] Allow post-install hooks in bash.
-- [x] Allow installing only one module with `dot neovim`.
-- [x] Allow multiple setups in one repo. Similar to "hosts" in Nix, `dot work` reads `profiles/work.lua` which includes whatever it wants from `modules/`.
-- [x] Package and distribute `dot` through Homebrew.
-- [x] Add `--unlink` option to remove symlinks and copy configs to output.
-- [x] Add `--purge` option to uninstall dependencies and remove configurations.
-- [x] Allow array of config. For example I could like two separate folders that are not siblings
-- [x] Improve profiles syntax. For example, `{ "*", "apps/work" }` should still be recursive except in "apps/". Or maybe accept negative patterns like `{ "!apps/personal" }` -> everything but apps/personal.
-- [x] Add screenshots to the README.
-- [ ] Support more ways of adding dependencies (e.g., wget binaries, git clone, apt...).
-  - [x] wget
-  - [ ] git clone
-  - [ ] apt
-- [ ] Unlinking dotfiles without copying. An option like `dot --unlink --no-copy` could be added.
-- [ ] `dot --purge-all` to purge all modules at once.
-- [x] Support Mac defaults, similar to `nix-darwin`.
-  - [x] Add tests
-  - [x] Ignore on linux
-  - [x] Add cog images to the header so it's easier to tell that it's not only about plaintext dotfiles
-- [x] Support an `os` field. i.e `os = { "mac" }` will be ignored on Linux.
-- [x] After using a profile, like `dot profile1`, it should remember it and all calls to `dot` should be done with this profile unless another profile is explicitely invoked, like `dot profile2`, which will replace it for the next invokations.
