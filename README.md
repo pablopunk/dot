@@ -71,6 +71,7 @@ return {
     brew = "brew install neovim ripgrep",
     apt = "sudo apt install -y neovim ripgrep"
   },
+  check = "nvim --version", -- Check if neovim is already installed
   link = {
     ["./config"] = "~/.config/nvim" -- link the whole directory or just one file, your choice
   }
@@ -93,6 +94,32 @@ return {
 ```
 
 In this example, if `brew` is available, it will use that. If not, it will try `apt`, then `yum`.
+
+#### Smart Installation with `check`
+
+To avoid reinstalling tools that are already installed, add a `check` field:
+
+```lua
+-- neovim/dot.lua
+return {
+  install = {
+    brew = "brew install neovim ripgrep",
+    apt = "sudo apt install -y neovim ripgrep"
+  },
+  check = "nvim --version", -- Check if neovim is already installed
+  link = {
+    ["./config"] = "~/.config/nvim"
+  }
+}
+```
+
+The `check` field specifies a command to verify if the tool is already installed. If the command succeeds, `dot` will skip the installation step.
+
+**Examples:**
+- `check = "nvim --version"` for Neovim
+- `check = "git --version"` for Git
+- `check = "node --version"` for Node.js
+- `check = "which docker"` for Docker
 
 ### Linking Files
 

@@ -1293,4 +1293,151 @@ return {
     local config_path = pl_path.join(home_dir, ".config", "test")
     assert.is_true(is_link(config_path), "Symlink should have been created")
   end)
+
+  it("should skip installation when check command succeeds", function()
+    -- Create a fake tool that exists (check command will succeed)
+    create_command("fake_tool", 0, "Tool version 1.0.0")
+    create_command("fake_apt", 0, "Package installed successfully")
+
+    -- Set up module with check field
+    setup_module(
+      "test_check_skip",
+      [[
+return {
+  install = {
+    fake_apt = "fake_apt install -y test-package",
+  },
+  check = "fake_tool --version",
+  link = {
+    ["./config"] = "$HOME/.config/test",
+  }
+}
+]]
+    )
+
+    -- Create config
+    pl_dir.makepath(pl_path.join(dotfiles_dir, "test_check_skip", "config"))
+    pl_file.write(pl_path.join(dotfiles_dir, "test_check_skip", "config", "test.conf"), "test config")
+
+    -- Run dot.lua
+    assert.is_true(run_dot "test_check_skip")
+
+    -- Check that check command was executed
+    assert.is_true(was_command_executed "fake_tool", "check command should have been executed")
+
+    -- Check that install command was NOT executed (tool already exists)
+    assert.is_false(was_command_executed "fake_apt", "install command should NOT have been executed")
+
+    -- Check that symlink was still created
+    local config_path = pl_path.join(home_dir, ".config", "test")
+    assert.is_true(is_link(config_path), "Symlink should have been created even when skipping install")
+  end)
+
+  it("should run installation when check command fails", function()
+    -- Create a fake tool that doesn't exist (check command will fail)
+    create_command("fake_apt", 0, "Package installed successfully")
+
+    -- Set up module with check field
+    setup_module(
+      "test_check_install",
+      [[
+return {
+  install = {
+    fake_apt = "fake_apt install -y test-package",
+  },
+  check = "nonexistent_tool --version",
+  link = {
+    ["./config"] = "$HOME/.config/test",
+  }
+}
+]]
+    )
+
+    -- Create config
+    pl_dir.makepath(pl_path.join(dotfiles_dir, "test_check_install", "config"))
+    pl_file.write(pl_path.join(dotfiles_dir, "test_check_install", "config", "test.conf"), "test config")
+
+    -- Run dot.lua
+    assert.is_true(run_dot "test_check_install")
+
+    -- Check that install command was executed (tool doesn't exist)
+    assert.is_true(was_command_executed "fake_apt", "install command should have been executed")
+
+    -- Check that symlink was created
+    local config_path = pl_path.join(home_dir, ".config", "test")
+    assert.is_true(is_link(config_path), "Symlink should have been created")
+  end)
+
+  it("should handle check command with complex arguments", function()
+    -- Create a fake tool that exists
+    create_command("fake_git", 0, "git version 2.30.0")
+    create_command("fake_apt", 0, "Package installed successfully")
+
+    -- Set up module with complex check command
+    setup_module(
+      "test_check_complex",
+      [[
+return {
+  install = {
+    fake_apt = "fake_apt install -y git",
+  },
+  check = "fake_git --version | grep -q 'version'",
+  link = {
+    ["./config"] = "$HOME/.config/test",
+  }
+}
+]]
+    )
+
+    -- Create config
+    pl_dir.makepath(pl_path.join(dotfiles_dir, "test_check_complex", "config"))
+    pl_file.write(pl_path.join(dotfiles_dir, "test_check_complex", "config", "test.conf"), "test config")
+
+    -- Run dot.lua
+    assert.is_true(run_dot "test_check_complex")
+
+    -- Check that check command was executed
+    assert.is_true(was_command_executed "fake_git", "check command should have been executed")
+
+    -- Check that install command was NOT executed (tool already exists)
+    assert.is_false(was_command_executed "fake_apt", "install command should NOT have been executed")
+
+    -- Check that symlink was still created
+    local config_path = pl_path.join(home_dir, ".config", "test")
+    assert.is_true(is_link(config_path), "Symlink should have been created")
+  end)
+
+  it("should work without check field (backward compatibility)", function()
+    -- Create package manager
+    create_command("fake_apt", 0, "Package installed successfully")
+
+    -- Set up module without check field
+    setup_module(
+      "test_no_check",
+      [[
+return {
+  install = {
+    fake_apt = "fake_apt install -y test-package",
+  },
+  link = {
+    ["./config"] = "$HOME/.config/test",
+  }
+}
+]]
+    )
+
+    -- Create config
+    pl_dir.makepath(pl_path.join(dotfiles_dir, "test_no_check", "config"))
+    pl_file.write(pl_path.join(dotfiles_dir, "test_no_check", "config", "test.conf"), "test config")
+
+    -- Run dot.lua
+    assert.is_true(run_dot "test_no_check")
+
+    -- Check that install command was executed (no check field)
+    assert.is_true(was_command_executed "fake_apt", "install command should have been executed")
+
+    -- Check that symlink was created
+    local config_path = pl_path.join(home_dir, ".config", "test")
+    assert.is_true(is_link(config_path), "Symlink should have been created")
+  end)
 end)

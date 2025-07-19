@@ -428,6 +428,15 @@ local function process_install(config)
 
   local install_happened = false
 
+  -- Check if tool is already installed (if check field is provided)
+  if config.check then
+    local exit_code, _ = execute(config.check .. " >/dev/null 2>&1")
+    if exit_code == 0 then
+      print_message("info", "install → already installed")
+      return false
+    end
+  end
+
   -- Find the first available command and run it
   for cmd_name, cmd_line in pairs(config.install) do
     if command_exists(cmd_name) then
