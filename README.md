@@ -293,9 +293,14 @@ $ dot app -e              # Export app preferences to plist
 $ dot app -i              # Import app preferences from plist
 ```
 
+### Hook Options
+```bash
+$ dot --postinstall       # Run postinstall hooks even if dependencies haven't changed
+$ dot --postlink          # Run postlink hooks even if symlinks haven't changed
+```
+
 ### Other Options
 ```bash
-$ dot --hooks             # Run hooks even if nothing changed
 $ dot --remove-profile    # Remove the last used profile
 $ dot --version           # Show version
 $ dot -h                  # Show help

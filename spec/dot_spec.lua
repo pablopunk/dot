@@ -622,6 +622,35 @@ return {
     assert.is_false(path_exists(postinstall_marker), "postinstall hook should NOT have executed")
   end)
 
+  it("should run postinstall hook with --postinstall flag even when no installation happens", function()
+    -- Set up module without any install commands
+    setup_module(
+      "test_postinstall_flag",
+      string.format(
+        [[
+return {
+  link = {
+    ["./config"] = "$HOME/.config/test",
+  },
+  postinstall = "touch %s/postinstall_executed.marker",
+}
+]],
+        home_dir
+      )
+    )
+
+    -- Create config
+    pl_dir.makepath(pl_path.join(dotfiles_dir, "test_postinstall_flag", "config"))
+    pl_file.write(pl_path.join(dotfiles_dir, "test_postinstall_flag", "config", "test.conf"), "test config")
+
+    -- Run dot.lua with --postinstall flag
+    assert.is_true(run_dot "test_postinstall_flag --postinstall")
+
+    -- Check that postinstall hook ran despite no installation
+    local postinstall_marker = pl_path.join(home_dir, "postinstall_executed.marker")
+    assert.is_true(path_exists(postinstall_marker), "postinstall hook should have executed with --postinstall flag")
+  end)
+
   it("should run install commands on every run (realistic behavior)", function()
     -- Create package manager that succeeds
     create_command("fake_apt", 0, "Package installed successfully")
@@ -893,6 +922,34 @@ return {
     -- Verify symlink was created
     local config_path = pl_path.join(home_dir, ".config", "test")
     assert.is_true(is_link(config_path), "Symlink should have been created")
+  end)
+
+  it("should run postlink hook with --postlink flag even when no linking happens", function()
+    -- Set up module with postlink hook but no link changes
+    setup_module(
+      "test_postlink_flag",
+      string.format(
+        [[
+return {
+  install = {
+    fake_apt = "fake_apt install -y test-package",
+  },
+  postlink = "touch %s/postlink_executed.marker",
+}
+]],
+        home_dir
+      )
+    )
+
+    -- Create fake package manager
+    create_command("fake_apt", 0, "Package installed successfully")
+
+    -- Run dot.lua with --postlink flag
+    assert.is_true(run_dot "test_postlink_flag --postlink")
+
+    -- Check that postlink hook ran despite no linking
+    local postlink_marker = pl_path.join(home_dir, "postlink_executed.marker")
+    assert.is_true(path_exists(postlink_marker), "postlink hook should have executed with --postlink flag")
   end)
 
   it("should handle OS restrictions", function()

@@ -6,7 +6,8 @@ local version = "1.0.0"
 local function parse_args()
   local force_mode = false
   local unlink_mode = false
-  local hooks_mode = false
+  local postinstall_mode = false
+  local postlink_mode = false
   local defaults_export = false
   local defaults_import = false
   local remove_profile = false
@@ -29,8 +30,10 @@ local function parse_args()
       defaults_import = true
     elseif arg[i] == "-i" then
       defaults_import = true
-    elseif arg[i] == "--hooks" then
-      hooks_mode = true
+    elseif arg[i] == "--postinstall" then
+      postinstall_mode = true
+    elseif arg[i] == "--postlink" then
+      postlink_mode = true
     elseif arg[i] == "--remove-profile" then
       remove_profile = true
     elseif arg[i] == "-h" then
@@ -46,7 +49,8 @@ Options:
   --defaults-export Save app preferences to a plist file
   -i                ↙ Short for --defaults-import
   --defaults-import Import app preferences from a plist file
-  --hooks           Run hooks even if dependencies haven't changed
+  --postinstall     Run postinstall hooks even if dependencies haven't changed
+  --postlink        Run postlink hooks even if symlinks haven't changed
   --remove-profile  Remove the last used profile
   -h                Display this help message
 ]]
@@ -63,7 +67,8 @@ Options:
     unlink_mode = unlink_mode,
     defaults_export = defaults_export,
     defaults_import = defaults_import,
-    hooks_mode = hooks_mode,
+    postinstall_mode = postinstall_mode,
+    postlink_mode = postlink_mode,
     remove_profile = remove_profile,
     args = args,
   }
@@ -712,13 +717,13 @@ local function process_module(module_name, options)
   end
 
   -- Run new hook system
-  if install_happened or options.hooks_mode then
+  if install_happened or options.postinstall_mode then
     if config.postinstall then
       run_hook(config.postinstall, "postinstall")
     end
   end
 
-  if link_happened or options.hooks_mode then
+  if link_happened or options.postlink_mode then
     if not options.unlink_mode and config.postlink then
       run_hook(config.postlink, "postlink")
     end
