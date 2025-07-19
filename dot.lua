@@ -279,9 +279,8 @@ end
 -- Get all modules recursively
 local function get_all_modules()
   local modules = {}
-  local modules_dir = "modules"
-  -- Find all dot.lua files within modules directory
-  local cmd = string.format('find "%s" -type f -name "dot.lua"', modules_dir)
+  -- Find all dot.lua files in any subdirectory
+  local cmd = 'find . -type f -name "dot.lua" -not -path "./dot.lua"'
   local exit_code, output = execute(cmd)
   if exit_code == 0 then
     -- First pass: collect all dot.lua files
@@ -299,8 +298,8 @@ local function get_all_modules()
     local has_parent_module = {}
 
     for _, file in ipairs(all_init_files) do
-      -- Extract the module path relative to modules_dir
-      local module_path = file:match("^" .. modules_dir .. "/(.+)/dot.lua$")
+      -- Extract the module path relative to current directory (remove ./ prefix)
+      local module_path = file:match "^%./(.+)/dot%.lua$"
       if module_path then
         local is_nested = false
 
@@ -651,7 +650,7 @@ end
 local function process_module(module_name, options)
   print_section(module_name)
 
-  local module_dir = "modules/" .. module_name
+  local module_dir = module_name
   local dot_file = module_dir .. "/dot.lua"
 
   -- Load the dot.lua file
@@ -740,19 +739,35 @@ end
 
 -- Process a single tool or profile
 local function process_tool(tool_name, options)
-  local profile_path = os.getenv "PWD" .. "/profiles/" .. tool_name .. ".lua"
+  local profiles_path = "profiles.lua"
 
-  if is_file(profile_path) then
-    -- Load and process the profile
-    local profile_func, load_err = loadfile(profile_path)
-    if not profile_func then
-      print_message("error", "Error loading profile: " .. load_err)
+  if is_file(profiles_path) then
+    -- Load and process the profiles file
+    local profiles_func, load_err = loadfile(profiles_path)
+    if not profiles_func then
+      print_message("error", "Error loading profiles: " .. load_err)
       return false
     end
 
-    local success, profile = pcall(profile_func)
-    if not success or not profile or not profile.modules then
-      print_message("error", "Error executing profile or invalid profile structure")
+    local success, profiles = pcall(profiles_func)
+    if not success or not profiles then
+      print_message("error", "Error executing profiles or invalid profiles structure")
+      return false
+    end
+
+    -- Check if the requested profile exists
+    if not profiles[tool_name] then
+      print_message("error", "Profile not found: " .. tool_name)
+      print_message("info", "Available profiles:")
+      for profile_name, _ in pairs(profiles) do
+        print_message("info", "  " .. profile_name)
+      end
+      return false
+    end
+
+    local profile = profiles[tool_name]
+    if not profile.modules then
+      print_message("error", "Invalid profile structure: missing modules field")
       return false
     end
 
@@ -795,7 +810,7 @@ local function process_tool(tool_name, options)
       return false
     else
       -- Check for exact module path
-      local module_path = "modules/" .. tool_name .. "/dot.lua"
+      local module_path = tool_name .. "/dot.lua"
       if is_file(module_path) then
         process_module(tool_name, options)
         return true
@@ -869,9 +884,15 @@ local function main()
       print_message("log", "dot --remove-profile  # remove the current profile")
     end
   else
-    local profile_path = os.getenv "PWD" .. "/profiles/" .. tool_name .. ".lua"
-    if is_file(profile_path) then
-      save_last_profile(tool_name)
+    local profiles_path = "profiles.lua"
+    if is_file(profiles_path) then
+      local profiles_func, load_err = loadfile(profiles_path)
+      if profiles_func then
+        local success, profiles = pcall(profiles_func)
+        if success and profiles and profiles[tool_name] then
+          save_last_profile(tool_name)
+        end
+      end
     end
   end
 
@@ -883,12 +904,6 @@ local function main()
       os.exit(1)
     end
   else
-    local modules_dir = "modules"
-    if not is_dir(modules_dir) then
-      print_message("error", "modules directory not found")
-      os.exit(1)
-    end
-
     local modules = get_all_modules()
     if #modules == 0 then
       print_message("error", "no modules found")

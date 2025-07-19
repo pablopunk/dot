@@ -18,7 +18,7 @@
   - [macOS Preferences (defaults)](#macos-preferences-defaults)
   - [OS Restrictions](#os-restrictions)
   - [Profiles](#profiles)
-  - [Hooks](#hooks)
+  - [Hooks](#hooks]
 - [Command-Line Options](#command-line-options)
 - [Examples](#examples)
 
@@ -36,22 +36,18 @@ $ brew install pablopunk/brew/dot
 $ cd /path/to/dotfiles
 $ tree
 
-profiles/
-├── work.lua
-├── personal.lua
-├── linux-server.lua
-modules/
-├── neovim/
-│   ├── dot.lua
-│   └── config/
-├── zsh/
-│   ├── dot.lua
-│   └── zshrc
-└── apps/
-    ├── work/
-    │   └── dot.lua
-    └── personal/
-        └── dot.lua
+profiles.lua
+neovim/
+├── dot.lua
+└── config/
+zsh/
+├── dot.lua
+└── zshrc
+apps/
+├── work/
+│   └── dot.lua
+└── personal/
+    └── dot.lua
 
 $ dot          # Link all dotfiles and install dependencies
 $ dot neovim   # Only process the 'neovim' module
@@ -62,14 +58,14 @@ $ dot work     # Only process the 'work' profile
 
 ### Modules
 
-Each module under the `modules/` folder needs to have a `dot.lua` file. **Modules can be nested** - you can have directories within the `modules/` folder, and each can contain its own `dot.lua` to define configurations and dependencies.
+Any subdirectory containing a `dot.lua` file is considered a module. **Modules can be nested** - you can have directories within directories, and each can contain its own `dot.lua` to define configurations and dependencies.
 
 #### `dot.lua`
 
 Example for neovim:
 
 ```lua
--- modules/neovim/dot.lua
+-- neovim/dot.lua
 return {
   install = {
     brew = "brew install neovim ripgrep",
@@ -86,7 +82,7 @@ return {
 The `install` system dynamically detects available package managers and uses the first one found. You can specify multiple package managers, and `dot` will use the first available one.
 
 ```lua
--- modules/apps/dot.lua
+-- apps/dot.lua
 return {
   install = {
     brew = "brew install whatsapp spotify slack vscode",
@@ -103,7 +99,7 @@ In this example, if `brew` is available, it will use that. If not, it will try `
 The `link` system creates symlinks from your dotfiles to their destinations. Use the new key-value format:
 
 ```lua
--- modules/multi-config/dot.lua
+-- cursor/dot.lua
 return {
   install = {
     brew = "brew install cursor"
@@ -117,8 +113,8 @@ return {
 
 This creates symlinks:
 ```bash
-~/Library/Application Support/Cursor/User/settings.json → ~/dotfiles/modules/multi-config/config/settings.json
-~/Library/Application Support/Cursor/User/keybindings.json → ~/dotfiles/modules/multi-config/config/keybindings.json
+~/Library/Application Support/Cursor/User/settings.json → ~/dotfiles/cursor/config/settings.json
+~/Library/Application Support/Cursor/User/keybindings.json → ~/dotfiles/cursor/config/keybindings.json
 ```
 
 ### macOS Preferences (defaults)
@@ -126,7 +122,7 @@ This creates symlinks:
 Manage macOS application preferences using the `defaults` field:
 
 ```lua
--- modules/swiftshift/dot.lua
+-- swiftshift/dot.lua
 return {
   defaults = {
     ["com.pablopunk.Swift-Shift"] = "./defaults/SwiftShift.xml"
@@ -168,7 +164,7 @@ $ dot swiftshift --defaults-import  # or -i
 Restrict modules to specific operating systems:
 
 ```lua
--- modules/macos-only/dot.lua
+-- macos-only/dot.lua
 return {
   os = { "mac" },  -- Only runs on macOS
   install = {
@@ -187,26 +183,31 @@ Supported OS values:
 
 ### Profiles
 
-Profiles let you manage different setups for different machines:
+Profiles let you manage different setups for different machines. Create a single `profiles.lua` file:
 
 ```lua
--- profiles/personal.lua
+-- profiles.lua
 return {
-  modules = {
-    "*",           -- Include all modules
-    "!apps/work"   -- Exclude work apps
-  }
-}
-```
-
-```lua
--- profiles/work.lua
-return {
-  modules = {
-    "apps/work",
-    "slack",
-    "neovim",
-    "zsh"
+  personal = {
+    modules = {
+      "*",           -- Include all modules
+      "!apps/work"   -- Exclude work apps
+    }
+  },
+  work = {
+    modules = {
+      "apps/work",
+      "slack",
+      "neovim",
+      "zsh"
+    }
+  },
+  linux_server = {
+    modules = {
+      "zsh",
+      "neovim",
+      "tmux"
+    }
   }
 }
 ```
@@ -285,8 +286,6 @@ Remove symlinks but keep config files:
 ```bash
 $ dot --unlink neovim
 ```
-
-
 
 ### Defaults Management
 ```bash

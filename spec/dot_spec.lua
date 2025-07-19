@@ -12,8 +12,6 @@ describe("dot.lua", function()
   local tmp_dir
   local dotfiles_dir
   local home_dir
-  local modules_dir
-  local profiles_dir
   local dot_executable
   local bin_dir
   local command_log_file
@@ -28,14 +26,20 @@ describe("dot.lua", function()
   local function create_command(name, exit_code, output)
     exit_code = exit_code or 0
     output = output or ""
-    
+
     local cmd_path = pl_path.join(bin_dir, name)
-    local script_content = string.format([[#!/bin/bash
+    local script_content = string.format(
+      [[#!/bin/bash
 echo "COMMAND_EXECUTED: %s $@" >> %q
 echo %q
 exit %d
-]], name, command_log_file, output, exit_code)
-    
+]],
+      name,
+      command_log_file,
+      output,
+      exit_code
+    )
+
     pl_file.write(cmd_path, script_content)
     os.execute(string.format("chmod +x %q", cmd_path))
     return cmd_path
@@ -44,13 +48,19 @@ exit %d
   -- Function to create a command that creates a marker file when run
   local function create_marker_command(name, marker_path)
     local cmd_path = pl_path.join(bin_dir, name)
-    local script_content = string.format([[#!/bin/bash
+    local script_content = string.format(
+      [[#!/bin/bash
 echo "COMMAND_EXECUTED: %s $@" >> %q
 touch %q
 echo "Package %s installed successfully"
 exit 0
-]], name, command_log_file, marker_path, name)
-    
+]],
+      name,
+      command_log_file,
+      marker_path,
+      name
+    )
+
     pl_file.write(cmd_path, script_content)
     os.execute(string.format("chmod +x %q", cmd_path))
     return cmd_path
@@ -72,7 +82,7 @@ exit 0
     end
     local log_content = pl_file.read(command_log_file)
     local count = 0
-    for line in log_content:gmatch("[^\n]+") do
+    for line in log_content:gmatch "[^\n]+" do
       if line:find("COMMAND_EXECUTED: " .. command_name, 1, true) then
         count = count + 1
       end
@@ -124,7 +134,7 @@ exit 0
 
   -- Function to set up a module with given name and content
   local function setup_module(name, content)
-    local module_dir = pl_path.join(modules_dir, name)
+    local module_dir = pl_path.join(dotfiles_dir, name)
     pl_dir.makepath(module_dir)
     local dot_lua = pl_path.join(module_dir, "dot.lua")
     pl_file.write(dot_lua, content)
@@ -132,8 +142,17 @@ exit 0
 
   -- Function to set up a profile with given name and content
   local function setup_profile(name, content)
-    local profile_lua = pl_path.join(profiles_dir, name .. ".lua")
-    pl_file.write(profile_lua, content)
+    local profiles_lua = pl_path.join(dotfiles_dir, "profiles.lua")
+    local profiles_content = string.format(
+      [[
+return {
+  %s = %s
+}
+]],
+      name,
+      content
+    )
+    pl_file.write(profiles_lua, profiles_content)
   end
 
   before_each(function()
@@ -146,8 +165,6 @@ exit 0
     -- Define directory paths
     dotfiles_dir = pl_path.join(tmp_dir, "dotfiles")
     home_dir = pl_path.join(tmp_dir, "home")
-    modules_dir = pl_path.join(dotfiles_dir, "modules")
-    profiles_dir = pl_path.join(dotfiles_dir, "profiles")
     dot_executable = pl_path.join(dotfiles_dir, "dot.lua")
     bin_dir = pl_path.join(tmp_dir, "bin")
     command_log_file = pl_path.join(tmp_dir, "command_log.txt")
@@ -155,8 +172,6 @@ exit 0
     -- Create necessary directories
     pl_dir.makepath(dotfiles_dir)
     pl_dir.makepath(home_dir)
-    pl_dir.makepath(modules_dir)
-    pl_dir.makepath(profiles_dir)
     pl_dir.makepath(bin_dir)
 
     -- Copy dot.lua to dotfiles_dir
@@ -350,9 +365,9 @@ return {
     )
 
     -- Create config directories and files
-    pl_dir.makepath(pl_path.join(modules_dir, "neovim", "config"))
-    pl_file.write(pl_path.join(modules_dir, "neovim", "config", "init.vim"), "set number")
-    pl_file.write(pl_path.join(modules_dir, "zsh", "zshrc"), "export ZSH=~/.oh-my-zsh")
+    pl_dir.makepath(pl_path.join(dotfiles_dir, "neovim", "config"))
+    pl_file.write(pl_path.join(dotfiles_dir, "neovim", "config", "init.vim"), "set number")
+    pl_file.write(pl_path.join(dotfiles_dir, "zsh", "zshrc"), "export ZSH=~/.oh-my-zsh")
 
     -- Run dot.lua without arguments to install all modules
     assert.is_true(run_dot())
@@ -391,8 +406,8 @@ return {
     )
 
     -- Create config
-    pl_dir.makepath(pl_path.join(modules_dir, "test_priority", "config"))
-    pl_file.write(pl_path.join(modules_dir, "test_priority", "config", "test.conf"), "test config")
+    pl_dir.makepath(pl_path.join(dotfiles_dir, "test_priority", "config"))
+    pl_file.write(pl_path.join(dotfiles_dir, "test_priority", "config", "test.conf"), "test config")
 
     -- Run dot.lua
     assert.is_true(run_dot "test_priority")
@@ -428,8 +443,8 @@ return {
     )
 
     -- Create config
-    pl_dir.makepath(pl_path.join(modules_dir, "test_fallback", "config"))
-    pl_file.write(pl_path.join(modules_dir, "test_fallback", "config", "test.conf"), "test config")
+    pl_dir.makepath(pl_path.join(dotfiles_dir, "test_fallback", "config"))
+    pl_file.write(pl_path.join(dotfiles_dir, "test_fallback", "config", "test.conf"), "test config")
 
     -- Run dot.lua
     assert.is_true(run_dot "test_fallback")
@@ -459,8 +474,8 @@ return {
     )
 
     -- Create config
-    pl_dir.makepath(pl_path.join(modules_dir, "test_custom", "config"))
-    pl_file.write(pl_path.join(modules_dir, "test_custom", "config", "test.conf"), "test config")
+    pl_dir.makepath(pl_path.join(dotfiles_dir, "test_custom", "config"))
+    pl_file.write(pl_path.join(dotfiles_dir, "test_custom", "config", "test.conf"), "test config")
 
     -- Run dot.lua
     assert.is_true(run_dot "test_custom")
@@ -489,8 +504,8 @@ return {
     )
 
     -- Create config
-    pl_dir.makepath(pl_path.join(modules_dir, "test_bash", "config"))
-    pl_file.write(pl_path.join(modules_dir, "test_bash", "config", "test.conf"), "test config")
+    pl_dir.makepath(pl_path.join(dotfiles_dir, "test_bash", "config"))
+    pl_file.write(pl_path.join(dotfiles_dir, "test_bash", "config", "test.conf"), "test config")
 
     -- Run dot.lua
     assert.is_true(run_dot "test_bash")
@@ -524,8 +539,8 @@ return {
     )
 
     -- Create config
-    pl_dir.makepath(pl_path.join(modules_dir, "test_failure", "config"))
-    pl_file.write(pl_path.join(modules_dir, "test_failure", "config", "test.conf"), "test config")
+    pl_dir.makepath(pl_path.join(dotfiles_dir, "test_failure", "config"))
+    pl_file.write(pl_path.join(dotfiles_dir, "test_failure", "config", "test.conf"), "test config")
 
     -- Run dot.lua (should complete despite install failure)
     assert.is_true(run_dot "test_failure")
@@ -563,8 +578,8 @@ return {
     )
 
     -- Create config
-    pl_dir.makepath(pl_path.join(modules_dir, "test_hooks", "config"))
-    pl_file.write(pl_path.join(modules_dir, "test_hooks", "config", "test.conf"), "test config")
+    pl_dir.makepath(pl_path.join(dotfiles_dir, "test_hooks", "config"))
+    pl_file.write(pl_path.join(dotfiles_dir, "test_hooks", "config", "test.conf"), "test config")
 
     -- Run dot.lua
     assert.is_true(run_dot "test_hooks")
@@ -596,8 +611,8 @@ return {
     )
 
     -- Create config
-    pl_dir.makepath(pl_path.join(modules_dir, "test_no_install", "config"))
-    pl_file.write(pl_path.join(modules_dir, "test_no_install", "config", "test.conf"), "test config")
+    pl_dir.makepath(pl_path.join(dotfiles_dir, "test_no_install", "config"))
+    pl_file.write(pl_path.join(dotfiles_dir, "test_no_install", "config", "test.conf"), "test config")
 
     -- Run dot.lua
     assert.is_true(run_dot "test_no_install")
@@ -627,8 +642,8 @@ return {
     )
 
     -- Create config
-    pl_dir.makepath(pl_path.join(modules_dir, "test_repeated", "config"))
-    pl_file.write(pl_path.join(modules_dir, "test_repeated", "config", "test.conf"), "test config")
+    pl_dir.makepath(pl_path.join(dotfiles_dir, "test_repeated", "config"))
+    pl_file.write(pl_path.join(dotfiles_dir, "test_repeated", "config", "test.conf"), "test config")
 
     -- Run dot.lua twice
     assert.is_true(run_dot "test_repeated")
@@ -676,7 +691,7 @@ return {
     setup_profile(
       "work",
       [[
-return {
+{
   modules = {
     "neovim"
   }
@@ -685,9 +700,9 @@ return {
     )
 
     -- Create configs
-    pl_dir.makepath(pl_path.join(modules_dir, "neovim", "config"))
-    pl_file.write(pl_path.join(modules_dir, "neovim", "config", "init.vim"), "set number")
-    pl_file.write(pl_path.join(modules_dir, "zsh", "zshrc"), "export ZSH=~/.oh-my-zsh")
+    pl_dir.makepath(pl_path.join(dotfiles_dir, "neovim", "config"))
+    pl_file.write(pl_path.join(dotfiles_dir, "neovim", "config", "init.vim"), "set number")
+    pl_file.write(pl_path.join(dotfiles_dir, "zsh", "zshrc"), "export ZSH=~/.oh-my-zsh")
 
     -- Run with work profile
     assert.is_true(run_dot "work")
@@ -726,7 +741,7 @@ return {
     setup_profile(
       "test_profile",
       [[
-return {
+{
   modules = {
     "neovim"
   }
@@ -735,8 +750,8 @@ return {
     )
 
     -- Create config
-    pl_dir.makepath(pl_path.join(modules_dir, "neovim", "config"))
-    pl_file.write(pl_path.join(modules_dir, "neovim", "config", "init.vim"), "set number")
+    pl_dir.makepath(pl_path.join(dotfiles_dir, "neovim", "config"))
+    pl_file.write(pl_path.join(dotfiles_dir, "neovim", "config", "init.vim"), "set number")
 
     -- Run with profile to save it
     assert.is_true(run_dot "test_profile")
@@ -779,8 +794,8 @@ return {
     )
 
     -- Create config
-    pl_dir.makepath(pl_path.join(modules_dir, "test_force", "config"))
-    pl_file.write(pl_path.join(modules_dir, "test_force", "config", "test.conf"), "test config")
+    pl_dir.makepath(pl_path.join(dotfiles_dir, "test_force", "config"))
+    pl_file.write(pl_path.join(dotfiles_dir, "test_force", "config", "test.conf"), "test config")
 
     -- Create existing file at destination
     local existing_config = pl_path.join(home_dir, ".config", "test")
@@ -822,7 +837,7 @@ return {
     )
 
     -- Create config file (not directory)
-    pl_file.write(pl_path.join(modules_dir, "test_unlink", "config"), "test config")
+    pl_file.write(pl_path.join(dotfiles_dir, "test_unlink", "config"), "test config")
 
     -- First run to create symlink
     assert.is_true(run_dot "test_unlink")
@@ -842,12 +857,10 @@ return {
     if path_exists(config_path) then
       local content = pl_file.read(config_path)
       -- The content might be from the source file, not the symlink target
-      local source_content = pl_file.read(pl_path.join(modules_dir, "test_unlink", "config"))
+      local source_content = pl_file.read(pl_path.join(dotfiles_dir, "test_unlink", "config"))
       assert.are.equal(source_content, content, "File content should have been copied from source")
     end
   end)
-
-
 
   it("should run postlink hooks when linking happens", function()
     -- Set up module with postlink hook
@@ -867,8 +880,8 @@ return {
     )
 
     -- Create config
-    pl_dir.makepath(pl_path.join(modules_dir, "test_postlink", "config"))
-    pl_file.write(pl_path.join(modules_dir, "test_postlink", "config", "test.conf"), "test config")
+    pl_dir.makepath(pl_path.join(dotfiles_dir, "test_postlink", "config"))
+    pl_file.write(pl_path.join(dotfiles_dir, "test_postlink", "config", "test.conf"), "test config")
 
     -- Run dot.lua
     assert.is_true(run_dot "test_postlink")
@@ -906,8 +919,8 @@ return {
     )
 
     -- Create config
-    pl_dir.makepath(pl_path.join(modules_dir, "test_macos_only", "config"))
-    pl_file.write(pl_path.join(modules_dir, "test_macos_only", "config", "test.conf"), "test config")
+    pl_dir.makepath(pl_path.join(dotfiles_dir, "test_macos_only", "config"))
+    pl_file.write(pl_path.join(dotfiles_dir, "test_macos_only", "config", "test.conf"), "test config")
 
     -- Run dot.lua
     local success = run_dot "test_macos_only"
@@ -951,8 +964,8 @@ return {
     )
 
     -- Create config
-    pl_dir.makepath(pl_path.join(modules_dir, "neovim_config", "config"))
-    pl_file.write(pl_path.join(modules_dir, "neovim_config", "config", "init.vim"), "set number")
+    pl_dir.makepath(pl_path.join(dotfiles_dir, "neovim_config", "config"))
+    pl_file.write(pl_path.join(dotfiles_dir, "neovim_config", "config", "init.vim"), "set number")
 
     -- Run dot.lua with fuzzy match
     assert.is_true(run_dot "neovim")
@@ -988,7 +1001,7 @@ return {
     setup_profile(
       "test_profile",
       [[
-return {
+{
   modules = {
     "neovim"
   }
@@ -997,8 +1010,8 @@ return {
     )
 
     -- Create config
-    pl_dir.makepath(pl_path.join(modules_dir, "neovim", "config"))
-    pl_file.write(pl_path.join(modules_dir, "neovim", "config", "init.vim"), "set number")
+    pl_dir.makepath(pl_path.join(dotfiles_dir, "neovim", "config"))
+    pl_file.write(pl_path.join(dotfiles_dir, "neovim", "config", "init.vim"), "set number")
 
     -- Run with profile to save it
     assert.is_true(run_dot "test_profile")
@@ -1079,7 +1092,7 @@ return {
       )
 
       -- Create defaults directory
-      pl_dir.makepath(pl_path.join(modules_dir, "test_defaults", "defaults"))
+      pl_dir.makepath(pl_path.join(dotfiles_dir, "test_defaults", "defaults"))
 
       -- Run dot.lua with defaults export
       assert.is_true(run_dot "-e test_defaults")
@@ -1211,8 +1224,8 @@ return {
     )
 
     -- Create config
-    pl_dir.makepath(pl_path.join(modules_dir, "test_multi_pm", "config"))
-    pl_file.write(pl_path.join(modules_dir, "test_multi_pm", "config", "test.conf"), "test config")
+    pl_dir.makepath(pl_path.join(dotfiles_dir, "test_multi_pm", "config"))
+    pl_file.write(pl_path.join(dotfiles_dir, "test_multi_pm", "config", "test.conf"), "test config")
 
     -- Run dot.lua
     assert.is_true(run_dot "test_multi_pm")
