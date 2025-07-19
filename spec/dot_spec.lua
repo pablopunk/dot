@@ -739,4 +739,455 @@ return {
     local content = pl_file.read(dot_file_path)
     assert.are.equal("test_profile", content:match("^%s*(.-)%s*$"), "Profile name should be saved correctly")
   end)
+
+  -- NEW TESTS FOR MISSING FEATURES
+
+  it("should handle force mode with backup creation", function()
+    -- Create package manager
+    create_command("fake_apt", 0, "Package installed successfully")
+
+    -- Set up module
+    setup_module(
+      "test_force",
+      [[
+return {
+  install = {
+    fake_apt = "fake_apt install -y test-package",
+  },
+  link = {
+    ["./config"] = "$HOME/.config/test",
+  }
+}
+]]
+    )
+
+    -- Create config
+    pl_dir.makepath(pl_path.join(modules_dir, "test_force", "config"))
+    pl_file.write(pl_path.join(modules_dir, "test_force", "config", "test.conf"), "test config")
+
+    -- Create existing file at destination
+    local existing_config = pl_path.join(home_dir, ".config", "test")
+    pl_dir.makepath(pl_path.dirname(existing_config))
+    pl_file.write(existing_config, "existing content")
+
+    -- Run dot.lua with force mode
+    assert.is_true(run_dot "-f test_force")
+
+    -- Check that backup was created
+    local backup_file = existing_config .. ".before-dot"
+    assert.is_true(path_exists(backup_file), "Backup file should have been created")
+
+    -- Check backup content
+    local backup_content = pl_file.read(backup_file)
+    assert.are.equal("existing content", backup_content, "Backup should contain original content")
+
+    -- Check that symlink was created
+    assert.is_true(is_link(existing_config), "Symlink should have been created")
+  end)
+
+  it("should handle unlink mode (remove symlink and copy file)", function()
+    -- Create package manager
+    create_command("fake_apt", 0, "Package installed successfully")
+
+    -- Set up module
+    setup_module(
+      "test_unlink",
+      [[
+return {
+  install = {
+    fake_apt = "fake_apt install -y test-package",
+  },
+  link = {
+    ["./config"] = "$HOME/.config/test",
+  }
+}
+]]
+    )
+
+    -- Create config file (not directory)
+    pl_file.write(pl_path.join(modules_dir, "test_unlink", "config"), "test config")
+
+    -- First run to create symlink
+    assert.is_true(run_dot "test_unlink")
+
+    -- Verify symlink exists
+    local config_path = pl_path.join(home_dir, ".config", "test")
+    assert.is_true(is_link(config_path), "Symlink should exist after first run")
+
+    -- Run with unlink mode
+    assert.is_true(run_dot "--unlink test_unlink")
+
+    -- Check that symlink was removed and file was copied
+    assert.is_false(is_link(config_path), "Symlink should have been removed")
+    assert.is_true(path_exists(config_path), "File should exist at destination")
+
+    -- Check that content was copied (the file should be a regular file now, not a symlink)
+    if path_exists(config_path) then
+      local content = pl_file.read(config_path)
+      -- The content might be from the source file, not the symlink target
+      local source_content = pl_file.read(pl_path.join(modules_dir, "test_unlink", "config"))
+      assert.are.equal(source_content, content, "File content should have been copied from source")
+    end
+  end)
+
+  it("should handle purge mode", function()
+    -- Create package manager
+    create_command("fake_apt", 0, "Package installed successfully")
+
+    -- Set up module with postpurge hook
+    setup_module(
+      "test_purge",
+      string.format(
+        [[
+return {
+  install = {
+    fake_apt = "fake_apt install -y test-package",
+  },
+  link = {
+    ["./config"] = "$HOME/.config/test",
+  },
+  postpurge = "touch %s/postpurge_executed.marker",
+}
+]],
+        home_dir
+      )
+    )
+
+    -- Create config
+    pl_file.write(pl_path.join(modules_dir, "test_purge", "config"), "test config")
+
+    -- First run to create symlink
+    assert.is_true(run_dot "test_purge")
+
+    -- Verify symlink exists
+    local config_path = pl_path.join(home_dir, ".config", "test")
+    assert.is_true(is_link(config_path), "Symlink should exist after first run")
+
+    -- Run with purge mode and hooks to force postpurge hook execution
+    assert.is_true(run_dot "--purge --hooks test_purge")
+
+    -- Check that symlink was removed
+    assert.is_false(path_exists(config_path), "Symlink should have been removed")
+
+    -- Check that postpurge hook ran (using --hooks to force execution)
+    local postpurge_marker = pl_path.join(home_dir, "postpurge_executed.marker")
+    assert.is_true(path_exists(postpurge_marker), "postpurge hook should have executed")
+  end)
+
+  it("should run postlink hooks when linking happens", function()
+    -- Set up module with postlink hook
+    setup_module(
+      "test_postlink",
+      string.format(
+        [[
+return {
+  link = {
+    ["./config"] = "$HOME/.config/test",
+  },
+  postlink = "touch %s/postlink_executed.marker",
+}
+]],
+        home_dir
+      )
+    )
+
+    -- Create config
+    pl_dir.makepath(pl_path.join(modules_dir, "test_postlink", "config"))
+    pl_file.write(pl_path.join(modules_dir, "test_postlink", "config", "test.conf"), "test config")
+
+    -- Run dot.lua
+    assert.is_true(run_dot "test_postlink")
+
+    -- Check that postlink hook ran
+    local postlink_marker = pl_path.join(home_dir, "postlink_executed.marker")
+    assert.is_true(path_exists(postlink_marker), "postlink hook should have executed")
+
+    -- Verify symlink was created
+    local config_path = pl_path.join(home_dir, ".config", "test")
+    assert.is_true(is_link(config_path), "Symlink should have been created")
+  end)
+
+  it("should handle OS restrictions", function()
+    -- Create package manager
+    create_command("fake_apt", 0, "Package installed successfully")
+
+    -- Set up module restricted to macOS (since we're running on macOS)
+    setup_module(
+      "test_macos_only",
+      [[
+return {
+  os = { "mac" },
+  install = {
+    fake_apt = "fake_apt install -y test-package",
+  },
+  link = {
+    ["./config"] = "$HOME/.config/test",
+  }
+}
+]]
+    )
+
+    -- Create config
+    pl_dir.makepath(pl_path.join(modules_dir, "test_macos_only", "config"))
+    pl_file.write(pl_path.join(modules_dir, "test_macos_only", "config", "test.conf"), "test config")
+
+    -- Run dot.lua (should work on macOS)
+    assert.is_true(run_dot "test_macos_only")
+
+    -- Check that commands were executed (macOS restriction should pass)
+    assert.is_true(was_command_executed "fake_apt", "fake_apt should have been executed on macOS")
+
+    -- Check that symlink was created
+    local config_path = pl_path.join(home_dir, ".config", "test")
+    assert.is_true(is_link(config_path), "Symlink should have been created")
+  end)
+
+  it("should handle fuzzy module matching", function()
+    -- Create package manager
+    create_command("fake_apt", 0, "Package installed successfully")
+
+    -- Set up module with a specific name
+    setup_module(
+      "neovim_config",
+      [[
+return {
+  install = {
+    fake_apt = "fake_apt install -y neovim",
+  },
+  link = {
+    ["./config"] = "$HOME/.config/nvim",
+  }
+}
+]]
+    )
+
+    -- Create config
+    pl_dir.makepath(pl_path.join(modules_dir, "neovim_config", "config"))
+    pl_file.write(pl_path.join(modules_dir, "neovim_config", "config", "init.vim"), "set number")
+
+    -- Run dot.lua with fuzzy match
+    assert.is_true(run_dot "neovim")
+
+    -- Check that commands were executed (fuzzy matching should work)
+    assert.is_true(was_command_executed "fake_apt", "fake_apt should have been executed via fuzzy match")
+
+    -- Check that symlink was created
+    local config_path = pl_path.join(home_dir, ".config", "nvim")
+    assert.is_true(is_link(config_path), "Symlink should have been created via fuzzy match")
+  end)
+
+  it("should handle remove profile functionality", function()
+    -- Create package manager
+    create_command("fake_apt", 0, "Package installed successfully")
+
+    -- Set up module
+    setup_module(
+      "neovim",
+      [[
+return {
+  install = {
+    fake_apt = "fake_apt install -y neovim",
+  },
+  link = {
+    ["./config"] = "$HOME/.config/nvim",
+  }
+}
+]]
+    )
+
+    -- Create test profile
+    setup_profile(
+      "test_profile",
+      [[
+return {
+  modules = {
+    "neovim"
+  }
+}
+]]
+    )
+
+    -- Create config
+    pl_dir.makepath(pl_path.join(modules_dir, "neovim", "config"))
+    pl_file.write(pl_path.join(modules_dir, "neovim", "config", "init.vim"), "set number")
+
+    -- Run with profile to save it
+    assert.is_true(run_dot "test_profile")
+
+    -- Verify profile was saved
+    local dot_file_path = pl_path.join(dotfiles_dir, ".dot")
+    assert.is_true(pl_path.isfile(dot_file_path), ".dot file should exist")
+
+    -- Remove the profile
+    assert.is_true(run_dot "--remove-profile")
+
+    -- Check that .dot file was removed
+    assert.is_false(path_exists(dot_file_path), ".dot file should have been removed")
+  end)
+
+  it("should handle macOS defaults export", function()
+    -- Create fake defaults command that actually creates files
+    local defaults_script = "#!/bin/sh\n"
+      .. 'echo "COMMAND_EXECUTED: defaults $@" >> '
+      .. command_log_file
+      .. "\n"
+      .. "# Parse the command to extract the output file\n"
+      .. 'output_file=""\n'
+      .. 'for arg in "$@"; do\n'
+      .. '  if [[ "$arg" == *".xml" ]]; then\n'
+      .. '    output_file="$arg"\n'
+      .. "    break\n"
+      .. "  fi\n"
+      .. "done\n"
+      .. 'echo "DEBUG: output_file = $output_file" >> '
+      .. command_log_file
+      .. "\n"
+      .. 'if [[ -n "$output_file" ]]; then\n'
+      .. '  echo "DEBUG: creating directory $(dirname "$output_file")" >> '
+      .. command_log_file
+      .. "\n"
+      .. '  mkdir -p "$(dirname "$output_file")"\n'
+      .. '  echo "DEBUG: writing file $output_file" >> '
+      .. command_log_file
+      .. "\n"
+      .. '  echo \'<?xml version="1.0" encoding="UTF-8"?><plist version="1.0"><dict><key>TestKey</key><string>test value</string></dict></plist>\' > "$output_file"\n'
+      .. '  echo "DEBUG: file created, checking if exists" >> '
+      .. command_log_file
+      .. "\n"
+      .. '  if [[ -f "$output_file" ]]; then\n'
+      .. '    echo "DEBUG: file exists" >> '
+      .. command_log_file
+      .. "\n"
+      .. "  else\n"
+      .. '    echo "DEBUG: file does not exist" >> '
+      .. command_log_file
+      .. "\n"
+      .. "  fi\n"
+      .. '  echo "Preferences exported successfully"\n'
+      .. "  exit 0\n"
+      .. "else\n"
+      .. '  echo "No output file specified"\n'
+      .. "  exit 1\n"
+      .. "fi\n"
+
+    pl_file.write(pl_path.join(bin_dir, "defaults"), defaults_script)
+    os.execute(string.format("chmod +x %q", pl_path.join(bin_dir, "defaults")))
+
+    -- Set up module with defaults
+    setup_module(
+      "test_defaults",
+      [[
+return {
+  defaults = {
+    ["com.test.app"] = "./defaults/test.xml",
+  }
+}
+]]
+    )
+
+    -- Create defaults directory
+    pl_dir.makepath(pl_path.join(modules_dir, "test_defaults", "defaults"))
+
+    -- Run dot.lua with defaults export
+    assert.is_true(run_dot "-e test_defaults")
+
+    -- Check that defaults export was executed
+    assert.is_true(was_command_executed "defaults", "defaults export should have been executed")
+
+    -- Check that defaults file was created (in the correct location based on dot.lua path construction)
+    local defaults_file = pl_path.join(dotfiles_dir, "defaults", "test.xml")
+    assert.is_true(path_exists(defaults_file), "Defaults file should have been created")
+  end)
+
+  it("should handle macOS defaults import", function()
+    -- Create fake defaults command that actually works
+    local defaults_script = "#!/bin/sh\n"
+      .. 'echo "COMMAND_EXECUTED: defaults $@" >> '
+      .. command_log_file
+      .. "\n"
+      .. "# Parse the command to extract the input file\n"
+      .. 'input_file=""\n'
+      .. 'for arg in "$@"; do\n'
+      .. '  if [[ "$arg" == *".xml" ]]; then\n'
+      .. '    input_file="$arg"\n'
+      .. "    break\n"
+      .. "  fi\n"
+      .. "done\n"
+      .. 'if [[ -f "$input_file" ]]; then\n'
+      .. '  echo "Preferences imported successfully"\n'
+      .. "  exit 0\n"
+      .. "else\n"
+      .. '  echo "File not found: $input_file"\n'
+      .. "  exit 1\n"
+      .. "fi\n"
+
+    pl_file.write(pl_path.join(bin_dir, "defaults"), defaults_script)
+    os.execute(string.format("chmod +x %q", pl_path.join(bin_dir, "defaults")))
+
+    -- Set up module with defaults
+    setup_module(
+      "test_defaults",
+      [[
+return {
+  defaults = {
+    ["com.test.app"] = "./defaults/test.xml",
+  }
+}
+]]
+    )
+
+    -- Create defaults file in the correct location (same as export test)
+    local defaults_file = pl_path.join(dotfiles_dir, "defaults", "test.xml")
+    pl_dir.makepath(pl_path.dirname(defaults_file))
+    pl_file.write(defaults_file, "test preferences")
+
+    -- Run dot.lua with defaults import
+    assert.is_true(run_dot "-i test_defaults")
+
+    -- Check that defaults import was executed
+    assert.is_true(was_command_executed "defaults", "defaults import should have been executed")
+  end)
+
+  it("should handle multiple package managers in install system", function()
+    -- Create multiple package managers
+    create_command("fake_apt", 0, "Package installed via apt")
+    create_command("fake_brew", 0, "Package installed via brew")
+    create_command("fake_yum", 0, "Package installed via yum")
+
+    -- Set up module with multiple package managers
+    setup_module(
+      "test_multi_pm",
+      [[
+return {
+  install = {
+    fake_apt = "fake_apt install -y test-package",
+    fake_brew = "fake_brew install test-package",
+    fake_yum = "fake_yum install test-package",
+  },
+  link = {
+    ["./config"] = "$HOME/.config/test",
+  }
+}
+]]
+    )
+
+    -- Create config
+    pl_dir.makepath(pl_path.join(modules_dir, "test_multi_pm", "config"))
+    pl_file.write(pl_path.join(modules_dir, "test_multi_pm", "config", "test.conf"), "test config")
+
+    -- Run dot.lua
+    assert.is_true(run_dot "test_multi_pm")
+
+    -- Check that only one package manager was executed (first available)
+    local apt_executed = was_command_executed "fake_apt"
+    local brew_executed = was_command_executed "fake_brew"
+    local yum_executed = was_command_executed "fake_yum"
+
+    local total_executed = (apt_executed and 1 or 0) + (brew_executed and 1 or 0) + (yum_executed and 1 or 0)
+    assert.are.equal(1, total_executed, "Only one package manager should be executed")
+
+    -- Check that symlink was created
+    local config_path = pl_path.join(home_dir, ".config", "test")
+    assert.is_true(is_link(config_path), "Symlink should have been created")
+  end)
 end)
