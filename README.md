@@ -204,10 +204,7 @@ Example:
 -- modules/swiftshift/dot.lua
 return {
   defaults = {
-    {
-      plist = "./defaults/SwiftShift.plist",
-      app = "com.pablopunk.Swift-Shift", -- Info on how to get this below
-    }
+    ["com.pablopunk.Swift-Shift"] = "./defaults/SwiftShift.plist", -- Info on how to get app id below
   }
 }
 ```
@@ -222,10 +219,7 @@ return {
 ```lua
 return {
   defaults = {
-    {
-      plist = "./defaults/SwiftShift.xml",
-      app = "com.pablopunk.Swift-Shift",
-    }
+    ["com.pablopunk.Swift-Shift"] = "./defaults/SwiftShift.xml",
   }
 }
 ```

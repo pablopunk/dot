@@ -578,27 +578,19 @@ local function process_defaults(config, options)
 
   local defaults_processed = false
 
-  for _, default_config in ipairs(config.defaults) do
-    local app = default_config.app
-    local plist = default_config.plist
-    
-    if not app or not plist then
-      print_message("error", "defaults → missing app or plist field")
-      goto continue
-    end
-
-    local plist_path = plist
-    if not plist_path:match("^/") then
-      -- Relative path, make it relative to module directory
-      plist_path = os.getenv("PWD") .. "/" .. plist_path:gsub("^./", "")
+  for app_id, plist_path in pairs(config.defaults) do
+    -- Make relative paths relative to current working directory
+    local full_plist_path = plist_path
+    if not full_plist_path:match("^/") then
+      full_plist_path = os.getenv("PWD") .. "/" .. plist_path:gsub("^./", "")
     end
 
     if options.defaults_export then
       -- Export defaults to plist file
-      print_message("info", "defaults → exporting " .. app .. " to " .. plist_path)
+      print_message("info", "defaults → exporting " .. app_id .. " to " .. full_plist_path)
       
       -- Ensure parent directory exists
-      local success, err = ensure_parent_directory(plist_path)
+      local success, err = ensure_parent_directory(full_plist_path)
       if not success then
         print_message("error", "defaults → " .. err)
         goto continue
@@ -606,15 +598,15 @@ local function process_defaults(config, options)
 
       -- Determine output format based on file extension
       local format_flag = ""
-      if plist_path:match("%.xml$") then
+      if full_plist_path:match("%.xml$") then
         format_flag = " -format xml1"
       end
 
-      local export_cmd = string.format('defaults export "%s" "%s"%s', app, plist_path, format_flag)
+      local export_cmd = string.format('defaults export "%s" "%s"%s', app_id, full_plist_path, format_flag)
       local exit_code, output = execute(export_cmd)
       
       if exit_code == 0 then
-        print_message("success", "defaults → exported " .. app)
+        print_message("success", "defaults → exported " .. app_id)
         defaults_processed = true
       else
         print_message("error", "defaults → export failed: " .. (output or "unknown error"))
@@ -622,18 +614,18 @@ local function process_defaults(config, options)
 
     elseif options.defaults_import then
       -- Import defaults from plist file
-      if not is_file(plist_path) then
-        print_message("error", "defaults → plist file not found: " .. plist_path)
+      if not is_file(full_plist_path) then
+        print_message("error", "defaults → plist file not found: " .. full_plist_path)
         goto continue
       end
 
-      print_message("info", "defaults → importing " .. app .. " from " .. plist_path)
+      print_message("info", "defaults → importing " .. app_id .. " from " .. full_plist_path)
       
-      local import_cmd = string.format('defaults import "%s" "%s"', app, plist_path)
+      local import_cmd = string.format('defaults import "%s" "%s"', app_id, full_plist_path)
       local exit_code, output = execute(import_cmd)
       
       if exit_code == 0 then
-        print_message("success", "defaults → imported " .. app)
+        print_message("success", "defaults → imported " .. app_id)
         defaults_processed = true
       else
         print_message("error", "defaults → import failed: " .. (output or "unknown error"))
@@ -641,20 +633,20 @@ local function process_defaults(config, options)
 
     else
       -- Regular processing (import during normal dot run)
-      if is_file(plist_path) then
-        print_message("info", "defaults → importing " .. app .. " from " .. plist_path)
+      if is_file(full_plist_path) then
+        print_message("info", "defaults → importing " .. app_id .. " from " .. full_plist_path)
         
-        local import_cmd = string.format('defaults import "%s" "%s"', app, plist_path)
+        local import_cmd = string.format('defaults import "%s" "%s"', app_id, full_plist_path)
         local exit_code, output = execute(import_cmd)
         
         if exit_code == 0 then
-          print_message("success", "defaults → imported " .. app)
+          print_message("success", "defaults → imported " .. app_id)
           defaults_processed = true
         else
           print_message("error", "defaults → import failed: " .. (output or "unknown error"))
         end
       else
-        print_message("warning", "defaults → plist file not found: " .. plist_path .. " (use -e to export)")
+        print_message("warning", "defaults → plist file not found: " .. full_plist_path .. " (use -e to export)")
       end
     end
 
