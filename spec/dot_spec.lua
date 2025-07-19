@@ -89,7 +89,15 @@ exit 0
       lua_path = "/usr/bin/lua" -- Ubuntu/Debian
     end
     if not pl_path.isfile(lua_path) then
-      lua_path = "lua" -- Fallback to PATH
+      -- Try to find lua in PATH using which
+      local handle = io.popen "which lua 2>/dev/null"
+      local which_output = handle:read "*a"
+      handle:close()
+      if which_output and which_output ~= "" then
+        lua_path = which_output:gsub("%s+$", "") -- Remove trailing whitespace
+      else
+        lua_path = "lua" -- Fallback to PATH
+      end
     end
 
     -- Use system lua directly, but put our bin_dir in PATH for fake commands
