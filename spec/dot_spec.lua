@@ -378,13 +378,13 @@ return {
   end)
 
   it("should handle bash commands", function()
-    -- Set up module with bash installation
+    -- Set up module with bash installation that calls touch (which we can track)
     setup_module(
       "test_bash",
       string.format([[
 return {
   install = {
-    bash = "echo 'Custom install script executed' > %s/custom_install.log",
+    bash = "touch %s/bash_install_marker.txt",
   },
   link = {
     ["./config"] = "$HOME/.config/test",
@@ -400,15 +400,12 @@ return {
     -- Run dot.lua
     assert.is_true(run_dot "test_bash")
 
-    -- Check that the custom script created its log file (this proves the bash command worked)
-    local log_file = pl_path.join(home_dir, "custom_install.log")
-    assert.is_true(path_exists(log_file), "Custom install script should have created log file")
+    -- Check that touch was executed (since the bash command actually calls touch)
+    assert.is_true(was_command_executed("touch"), "touch should have been executed as part of the bash command")
     
-    -- Check the content of the log file
-    if path_exists(log_file) then
-      local content = pl_file.read(log_file)
-      assert.are.equal("Custom install script executed", content:match("^%s*(.-)%s*$"), "Log file should contain expected content")
-    end
+    -- Check that the marker file was created (this proves the command worked)
+    local marker_file = pl_path.join(home_dir, "bash_install_marker.txt")
+    assert.is_true(path_exists(marker_file), "Bash command should have created marker file")
   end)
 
   it("should handle command failures gracefully", function()
