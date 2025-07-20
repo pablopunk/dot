@@ -2006,7 +2006,7 @@ return {
     fake_apt = "fake_apt install -y test-package",
   },
   link = {
-    ["./config"] = "$HOME/.config/test",
+    ["./config"] = "$HOME/.config/test_string",
   }
 }
 ]]
@@ -2022,7 +2022,7 @@ return {
     fake_apt = "fake_apt install -y test-package",
   },
   link = {
-    ["./config"] = "$HOME/.config/test",
+    ["./config"] = "$HOME/.config/test_array",
   }
 }
 ]]
@@ -2043,7 +2043,9 @@ return {
     assert.is_true(was_command_executed "fake_apt", "install command should have been executed for array OS")
 
     -- Check that symlinks were created
-    local config_path1 = pl_path.join(home_dir, ".config", "test")
+    local config_path1 = pl_path.join(home_dir, ".config", "test_string")
+    local config_path2 = pl_path.join(home_dir, ".config", "test_array")
     assert.is_true(is_link(config_path1), "Symlink should have been created for string OS")
+    assert.is_true(is_link(config_path2), "Symlink should have been created for array OS")
   end)
 end)
