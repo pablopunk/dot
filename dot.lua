@@ -503,30 +503,20 @@ local function process_defaults(config, options)
   local defaults_processed = false
 
   for app_id, plist_path in pairs(config.defaults) do
-    -- Handle both old format (table with plist/app keys) and new format (app_id = plist_path)
-    local actual_app_id = app_id
-    local actual_plist_path = plist_path
-
-    if type(plist_path) == "table" and plist_path.plist and plist_path.app then
-      -- Old format: { plist = "./file.xml", app = "com.example.app" }
-      actual_app_id = plist_path.app
-      actual_plist_path = plist_path.plist
-    end
-
     -- Make relative paths relative to current working directory
-    local full_plist_path = actual_plist_path or ""
-    if actual_plist_path and full_plist_path ~= "" and not full_plist_path:match "^/" then
+    local full_plist_path = plist_path or ""
+    if plist_path and full_plist_path ~= "" and not full_plist_path:match "^/" then
       full_plist_path = os.getenv "PWD" .. "/" .. full_plist_path:gsub("^./", "")
     end
 
     if not full_plist_path or full_plist_path == "" then
-      print_message("error", "defaults → invalid plist path for " .. actual_app_id)
+      print_message("error", "defaults → invalid plist path for " .. app_id)
       goto continue
     end
 
     if options.defaults_export then
       -- Export defaults to plist file
-      print_message("info", "defaults → exporting " .. actual_app_id .. " to " .. full_plist_path)
+      print_message("info", "defaults → exporting " .. app_id .. " to " .. full_plist_path)
 
       -- Ensure parent directory exists
       local success, err = ensure_parent_directory(full_plist_path)
@@ -541,11 +531,11 @@ local function process_defaults(config, options)
         format_flag = " -format xml1"
       end
 
-      local export_cmd = string.format('defaults export "%s" "%s"%s', actual_app_id, full_plist_path, format_flag)
+      local export_cmd = string.format('defaults export "%s" "%s"%s', app_id, full_plist_path, format_flag)
       local exit_code, output = execute(export_cmd)
 
       if exit_code == 0 then
-        print_message("success", "defaults → exported " .. actual_app_id)
+        print_message("success", "defaults → exported " .. app_id)
         defaults_processed = true
       else
         print_message("error", "defaults → export failed: " .. (output or "unknown error"))
@@ -557,13 +547,13 @@ local function process_defaults(config, options)
         goto continue
       end
 
-      print_message("info", "defaults → importing " .. actual_app_id .. " from " .. full_plist_path)
+      print_message("info", "defaults → importing " .. app_id .. " from " .. full_plist_path)
 
-      local import_cmd = string.format('defaults import "%s" "%s"', actual_app_id, full_plist_path)
+      local import_cmd = string.format('defaults import "%s" "%s"', app_id, full_plist_path)
       local exit_code, output = execute(import_cmd)
 
       if exit_code == 0 then
-        print_message("success", "defaults → imported " .. actual_app_id)
+        print_message("success", "defaults → imported " .. app_id)
         defaults_processed = true
       else
         print_message("error", "defaults → import failed: " .. (output or "unknown error"))
@@ -571,13 +561,13 @@ local function process_defaults(config, options)
     else
       -- Regular processing (import during normal dot run)
       if is_file(full_plist_path) then
-        print_message("info", "defaults → importing " .. actual_app_id .. " from " .. full_plist_path)
+        print_message("info", "defaults → importing " .. app_id .. " from " .. full_plist_path)
 
-        local import_cmd = string.format('defaults import "%s" "%s"', actual_app_id, full_plist_path)
+        local import_cmd = string.format('defaults import "%s" "%s"', app_id, full_plist_path)
         local exit_code, output = execute(import_cmd)
 
         if exit_code == 0 then
-          print_message("success", "defaults → imported " .. actual_app_id)
+          print_message("success", "defaults → imported " .. app_id)
           defaults_processed = true
         else
           print_message("error", "defaults → import failed: " .. (output or "unknown error"))
