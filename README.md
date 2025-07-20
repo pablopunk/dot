@@ -23,9 +23,22 @@
 - [Examples](#examples)
 
 ## Installation
+
+**Option 1: Using curl (installs Lua and dot)**
 ```bash
-$ brew install pablopunk/brew/dot
+curl -fsSL https://raw.githubusercontent.com/pablopunk/dot/main/install.sh | bash
 ```
+
+**Option 2: Using Homebrew**
+```bash
+brew install pablopunk/brew/dot
+```
+
+The curl installer will:
+- Detect your OS (macOS, Linux)
+- Install Lua if not present
+- Download and install the `dot` tool
+- Add it to your PATH
 
 ## Quick Start
 
