@@ -46,8 +46,6 @@ curl -fsSL https://raw.githubusercontent.com/pablopunk/dot/main/install.sh | bas
 
 ## Quick Start
 
-<img src="https://github.com/user-attachments/assets/8c235cb8-d6c5-4f9c-88db-db1a04e914e4" width="600px" />
-
 ```bash
 $ cd /path/to/dotfiles
 $ tree
