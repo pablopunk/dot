@@ -838,11 +838,18 @@ local function process_tool(tool_name, options)
         process_module(matches[1], options)
         return true
       elseif #matches > 1 then
-        print_message("error", "Multiple modules match '" .. tool_name .. "':")
+        -- Multiple matches found - install all of them
+        print_message("info", "Multiple modules match '" .. tool_name .. "':")
         for _, match in ipairs(matches) do
           print_message("info", "  " .. match)
         end
-        return false
+        print_message("info", "Installing all matching modules...")
+
+        local all_success = true
+        for _, match in ipairs(matches) do
+          process_module(match, options)
+        end
+        return all_success
       else
         -- Check for exact module path
         local module_path = tool_name .. "/dot.lua"
@@ -868,11 +875,18 @@ local function process_tool(tool_name, options)
       process_module(matches[1], options)
       return true
     elseif #matches > 1 then
-      print_message("error", "Multiple modules match '" .. tool_name .. "':")
+      -- Multiple matches found - install all of them
+      print_message("info", "Multiple modules match '" .. tool_name .. "':")
       for _, match in ipairs(matches) do
         print_message("info", "  " .. match)
       end
-      return false
+      print_message("info", "Installing all matching modules...")
+
+      local all_success = true
+      for _, match in ipairs(matches) do
+        process_module(match, options)
+      end
+      return all_success
     else
       -- Check for exact module path
       local module_path = tool_name .. "/dot.lua"

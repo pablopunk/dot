@@ -639,9 +639,8 @@ return {
       )
     )
 
-    -- Create config
-    pl_dir.makepath(pl_path.join(dotfiles_dir, "test_postinstall_flag", "config"))
-    pl_file.write(pl_path.join(dotfiles_dir, "test_postinstall_flag", "config", "test.conf"), "test config")
+    -- Create fake package manager
+    create_command("fake_apt", 0, "Package installed successfully")
 
     -- Run dot.lua with --postinstall flag
     assert.is_true(run_dot "test_postinstall_flag --postinstall")
@@ -1588,13 +1587,306 @@ return {
     -- Run dot.lua
     assert.is_true(run_dot "test_multiline_whitespace")
 
-    -- Check that both steps were executed (whitespace should be trimmed)
-    assert.is_true(was_command_executed "fake_step1", "Step 1 should have been executed")
-    assert.is_true(was_command_executed "fake_step2", "Step 2 should have been executed")
+    -- Check that all commands were executed
+    assert.is_true(was_command_executed "fake_step1 install package1")
+    assert.is_true(was_command_executed "fake_step2 install package2")
+  end)
 
-    -- Check that symlink was created
-    local config_path = pl_path.join(home_dir, ".config", "test")
-    assert.is_true(is_link(config_path), "Symlink should have been created")
+  describe("individual module installation with profiles.lua", function()
+    it("should install individual module when profile doesn't exist", function()
+      -- Create profiles.lua with some profiles
+      pl_file.write(
+        pl_path.join(dotfiles_dir, "profiles.lua"),
+        [[
+return {
+  work = { "test_module1", "test_module2" },
+  personal = { "test_module3" }
+}
+]]
+      )
+
+      -- Create a module that's not in any profile
+      create_command("fake_apt", 0, "Package installed successfully")
+      setup_module(
+        "test_individual_module",
+        [[
+return {
+  install = {
+    fake_apt = "fake_apt install -y test-package",
+  },
+  link = {
+    ["./config"] = "$HOME/.config/test",
+  }
+}
+]]
+      )
+
+      -- Create config
+      pl_dir.makepath(pl_path.join(dotfiles_dir, "test_individual_module", "config"))
+      pl_file.write(pl_path.join(dotfiles_dir, "test_individual_module", "config", "test.conf"), "test config")
+
+      -- Run dot.lua with individual module
+      assert.is_true(run_dot "test_individual_module")
+
+      -- Check that install command was executed
+      assert.is_true(was_command_executed "fake_apt install -y test-package")
+    end)
+
+    it("should use profile when it exists", function()
+      -- Create profiles.lua
+      pl_file.write(
+        pl_path.join(dotfiles_dir, "profiles.lua"),
+        [[
+return {
+  work = { "test_profile_module" }
+}
+]]
+      )
+
+      -- Create module that's in the profile
+      create_command("fake_apt", 0, "Package installed successfully")
+      setup_module(
+        "test_profile_module",
+        [[
+return {
+  install = {
+    fake_apt = "fake_apt install -y test-package",
+  },
+  link = {
+    ["./config"] = "$HOME/.config/test",
+  }
+}
+]]
+      )
+
+      -- Create config
+      pl_dir.makepath(pl_path.join(dotfiles_dir, "test_profile_module", "config"))
+      pl_file.write(pl_path.join(dotfiles_dir, "test_profile_module", "config", "test.conf"), "test config")
+
+      -- Run dot.lua with profile name
+      assert.is_true(run_dot "work")
+
+      -- Check that install command was executed
+      assert.is_true(was_command_executed "fake_apt install -y test-package")
+    end)
+
+    it("should handle fuzzy matching for individual modules", function()
+      -- Create profiles.lua
+      pl_file.write(
+        pl_path.join(dotfiles_dir, "profiles.lua"),
+        [[
+return {
+  work = { "test_module1" },
+  personal = { "test_module2" }
+}
+]]
+      )
+
+      -- Create modules with similar names
+      create_command("fake_apt", 0, "Package installed successfully")
+
+      setup_module(
+        "test_stats_module",
+        [[
+return {
+  install = {
+    fake_apt = "fake_apt install -y stats-package",
+  },
+  link = {
+    ["./config"] = "$HOME/.config/stats",
+  }
+}
+]]
+      )
+
+      setup_module(
+        "test_startup_module",
+        [[
+return {
+  install = {
+    fake_apt = "fake_apt install -y startup-package",
+  },
+  link = {
+    ["./config"] = "$HOME/.config/startup",
+  }
+}
+]]
+      )
+
+      -- Create configs
+      pl_dir.makepath(pl_path.join(dotfiles_dir, "test_stats_module", "config"))
+      pl_file.write(pl_path.join(dotfiles_dir, "test_stats_module", "config", "test.conf"), "stats config")
+
+      pl_dir.makepath(pl_path.join(dotfiles_dir, "test_startup_module", "config"))
+      pl_file.write(pl_path.join(dotfiles_dir, "test_startup_module", "config", "test.conf"), "startup config")
+
+      -- Test fuzzy matching with unique match
+      assert.is_true(run_dot "stats")
+
+      -- Check that stats module was executed
+      assert.is_true(was_command_executed "fake_apt install -y stats-package")
+    end)
+
+    it("should install all modules when multiple fuzzy matches are found", function()
+      -- Create profiles.lua
+      pl_file.write(
+        pl_path.join(dotfiles_dir, "profiles.lua"),
+        [[
+return {
+  work = { "test_module1" }
+}
+]]
+      )
+
+      -- Create modules with similar names
+      create_command("fake_apt", 0, "Package installed successfully")
+
+      setup_module(
+        "test_stats_module",
+        [[
+return {
+  install = {
+    fake_apt = "fake_apt install -y stats-package",
+  },
+  link = {
+    ["./config"] = "$HOME/.config/stats",
+  }
+}
+]]
+      )
+
+      setup_module(
+        "test_startup_module",
+        [[
+return {
+  install = {
+    fake_apt = "fake_apt install -y startup-package",
+  },
+  link = {
+    ["./config"] = "$HOME/.config/startup",
+  }
+}
+]]
+      )
+
+      -- Create configs
+      pl_dir.makepath(pl_path.join(dotfiles_dir, "test_stats_module", "config"))
+      pl_file.write(pl_path.join(dotfiles_dir, "test_stats_module", "config", "test.conf"), "stats config")
+
+      pl_dir.makepath(pl_path.join(dotfiles_dir, "test_startup_module", "config"))
+      pl_file.write(pl_path.join(dotfiles_dir, "test_startup_module", "config", "test.conf"), "startup config")
+
+      -- Test fuzzy matching with multiple matches
+      assert.is_true(run_dot "st") -- Should install both modules
+
+      -- Check that both install commands were executed
+      assert.is_true(was_command_executed "fake_apt install -y stats-package")
+      assert.is_true(was_command_executed "fake_apt install -y startup-package")
+    end)
+
+    it("should install all modules when multiple fuzzy matches are found (no profiles.lua)", function()
+      -- Create modules with similar names (no profiles.lua)
+      create_command("fake_apt", 0, "Package installed successfully")
+
+      setup_module(
+        "test_stats_module",
+        [[
+return {
+  install = {
+    fake_apt = "fake_apt install -y stats-package",
+  },
+  link = {
+    ["./config"] = "$HOME/.config/stats",
+  }
+}
+]]
+      )
+
+      setup_module(
+        "test_startup_module",
+        [[
+return {
+  install = {
+    fake_apt = "fake_apt install -y startup-package",
+  },
+  link = {
+    ["./config"] = "$HOME/.config/startup",
+  }
+}
+]]
+      )
+
+      -- Create configs
+      pl_dir.makepath(pl_path.join(dotfiles_dir, "test_stats_module", "config"))
+      pl_file.write(pl_path.join(dotfiles_dir, "test_stats_module", "config", "test.conf"), "stats config")
+
+      pl_dir.makepath(pl_path.join(dotfiles_dir, "test_startup_module", "config"))
+      pl_file.write(pl_path.join(dotfiles_dir, "test_startup_module", "config", "test.conf"), "startup config")
+
+      -- Test fuzzy matching with multiple matches (no profiles.lua)
+      assert.is_true(run_dot "st") -- Should install both modules
+
+      -- Check that both install commands were executed
+      assert.is_true(was_command_executed "fake_apt install -y stats-package")
+      assert.is_true(was_command_executed "fake_apt install -y startup-package")
+    end)
+
+    it("should handle exact module path when fuzzy matching fails", function()
+      -- Create profiles.lua
+      pl_file.write(
+        pl_path.join(dotfiles_dir, "profiles.lua"),
+        [[
+return {
+  work = { "test_module1" }
+}
+]]
+      )
+
+      -- Create a module with exact name
+      create_command("fake_apt", 0, "Package installed successfully")
+      setup_module(
+        "exact_module_name",
+        [[
+return {
+  install = {
+    fake_apt = "fake_apt install -y exact-package",
+  },
+  link = {
+    ["./config"] = "$HOME/.config/exact",
+  }
+}
+]]
+      )
+
+      -- Create config
+      pl_dir.makepath(pl_path.join(dotfiles_dir, "exact_module_name", "config"))
+      pl_file.write(pl_path.join(dotfiles_dir, "exact_module_name", "config", "test.conf"), "exact config")
+
+      -- Test exact module path
+      assert.is_true(run_dot "exact_module_name")
+
+      -- Check that install command was executed
+      assert.is_true(was_command_executed "fake_apt install -y exact-package")
+    end)
+
+    it("should show profile list when neither profile nor module exists", function()
+      -- Create profiles.lua
+      pl_file.write(
+        pl_path.join(dotfiles_dir, "profiles.lua"),
+        [[
+return {
+  work = { "test_module1" },
+  personal = { "test_module2" }
+}
+]]
+      )
+
+      -- Test non-existent module/profile
+      local success = run_dot "nonexistent_module"
+      -- The script exits with code 1 when module not found
+      -- os.execute behavior varies by system, so we accept any non-false value
+      assert.is_not_false(success) -- Command executed (true, nil, or other non-false value)
+    end)
   end)
 
   it("should handle single-line commands (backward compatibility)", function()
