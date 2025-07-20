@@ -305,6 +305,13 @@ $ dot -f          # Force install all modules
 $ dot -f neovim   # Force install the 'neovim' module
 ```
 
+### Force Install Mode
+Skip `check` commands and run install commands directly:
+```bash
+$ dot --install           # Force install all modules (skip checks)
+$ dot --install karabiner # Force install karabiner (skip checks)
+```
+
 ### Unlink Mode
 Remove symlinks but keep config files:
 ```bash
@@ -325,6 +332,7 @@ $ dot --postlink          # Run postlink hooks even if symlinks haven't changed
 
 ### Other Options
 ```bash
+$ dot --install           # Skip check commands and run install commands directly
 $ dot --remove-profile    # Remove the last used profile
 $ dot --version           # Show version
 $ dot -h                  # Show help

@@ -5,6 +5,7 @@ local version = "1.0.0"
 -- Parse command-line arguments
 local function parse_args()
   local force_mode = false
+  local force_install = false
   local unlink_mode = false
   local postinstall_mode = false
   local postlink_mode = false
@@ -18,6 +19,8 @@ local function parse_args()
   while i <= #arg do
     if arg[i] == "-f" then
       force_mode = true
+    elseif arg[i] == "--install" then
+      force_install = true
     elseif arg[i] == "--version" or arg[i] == "-v" then
       print("dot version " .. version)
       os.exit(0)
@@ -44,6 +47,7 @@ Usage: dot [options] [module/profile]
 
 Options:
   -f                Force mode: replace existing configurations, backing them up to <config>.before-dot
+  --install         Force installation: skip check commands and run install commands directly
   --version         Display the version of dot
 
   --unlink          Unlink mode: remove symlinks but keep the config files in their destination
@@ -65,7 +69,7 @@ Options:
 
   return {
     force_mode = force_mode,
-
+    force_install = force_install,
     unlink_mode = unlink_mode,
     defaults_export = defaults_export,
     defaults_import = defaults_import,
@@ -459,15 +463,15 @@ local function run_hook(hook_script, hook_type)
 end
 
 -- Process new install system
-local function process_install(config)
+local function process_install(config, options)
   if not config.install then
     return false
   end
 
   local install_happened = false
 
-  -- Check if tool is already installed (if check field is provided)
-  if config.check then
+  -- Check if tool is already installed (if check field is provided and not forcing install)
+  if config.check and not options.force_install then
     local handle = io.popen(config.check .. " >/dev/null 2>&1; echo $?")
     if handle then
       local result = handle:read "*a"
@@ -478,6 +482,8 @@ local function process_install(config)
         return false
       end
     end
+  elseif config.check and options.force_install then
+    print_message("info", "install → forcing installation (skipping check)")
   end
 
   -- Find the first available command and run it
@@ -792,7 +798,7 @@ local function process_module(module_name, options)
   local defaults_happened = false
 
   -- Process installation
-  if process_install(config) then
+  if process_install(config, options) then
     install_happened = true
   end
 

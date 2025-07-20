@@ -1455,6 +1455,42 @@ return {
     assert.is_true(is_link(config_path), "Symlink should have been created")
   end)
 
+  it("should force install when --install flag is used", function()
+    -- Create a fake tool that exists (check command will succeed)
+    create_command("fake_tool", 0, "Tool version 1.0.0")
+    create_command("fake_apt", 0, "Package installed successfully")
+
+    -- Set up module with check field
+    setup_module(
+      "test_force_install",
+      [[
+return {
+  install = {
+    fake_apt = "fake_apt install -y test-package",
+  },
+  check = "fake_tool --version",
+  link = {
+    ["./config"] = "$HOME/.config/test",
+  }
+}
+]]
+    )
+
+    -- Create config
+    pl_dir.makepath(pl_path.join(dotfiles_dir, "test_force_install", "config"))
+    pl_file.write(pl_path.join(dotfiles_dir, "test_force_install", "config", "test.conf"), "test config")
+
+    -- Run dot.lua with --install flag
+    assert.is_true(run_dot "--install test_force_install")
+
+    -- Check that install command was executed despite tool existing
+    assert.is_true(was_command_executed "fake_apt", "install command should have been executed with --install")
+
+    -- Check that symlink was created
+    local config_path = pl_path.join(home_dir, ".config", "test")
+    assert.is_true(is_link(config_path), "Symlink should have been created")
+  end)
+
   it("should handle multi-line install commands successfully", function()
     -- Create multiple fake commands for multi-line test
     create_command("fake_step1", 0, "Step 1 completed")
