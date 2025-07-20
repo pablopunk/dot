@@ -490,9 +490,11 @@ local function process_install(config)
       for _, line in ipairs(cmd_lines) do
         local trimmed_line = str_trim(line)
         if trimmed_line ~= "" then
-          local exit_code, output = execute(trimmed_line)
+          -- For install commands, use os.execute to handle interactive prompts properly
+          print_message("info", "install → running: " .. trimmed_line)
+          local exit_code = os.execute(trimmed_line)
           if exit_code ~= 0 then
-            print_message("error", "install → failed: " .. (output or "unknown error"))
+            print_message("error", "install → failed")
             all_succeeded = false
             break
           end
