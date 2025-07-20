@@ -74,7 +74,7 @@ return {
     brew = "brew install neovim ripgrep",
     apt = "sudo apt install -y neovim ripgrep"
   },
-  check = "nvim --version", -- Check if neovim is already installed
+  check = "which nvim", -- Check if neovim is already installed
   link = {
     ["./config"] = "~/.config/nvim" -- link the whole directory or just one file, your choice
   }
@@ -109,7 +109,7 @@ return {
     brew = "brew install neovim ripgrep",
     apt = "sudo apt install -y neovim ripgrep"
   },
-  check = "nvim --version", -- Check if neovim is already installed
+  check = "which nvim", -- Check if neovim is already installed
   link = {
     ["./config"] = "~/.config/nvim"
   }
@@ -119,14 +119,14 @@ return {
 The `check` field specifies a command to verify if the tool is already installed. If the command succeeds, `dot` will skip the installation step.
 
 **Examples:**
-- `check = "nvim --version"` for Neovim
-- `check = "git --version"` for Git
-- `check = "node --version"` for Node.js
-- `check = "which docker"` for Docker
+- `check = "which nvim && which rg"`
+- `check = "which git && which gh"`
+- `check = "node --version"`
+- `check = "which docker"`
 
 ### Linking Files
 
-The `link` system creates symlinks from your dotfiles to their destinations. Use the new key-value format:
+The `link` system creates symlinks from your dotfiles to their destinations. Use the key-value format:
 
 ```lua
 -- cursor/dot.lua
