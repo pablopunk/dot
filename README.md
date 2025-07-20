@@ -12,7 +12,7 @@
 - [Quick Start](#quick-start)
 - [Usage](#usage)
   - [Modules](#modules)
-  - [Installation System](#installation-system)
+  - [Installation](#installation)
   - [Linking Files](#linking-files)
   - [macOS Preferences (defaults)](#macos-preferences-defaults)
   - [OS Restrictions](#os-restrictions)
