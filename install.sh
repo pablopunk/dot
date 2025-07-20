@@ -78,6 +78,44 @@ install_lua_linux() {
 
 
 
+# Get version from dot.lua file
+get_version_from_file() {
+    local file_path="$1"
+    if [[ -f "$file_path" ]]; then
+        local version_line=$(grep "local version = " "$file_path" 2>/dev/null)
+        if [[ -n "$version_line" ]]; then
+            echo "$version_line" | sed 's/local version = "\([^"]*\)"/\1/'
+        fi
+    fi
+}
+
+# Get latest version from GitHub
+get_latest_version() {
+    local version_url="https://raw.githubusercontent.com/pablopunk/dot/main/dot.lua"
+    local version_line=$(curl -fsSL "$version_url" 2>/dev/null | grep "local version = " | head -1)
+    if [[ -n "$version_line" ]]; then
+        echo "$version_line" | sed 's/local version = "\([^"]*\)"/\1/'
+    fi
+}
+
+# Compare versions
+version_compare() {
+    local version1="$1"
+    local version2="$2"
+    
+    # Convert versions to comparable numbers (e.g., 1.2.3 -> 1002003)
+    local v1=$(echo "$version1" | awk -F. '{print $1*1000000 + $2*1000 + $3}')
+    local v2=$(echo "$version2" | awk -F. '{print $1*1000000 + $2*1000 + $3}')
+    
+    if [[ "$v1" -lt "$v2" ]]; then
+        echo "older"
+    elif [[ "$v1" -gt "$v2" ]]; then
+        echo "newer"
+    else
+        echo "same"
+    fi
+}
+
 # Install dot tool
 install_dot() {
     local os=$(detect_os)
@@ -87,19 +125,61 @@ install_dot() {
     # Create install directory
     mkdir -p "$install_dir"
     
-    # Download the dot.lua file
-    print_status "Downloading dot tool..."
-    if command_exists curl; then
-        curl -fsSL "https://raw.githubusercontent.com/pablopunk/dot/main/dot.lua" -o "$dot_path"
-    elif command_exists wget; then
-        wget -qO "$dot_path" "https://raw.githubusercontent.com/pablopunk/dot/main/dot.lua"
+    # Check if dot is already installed
+    local current_version=""
+    local latest_version=""
+    local update_needed=false
+    
+    if [[ -f "$dot_path" ]]; then
+        current_version=$(get_version_from_file "$dot_path")
+        latest_version=$(get_latest_version)
+        
+        if [[ -n "$current_version" && -n "$latest_version" ]]; then
+            local comparison=$(version_compare "$current_version" "$latest_version")
+            if [[ "$comparison" == "older" ]]; then
+                print_status "Current version: $current_version"
+                print_status "Latest version: $latest_version"
+                print_status "Updating dot tool..."
+                update_needed=true
+            elif [[ "$comparison" == "same" ]]; then
+                print_success "dot tool is already up to date (version $current_version)"
+                # Still check PATH and show usage info
+            else
+                print_warning "Local version ($current_version) is newer than remote ($latest_version)"
+                print_warning "This might be a development version"
+            fi
+        else
+            print_status "Installing dot tool..."
+            update_needed=true
+        fi
     else
-        print_error "Neither curl nor wget found. Please install one of them."
-        exit 1
+        print_status "Installing dot tool..."
+        update_needed=true
     fi
     
-    # Make it executable
-    chmod +x "$dot_path"
+    # Download/update the dot.lua file
+    if [[ "$update_needed" == true ]]; then
+        print_status "Downloading dot tool..."
+        if command_exists curl; then
+            curl -fsSL "https://raw.githubusercontent.com/pablopunk/dot/main/dot.lua" -o "$dot_path"
+        elif command_exists wget; then
+            wget -qO "$dot_path" "https://raw.githubusercontent.com/pablopunk/dot/main/dot.lua"
+        else
+            print_error "Neither curl nor wget found. Please install one of them."
+            exit 1
+        fi
+        
+        # Make it executable
+        chmod +x "$dot_path"
+        
+        # Get the new version
+        local new_version=$(get_version_from_file "$dot_path")
+        if [[ -n "$new_version" ]]; then
+            print_success "dot tool updated to version $new_version"
+        else
+            print_success "dot tool installed successfully"
+        fi
+    fi
     
     # Check if directory is already in PATH
     if [[ ":$PATH:" == *":$install_dir:"* ]]; then
@@ -146,7 +226,6 @@ main() {
     echo "  $HOME/.local/bin/dot            # Install all modules"
     echo "  $HOME/.local/bin/dot neovim     # Install only the 'neovim' module"
     echo "  $HOME/.local/bin/dot work       # Install only the 'work' profile"
-    echo "  $HOME/.local/bin/dot --update   # Update dot tool to latest version"
     echo "  $HOME/.local/bin/dot -h         # Show help"
     echo
     print_status "To make 'dot' available as a command, add $HOME/.local/bin to your PATH"
