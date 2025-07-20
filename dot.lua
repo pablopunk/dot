@@ -112,6 +112,13 @@ end
 
 -- Execute an OS command and return exit code and output
 local function execute(cmd)
+  -- For ln commands, don't capture output at all
+  if cmd:match "^ln " then
+    print("DEBUG: Found ln command: " .. cmd)
+    local exit_code = os.execute(cmd .. " > /dev/null 2>&1")
+    return exit_code, ""
+  end
+
   local handle = io.popen(cmd .. " 2>&1; echo $?")
   local result = handle:read "*a"
   handle:close()
@@ -140,6 +147,8 @@ local function execute(cmd)
     and not cmd:match "sudo:"
     and not cmd:match "Please enter"
     and not cmd:match "^find "
+    and not cmd:match "find ."
+    and not cmd:match "^readlink "
   then
     print(output)
   end
@@ -566,7 +575,7 @@ local function process_defaults(config, options, module_dir)
         local temp_current = "/tmp/dot_current_defaults_" .. app_id:gsub("[^%w]", "_")
         local export_current_cmd = string.format('defaults export "%s" "%s"', app_id, temp_current)
         local exit_code, _ = execute(export_current_cmd)
-        
+
         if exit_code == 0 then
           -- Compare current defaults with the plist file
           local diff_cmd = string.format('diff "%s" "%s" >/dev/null 2>&1', temp_current, full_plist_path)
@@ -669,7 +678,9 @@ local function handle_links(config, module_dir, options)
         end
 
         local cmd = string.format('ln -sf "%s" "%s"', source, output)
+        print("DEBUG: Executing command: " .. cmd)
         local exit_code, error_output = execute(cmd)
+        print("DEBUG: Command output: " .. (error_output or "nil"))
         if exit_code ~= 0 then
           print_message("error", "link → failed to create symlink: " .. error_output)
         else
@@ -729,7 +740,10 @@ local function process_module(module_name, options)
     local current_os = OS_NAME:lower()
     local os_supported = false
 
-    for _, os_name in ipairs(config.os) do
+    -- Handle both string and array values for os
+    local os_list = type(config.os) == "string" and { config.os } or config.os
+
+    for _, os_name in ipairs(os_list) do
       local normalized_os = os_name:lower()
 
       if (normalized_os == "mac" or normalized_os == "macos" or normalized_os == "darwin") and is_macos() then

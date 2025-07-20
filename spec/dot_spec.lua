@@ -1984,4 +1984,59 @@ return {
     -- Check that diff was called to compare files
     assert.is_true(was_command_executed "diff")
   end)
+
+  it("should handle OS detection with both string and array values", function()
+    -- Create package manager
+    create_command("fake_apt", 0, "Package installed successfully")
+
+    -- Set up module with string OS value
+    setup_module(
+      "test_os_string",
+      [[
+return {
+  os = "macos",
+  install = {
+    fake_apt = "fake_apt install -y test-package",
+  },
+  link = {
+    ["./config"] = "$HOME/.config/test",
+  }
+}
+]]
+    )
+
+    -- Set up module with array OS value
+    setup_module(
+      "test_os_array",
+      [[
+return {
+  os = {"macos", "linux"},
+  install = {
+    fake_apt = "fake_apt install -y test-package",
+  },
+  link = {
+    ["./config"] = "$HOME/.config/test",
+  }
+}
+]]
+    )
+
+    -- Create configs
+    pl_dir.makepath(pl_path.join(dotfiles_dir, "test_os_string", "config"))
+    pl_file.write(pl_path.join(dotfiles_dir, "test_os_string", "config", "test.conf"), "test config")
+    pl_dir.makepath(pl_path.join(dotfiles_dir, "test_os_array", "config"))
+    pl_file.write(pl_path.join(dotfiles_dir, "test_os_array", "config", "test.conf"), "test config")
+
+    -- Run dot.lua for both modules
+    assert.is_true(run_dot "test_os_string")
+    assert.is_true(run_dot "test_os_array")
+
+    -- Check that install commands were executed (modules should be processed on supported OS)
+    assert.is_true(was_command_executed "fake_apt", "install command should have been executed for string OS")
+    assert.is_true(was_command_executed "fake_apt", "install command should have been executed for array OS")
+
+    -- Check that symlinks were created
+    local config_path1 = pl_path.join(home_dir, ".config", "test")
+    assert.is_true(is_link(config_path1), "Symlink should have been created for string OS")
+  end)
 end)
