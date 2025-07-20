@@ -89,7 +89,7 @@ The `install` system dynamically detects available package managers and uses the
 -- apps/dot.lua
 return {
   install = {
-    brew = "brew install whatsapp spotify slack vscode",
+    brew = "brew install vim git curl",
     apt = "sudo apt install -y vim git curl",
     yum = "yum install vim git curl"
   }
