@@ -139,6 +139,7 @@ local function execute(cmd)
     and not cmd:match "installer:"
     and not cmd:match "sudo:"
     and not cmd:match "Please enter"
+    and not cmd:match "^find "
   then
     print(output)
   end
