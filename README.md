@@ -1,7 +1,7 @@
 # `dot`
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/3984a5c4-67f7-4f0e-a4dd-6ebdec323b49#gh-light-mode-only" width="600px" />
+  <img src="https://github.com/user-attachments/assets/7dbda7f1-cce5-4183-82c0-f596ac375fa2" width="600px" />
   <img src="https://github.com/user-attachments/assets/3733f2ea-b640-4d6c-b750-b2393638fd90#gh-dark-mode-only" width="600px" />
 </p>
 
