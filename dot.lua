@@ -490,7 +490,7 @@ local function process_install(config)
 end
 
 -- Process macOS defaults
-local function process_defaults(config, options)
+local function process_defaults(config, options, module_dir)
   if not config.defaults then
     return false
   end
@@ -504,10 +504,10 @@ local function process_defaults(config, options)
   local defaults_processed = false
 
   for app_id, plist_path in pairs(config.defaults) do
-    -- Make relative paths relative to current working directory
+    -- Make relative paths relative to module directory
     local full_plist_path = plist_path or ""
     if plist_path and full_plist_path ~= "" and not full_plist_path:match "^/" then
-      full_plist_path = os.getenv "PWD" .. "/" .. full_plist_path:gsub("^./", "")
+      full_plist_path = os.getenv "PWD" .. "/" .. module_dir:gsub("^./", "") .. "/" .. full_plist_path:gsub("^./", "")
     end
 
     if not full_plist_path or full_plist_path == "" then
@@ -750,7 +750,7 @@ local function process_module(module_name, options)
   end
 
   -- Process defaults
-  if process_defaults(config, options) then
+  if process_defaults(config, options, module_dir) then
     defaults_happened = true
   end
 

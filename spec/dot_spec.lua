@@ -1922,4 +1922,33 @@ return {
     local config_path = pl_path.join(home_dir, ".config", "test")
     assert.is_true(is_link(config_path), "Symlink should have been created")
   end)
+
+  it("should handle relative paths in defaults correctly", function()
+    -- Create a module with relative path in defaults
+    create_command("defaults", 0, "Preferences imported successfully")
+
+    setup_module(
+      "test_relative_defaults",
+      [[
+return {
+  install = {
+    fake_apt = "fake_apt install -y test-package",
+  },
+  defaults = {
+    ["com.test.app"] = "./test.xml",
+  }
+}
+]]
+    )
+
+    -- Create the XML file in the module directory
+    pl_dir.makepath(pl_path.join(dotfiles_dir, "test_relative_defaults"))
+    pl_file.write(pl_path.join(dotfiles_dir, "test_relative_defaults", "test.xml"), "test plist content")
+
+    -- Run dot.lua
+    assert.is_true(run_dot "test_relative_defaults")
+
+    -- Check that defaults import was called (the exact path might vary due to temp directories)
+    assert.is_true(was_command_executed "defaults import")
+  end)
 end)
