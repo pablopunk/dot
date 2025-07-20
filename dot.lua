@@ -465,10 +465,15 @@ local function process_install(config)
 
   -- Check if tool is already installed (if check field is provided)
   if config.check then
-    local exit_code, _ = execute(config.check .. " >/dev/null 2>&1")
-    if exit_code == 0 then
-      print_message("info", "install → already installed")
-      return false
+    local handle = io.popen(config.check .. " >/dev/null 2>&1; echo $?")
+    if handle then
+      local result = handle:read "*a"
+      handle:close()
+      local exit_code = tonumber(result:match "(%d+)")
+      if exit_code == 0 then
+        print_message("info", "install → already installed")
+        return false
+      end
     end
   end
 
