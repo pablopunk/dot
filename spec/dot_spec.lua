@@ -110,6 +110,14 @@ exit 0
     return os_name
   end
 
+  -- Function to get OS name (matches dot.lua implementation)
+  local function os_name()
+    local handle = io.popen "uname"
+    local result = handle:read "*l"
+    handle:close()
+    return result or "Unknown"
+  end
+
   -- Function to run dot.lua with given arguments
   local function run_dot(args)
     args = args or ""
@@ -1956,7 +1964,13 @@ return {
     assert.is_true(run_dot "test_relative_defaults")
 
     -- Check that defaults import was called (the exact path might vary due to temp directories)
-    assert.is_true(was_command_executed "defaults", "defaults command should have been executed")
+    -- Note: defaults only work on macOS, so we check based on OS
+    if os_name() == "Darwin" then
+      assert.is_true(was_command_executed "defaults", "defaults command should have been executed")
+    else
+      -- On non-macOS, defaults should be skipped
+      assert.is_false(was_command_executed "defaults", "defaults command should not be executed on non-macOS")
+    end
   end)
 
   it("should check for defaults differences and prompt user instead of auto-importing", function()
@@ -1986,10 +2000,16 @@ return {
     assert.is_true(run_dot "test_defaults_check")
 
     -- Check that defaults export was called to get current settings
-    assert.is_true(was_command_executed "defaults export")
-
-    -- Check that diff was called to compare files
-    assert.is_true(was_command_executed "diff")
+    -- Note: defaults only work on macOS, so we check based on OS
+    if os_name() == "Darwin" then
+      assert.is_true(was_command_executed "defaults export")
+      -- Check that diff was called to compare files
+      assert.is_true(was_command_executed "diff")
+    else
+      -- On non-macOS, defaults should be skipped
+      assert.is_false(was_command_executed "defaults export", "defaults should not be executed on non-macOS")
+      assert.is_false(was_command_executed "diff", "diff should not be executed on non-macOS")
+    end
   end)
 
   it("should handle OS detection with both string and array values", function()
@@ -2038,14 +2058,28 @@ return {
     assert.is_true(run_dot "test_os_string")
     assert.is_true(run_dot "test_os_array")
 
-    -- Check that install commands were executed (modules should be processed on supported OS)
-    assert.is_true(was_command_executed "fake_apt", "install command should have been executed for string OS")
-    assert.is_true(was_command_executed "fake_apt", "install command should have been executed for array OS")
+    -- Check that install commands were executed based on OS support
+    local current_os = os_name()
+    if current_os == "Darwin" then
+      -- On macOS, both modules should work
+      assert.is_true(was_command_executed "fake_apt", "install command should have been executed for string OS")
+      assert.is_true(was_command_executed "fake_apt", "install command should have been executed for array OS")
 
-    -- Check that symlinks were created
-    local config_path1 = pl_path.join(home_dir, ".config", "test_string")
-    local config_path2 = pl_path.join(home_dir, ".config", "test_array")
-    assert.is_true(is_link(config_path1), "Symlink should have been created for string OS")
-    assert.is_true(is_link(config_path2), "Symlink should have been created for array OS")
+      -- Check that symlinks were created
+      local config_path1 = pl_path.join(home_dir, ".config", "test_string")
+      local config_path2 = pl_path.join(home_dir, ".config", "test_array")
+      assert.is_true(is_link(config_path1), "Symlink should have been created for string OS")
+      assert.is_true(is_link(config_path2), "Symlink should have been created for array OS")
+    elseif current_os == "Linux" then
+      -- On Linux, only the array module should work
+      assert.is_false(was_command_executed "fake_apt", "install command should not be executed for string OS on Linux")
+      assert.is_true(was_command_executed "fake_apt", "install command should have been executed for array OS")
+
+      -- Check that only array symlink was created
+      local config_path1 = pl_path.join(home_dir, ".config", "test_string")
+      local config_path2 = pl_path.join(home_dir, ".config", "test_array")
+      assert.is_false(is_link(config_path1), "Symlink should not have been created for string OS on Linux")
+      assert.is_true(is_link(config_path2), "Symlink should have been created for array OS")
+    end
   end)
 end)
