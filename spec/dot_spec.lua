@@ -1951,4 +1951,37 @@ return {
     -- Check that defaults import was called (the exact path might vary due to temp directories)
     assert.is_true(was_command_executed "defaults import")
   end)
+
+  it("should check for defaults differences and prompt user instead of auto-importing", function()
+    -- Create a module with defaults configuration
+    create_command("defaults", 0, "Preferences exported successfully")
+    create_command("diff", 1, "") -- Return 1 to indicate differences
+
+    setup_module(
+      "test_defaults_check",
+      [[
+return {
+  install = {
+    fake_apt = "fake_apt install -y test-package",
+  },
+  defaults = {
+    ["com.test.app"] = "./test.xml",
+  }
+}
+]]
+    )
+
+    -- Create the XML file in the module directory
+    pl_dir.makepath(pl_path.join(dotfiles_dir, "test_defaults_check"))
+    pl_file.write(pl_path.join(dotfiles_dir, "test_defaults_check", "test.xml"), "test plist content")
+
+    -- Run dot.lua (should check for differences, not import)
+    assert.is_true(run_dot "test_defaults_check")
+
+    -- Check that defaults export was called to get current settings
+    assert.is_true(was_command_executed "defaults export")
+
+    -- Check that diff was called to compare files
+    assert.is_true(was_command_executed "diff")
+  end)
 end)

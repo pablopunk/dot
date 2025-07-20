@@ -560,18 +560,33 @@ local function process_defaults(config, options, module_dir)
         print_message("error", "defaults → import failed: " .. (output or "unknown error"))
       end
     else
-      -- Regular processing (import during normal dot run)
+      -- Regular processing: check for differences and prompt user
       if is_file(full_plist_path) then
-        print_message("info", "defaults → importing " .. app_id .. " from " .. full_plist_path)
-
-        local import_cmd = string.format('defaults import "%s" "%s"', app_id, full_plist_path)
-        local exit_code, output = execute(import_cmd)
-
+        -- Check if current defaults differ from the plist file
+        local temp_current = "/tmp/dot_current_defaults_" .. app_id:gsub("[^%w]", "_")
+        local export_current_cmd = string.format('defaults export "%s" "%s"', app_id, temp_current)
+        local exit_code, _ = execute(export_current_cmd)
+        
         if exit_code == 0 then
-          print_message("success", "defaults → imported " .. app_id)
-          defaults_processed = true
+          -- Compare current defaults with the plist file
+          local diff_cmd = string.format('diff "%s" "%s" >/dev/null 2>&1', temp_current, full_plist_path)
+          local diff_exit_code, _ = execute(diff_cmd)
+
+          -- Clean up temp file
+          os.execute(string.format('rm -f "%s"', temp_current))
+
+          if diff_exit_code ~= 0 then
+            -- Files are different, prompt user
+            print_message("warning", "defaults → settings differ for " .. app_id)
+            print_message("info", "  Use -e to export current settings to " .. full_plist_path)
+            print_message("info", "  Use -i to import settings from " .. full_plist_path)
+          else
+            print_message("info", "defaults → settings are up to date for " .. app_id)
+          end
         else
-          print_message("error", "defaults → import failed: " .. (output or "unknown error"))
+          print_message("warning", "defaults → could not check current settings for " .. app_id)
+          print_message("info", "  Use -e to export current settings to " .. full_plist_path)
+          print_message("info", "  Use -i to import settings from " .. full_plist_path)
         end
       else
         print_message("warning", "defaults → plist file not found: " .. full_plist_path .. " (use -e to export)")
