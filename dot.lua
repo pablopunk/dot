@@ -11,6 +11,7 @@ local function parse_args()
   local defaults_export = false
   local defaults_import = false
   local remove_profile = false
+  local update_mode = false
   local args = {}
 
   local i = 1
@@ -36,6 +37,8 @@ local function parse_args()
       postlink_mode = true
     elseif arg[i] == "--remove-profile" then
       remove_profile = true
+    elseif arg[i] == "--update" then
+      update_mode = true
     elseif arg[i] == "-h" then
       print [[
 Usage: dot [options] [module/profile]
@@ -52,6 +55,7 @@ Options:
   --postinstall     Run postinstall hooks even if dependencies haven't changed
   --postlink        Run postlink hooks even if symlinks haven't changed
   --remove-profile  Remove the last used profile
+  --update          Update the dot tool to the latest version
   -h                Display this help message
 ]]
       os.exit(0)
@@ -70,6 +74,7 @@ Options:
     postinstall_mode = postinstall_mode,
     postlink_mode = postlink_mode,
     remove_profile = remove_profile,
+    update_mode = update_mode,
     args = args,
   }
 end
@@ -992,6 +997,50 @@ local function remove_last_profile()
   return true
 end
 
+-- Update the dot tool to the latest version
+local function update_dot_tool()
+  print_section "updating dot tool"
+
+  local install_dir = os.getenv "HOME" .. "/.local/bin"
+  local dot_path = install_dir .. "/dot"
+
+  -- Check if dot is installed in the expected location
+  if not is_file(dot_path) then
+    print_message("error", "dot tool not found at " .. dot_path)
+    print_message("info", "Please run the installer first:")
+    print_message("info", "  curl -fsSL https://raw.githubusercontent.com/pablopunk/dot/main/install.sh | bash")
+    return
+  end
+
+  -- Create install directory if it doesn't exist
+  local cmd = string.format('mkdir -p "%s"', install_dir)
+  execute(cmd)
+
+  -- Download the latest version
+  print_message("info", "Downloading latest version...")
+  local download_cmd
+  if execute "which curl" == 0 then
+    download_cmd =
+      string.format('curl -fsSL "https://raw.githubusercontent.com/pablopunk/dot/main/dot.lua" -o "%s"', dot_path)
+  else
+    download_cmd =
+      string.format('wget -qO "%s" "https://raw.githubusercontent.com/pablopunk/dot/main/dot.lua"', dot_path)
+  end
+
+  local exit_code, output = execute(download_cmd)
+  if exit_code ~= 0 then
+    print_message("error", "Failed to download latest version: " .. output)
+    return
+  end
+
+  -- Make it executable
+  local chmod_cmd = string.format('chmod +x "%s"', dot_path)
+  execute(chmod_cmd)
+
+  print_message("success", "dot tool updated successfully!")
+  print_message("info", "Location: " .. dot_path)
+end
+
 -- Main function
 local function main()
   local options = parse_args()
@@ -999,6 +1048,11 @@ local function main()
   if options.remove_profile then
     remove_last_profile()
     print_message("info", "Profile removed.")
+    return
+  end
+
+  if options.update_mode then
+    update_dot_tool()
     return
   end
 

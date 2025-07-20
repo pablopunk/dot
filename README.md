@@ -40,6 +40,11 @@ The curl installer will:
 - Download and install the `dot` tool
 - Add it to your PATH
 
+**To update the tool later:**
+```bash
+dot --update
+```
+
 ## Quick Start
 
 <img src="https://github.com/user-attachments/assets/8c235cb8-d6c5-4f9c-88db-db1a04e914e4" width="600px" />

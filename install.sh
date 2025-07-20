@@ -146,6 +146,7 @@ main() {
     echo "  $HOME/.local/bin/dot            # Install all modules"
     echo "  $HOME/.local/bin/dot neovim     # Install only the 'neovim' module"
     echo "  $HOME/.local/bin/dot work       # Install only the 'work' profile"
+    echo "  $HOME/.local/bin/dot --update   # Update dot tool to latest version"
     echo "  $HOME/.local/bin/dot -h         # Show help"
     echo
     print_status "To make 'dot' available as a command, add $HOME/.local/bin to your PATH"
