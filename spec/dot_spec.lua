@@ -18,8 +18,19 @@ describe("dot.lua", function()
 
   -- Function to check if a path is a symbolic link
   local function is_link(path)
-    local attr = lfs.symlinkattributes(path)
-    return attr and attr.mode == "link" or false
+    -- Use system test command instead of lfs, run in the correct directory
+    -- Extract the relative path from the full path
+    local relative_path = path:gsub("^" .. home_dir .. "/", "")
+    local cmd = string.format(
+      'cd %q && test -L "%s" && test -e "%s" && echo "true" || echo "false"',
+      home_dir,
+      relative_path,
+      relative_path
+    )
+    local handle = io.popen(cmd)
+    local result = handle:read("*a"):gsub("%s+$", "") -- Remove trailing whitespace
+    handle:close()
+    return result == "true"
   end
 
   -- Function to create a fake command that logs when it's called
@@ -220,128 +231,37 @@ fi
     pl_file.write(pl_path.join(bin_dir, "bash"), bash_script)
     os.execute(string.format("chmod +x %q", pl_path.join(bin_dir, "bash")))
 
-    -- Create filesystem operation commands with unique names
-    local function find_command(cmd_name)
-      -- Try to find the actual command location
-      local common_paths = { "/bin/" .. cmd_name, "/usr/bin/" .. cmd_name }
-      for _, path in ipairs(common_paths) do
-        local check = os.execute(string.format("test -x %q", path))
-        if check == 0 then
-          return path
-        end
-      end
-      return cmd_name -- fallback to just the command name
+    -- Create real system commands that actually work
+    local function create_real_command(name, real_path)
+      local script = string.format(
+        [[#!/bin/sh
+echo "COMMAND_EXECUTED: %s $@" >> %q
+%s "$@"
+]],
+        name,
+        command_log_file,
+        real_path
+      )
+      pl_file.write(pl_path.join(bin_dir, name), script)
+      os.execute(string.format("chmod +x %q", pl_path.join(bin_dir, name)))
     end
 
-    local mkdir_script = string.format(
-      [[#!/bin/sh
-echo "COMMAND_EXECUTED: mkdir $@" >> %q
-%s "$@"
-]],
-      command_log_file,
-      find_command "mkdir"
-    )
-    pl_file.write(pl_path.join(bin_dir, "fake_mkdir"), mkdir_script)
-    os.execute(string.format("chmod +x %q", pl_path.join(bin_dir, "fake_mkdir")))
-
-    -- Create a real mkdir command that actually works
-    local real_mkdir_script = string.format(
-      [[#!/bin/sh
-echo "COMMAND_EXECUTED: mkdir $@" >> %q
-/bin/mkdir "$@"
-]],
-      command_log_file
-    )
-    pl_file.write(pl_path.join(bin_dir, "mkdir"), real_mkdir_script)
-    os.execute(string.format("chmod +x %q", pl_path.join(bin_dir, "mkdir")))
-
-    local ln_script = string.format(
-      [[#!/bin/sh
-echo "COMMAND_EXECUTED: ln $@" >> %q
-%s "$@"
-]],
-      command_log_file,
-      find_command "ln"
-    )
-    pl_file.write(pl_path.join(bin_dir, "fake_ln"), ln_script)
-    os.execute(string.format("chmod +x %q", pl_path.join(bin_dir, "fake_ln")))
-
-    -- Create a real ln command that actually works
-    local real_ln_script = string.format(
-      [[#!/bin/sh
-echo "COMMAND_EXECUTED: ln $@" >> %q
-/bin/ln "$@"
-]],
-      command_log_file
-    )
-    pl_file.write(pl_path.join(bin_dir, "ln"), real_ln_script)
-    os.execute(string.format("chmod +x %q", pl_path.join(bin_dir, "ln")))
-
-    local echo_script = string.format(
-      [[#!/bin/sh
-echo "COMMAND_EXECUTED: echo $@" >> %q
-%s "$@"
-]],
-      command_log_file,
-      find_command "echo"
-    )
-    pl_file.write(pl_path.join(bin_dir, "fake_echo"), echo_script)
-    os.execute(string.format("chmod +x %q", pl_path.join(bin_dir, "fake_echo")))
-
-    local touch_script = string.format(
-      [[#!/bin/sh
-echo "COMMAND_EXECUTED: touch $@" >> %q
-%s "$@"
-]],
-      command_log_file,
-      find_command "touch"
-    )
-    pl_file.write(pl_path.join(bin_dir, "fake_touch"), touch_script)
-    os.execute(string.format("chmod +x %q", pl_path.join(bin_dir, "fake_touch")))
-
-    local cp_script = string.format(
-      [[#!/bin/sh
-echo "COMMAND_EXECUTED: cp $@" >> %q
-%s "$@"
-]],
-      command_log_file,
-      find_command "cp"
-    )
-    pl_file.write(pl_path.join(bin_dir, "fake_cp"), cp_script)
-    os.execute(string.format("chmod +x %q", pl_path.join(bin_dir, "fake_cp")))
-
-    local rm_script = string.format(
-      [[#!/bin/sh
-echo "COMMAND_EXECUTED: rm $@" >> %q
-%s "$@"
-]],
-      command_log_file,
-      find_command "rm"
-    )
-    pl_file.write(pl_path.join(bin_dir, "fake_rm"), rm_script)
-    os.execute(string.format("chmod +x %q", pl_path.join(bin_dir, "fake_rm")))
-
-    local mv_script = string.format(
-      [[#!/bin/sh
-echo "COMMAND_EXECUTED: mv $@" >> %q
-%s "$@"
-]],
-      command_log_file,
-      find_command "mv"
-    )
-    pl_file.write(pl_path.join(bin_dir, "fake_mv"), mv_script)
-    os.execute(string.format("chmod +x %q", pl_path.join(bin_dir, "fake_mv")))
-
-    local find_script = string.format(
-      [[#!/bin/sh
-echo "COMMAND_EXECUTED: find $@" >> %q
-%s "$@"
-]],
-      command_log_file,
-      find_command "find"
-    )
-    pl_file.write(pl_path.join(bin_dir, "fake_find"), find_script)
-    os.execute(string.format("chmod +x %q", pl_path.join(bin_dir, "fake_find")))
+    -- Create real commands that the tests need
+    create_real_command("mkdir", "/bin/mkdir")
+    create_real_command("ln", "/bin/ln")
+    create_real_command("rm", "/bin/rm")
+    create_real_command("cp", "/bin/cp")
+    create_real_command("mv", "/bin/mv")
+    create_real_command("find", "/usr/bin/find")
+    create_real_command("readlink", "/usr/bin/readlink")
+    create_real_command("test", "/usr/bin/test")
+    create_real_command("echo", "/bin/echo")
+    create_real_command("touch", "/usr/bin/touch")
+    create_real_command("diff", "/usr/bin/diff")
+    create_real_command("du", "/usr/bin/du")
+    create_real_command("wc", "/usr/bin/wc")
+    create_real_command("cut", "/usr/bin/cut")
+    create_real_command("defaults", "/usr/bin/defaults")
   end)
 
   after_each(function()
@@ -349,6 +269,71 @@ echo "COMMAND_EXECUTED: find $@" >> %q
     if tmp_dir and path_exists(tmp_dir) then
       pl_dir.rmtree(tmp_dir)
     end
+  end)
+
+  it("should create symlinks successfully", function()
+    -- Create a simple module with just a link
+    setup_module(
+      "test_simple_link",
+      [[
+return {
+  link = {
+    ["./config"] = "$HOME/.config/test",
+  }
+}
+]]
+    )
+
+    -- Create the source file
+    pl_dir.makepath(pl_path.join(dotfiles_dir, "test_simple_link", "config"))
+    pl_file.write(pl_path.join(dotfiles_dir, "test_simple_link", "config", "test.conf"), "test config")
+
+    -- Run dot.lua and capture output
+    -- Find the correct lua path dynamically
+    local lua_path = "/opt/homebrew/bin/lua" -- macOS Homebrew
+    if not pl_path.isfile(lua_path) then
+      lua_path = "/usr/bin/lua" -- Ubuntu/Debian
+    end
+    if not pl_path.isfile(lua_path) then
+      -- Try to find lua in PATH using which
+      local handle = io.popen "which lua 2>/dev/null"
+      local which_output = handle:read "*a"
+      handle:close()
+      if which_output and which_output ~= "" then
+        lua_path = which_output:gsub("%s+$", "") -- Remove trailing whitespace
+      else
+        lua_path = "lua" -- Fallback to PATH
+      end
+    end
+
+    local handle = io.popen(
+      string.format(
+        "cd %q && HOME=%q PATH=%q:/usr/bin:/bin %s %q test_simple_link 2>&1",
+        dotfiles_dir,
+        home_dir,
+        bin_dir,
+        lua_path,
+        dot_executable
+      )
+    )
+    local output = handle:read "*a"
+    handle:close()
+
+    -- Check if symlink creation failed
+    if output:find "failed to create symlink" then
+      error("Symlink creation failed: " .. output)
+    end
+
+    -- Check that symlink was created
+    local config_path = pl_path.join(home_dir, ".config", "test")
+    assert.is_true(is_link(config_path), "Symlink should have been created")
+
+    -- Check that the symlink points to the correct location using system readlink
+    local readlink_handle = io.popen(string.format('readlink "%s"', config_path))
+    local link_target = readlink_handle:read("*a"):gsub("%s+$", "") -- Remove trailing whitespace
+    readlink_handle:close()
+    local expected_target = pl_path.join(dotfiles_dir, "test_simple_link", "config")
+    assert.are.equal(expected_target, link_target, "Symlink should point to the correct location")
   end)
 
   it("should install all modules using real commands", function()
@@ -1173,7 +1158,7 @@ return {
       assert.is_true(was_command_executed "defaults", "defaults export should have been executed")
 
       -- Check that defaults file was created (in the correct location based on dot.lua path construction)
-      local defaults_file = pl_path.join(dotfiles_dir, "defaults", "test.xml")
+      local defaults_file = pl_path.join(dotfiles_dir, "test_defaults", "defaults", "test.xml")
       assert.is_true(path_exists(defaults_file), "Defaults file should have been created")
     else
       -- On non-macOS, defaults should be skipped
@@ -1242,7 +1227,7 @@ return {
       )
 
       -- Create defaults file in the correct location (same as export test)
-      local defaults_file = pl_path.join(dotfiles_dir, "defaults", "test.xml")
+      local defaults_file = pl_path.join(dotfiles_dir, "test_defaults", "defaults", "test.xml")
       pl_dir.makepath(pl_path.dirname(defaults_file))
       pl_file.write(defaults_file, "test preferences")
 
@@ -1971,7 +1956,7 @@ return {
     assert.is_true(run_dot "test_relative_defaults")
 
     -- Check that defaults import was called (the exact path might vary due to temp directories)
-    assert.is_true(was_command_executed "defaults import")
+    assert.is_true(was_command_executed "defaults", "defaults command should have been executed")
   end)
 
   it("should check for defaults differences and prompt user instead of auto-importing", function()

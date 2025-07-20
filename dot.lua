@@ -112,10 +112,22 @@ end
 
 -- Execute an OS command and return exit code and output
 local function execute(cmd)
-  -- For ln commands, don't capture output at all
+  -- For ln commands, capture error output to debug failures
   if cmd:match "^ln " then
-    local exit_code = os.execute(cmd .. " > /dev/null 2>&1")
-    return exit_code, ""
+    local handle = io.popen(cmd .. " 2>&1; echo $?")
+    if not handle then
+      return 1, "Failed to execute command"
+    end
+    local result = handle:read "*a"
+    handle:close()
+    local lines = {}
+    for line in result:gmatch "[^\r\n]+" do
+      table.insert(lines, line)
+    end
+    local exit_code = tonumber(lines[#lines])
+    table.remove(lines)
+    local output = table.concat(lines, "\n")
+    return exit_code, output
   end
 
   local handle = io.popen(cmd .. " 2>&1; echo $?")
@@ -254,6 +266,7 @@ local function ensure_parent_directory(path)
     local cmd = string.format('mkdir -p "%s"', parent)
     local exit_code, output = execute(cmd)
     if exit_code ~= 0 then
+      print_message("error", "Failed to create parent directory: " .. output)
       return false, "Failed to create parent directory: " .. output
     end
   end
