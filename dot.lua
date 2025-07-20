@@ -492,8 +492,8 @@ local function process_install(config)
         if trimmed_line ~= "" then
           -- For install commands, use os.execute to handle interactive prompts properly
           print_message("info", "install → running: " .. trimmed_line)
-          local exit_code = os.execute(trimmed_line)
-          if exit_code ~= 0 then
+          local result = os.execute(trimmed_line)
+          if result ~= true then
             print_message("error", "install → failed")
             all_succeeded = false
             break
