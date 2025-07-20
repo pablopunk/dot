@@ -799,46 +799,68 @@ local function process_tool(tool_name, options)
     end
 
     -- Check if the requested profile exists
-    if not profiles[tool_name] then
-      print_message("error", "Profile not found: " .. tool_name)
-      print_message("info", "Available profiles:")
-      for profile_name, _ in pairs(profiles) do
-        print_message("info", "  " .. profile_name)
+    if profiles[tool_name] then
+      local profile = profiles[tool_name]
+      if not profile then
+        print_message("error", "Invalid profile structure: profile should be a list of modules")
+        return false
       end
-      return false
-    end
 
-    local profile = profiles[tool_name]
-    if not profile then
-      print_message("error", "Invalid profile structure: profile should be a list of modules")
-      return false
-    end
+      local modules_to_process = {}
+      local exclusions = {}
 
-    local modules_to_process = {}
-    local exclusions = {}
-
-    for _, module_name in ipairs(profile) do
-      if module_name:sub(1, 1) == "!" then
-        table.insert(exclusions, module_name:sub(2))
-      elseif module_name == "*" then
-        local all_modules = get_all_modules()
-        for _, module in ipairs(all_modules) do
-          modules_to_process[module] = true
+      for _, module_name in ipairs(profile) do
+        if module_name:sub(1, 1) == "!" then
+          table.insert(exclusions, module_name:sub(2))
+        elseif module_name == "*" then
+          local all_modules = get_all_modules()
+          for _, module in ipairs(all_modules) do
+            modules_to_process[module] = true
+          end
+        else
+          modules_to_process[module_name] = true
         end
+      end
+
+      for module_name in pairs(modules_to_process) do
+        if not should_exclude(module_name, exclusions) then
+          process_module(module_name, options)
+        end
+      end
+
+      return true
+    else
+      -- Profile not found, try fuzzy matching for module
+      local matches = find_modules_fuzzy(tool_name)
+
+      if #matches == 1 then
+        -- Exact fuzzy match found
+        process_module(matches[1], options)
+        return true
+      elseif #matches > 1 then
+        print_message("error", "Multiple modules match '" .. tool_name .. "':")
+        for _, match in ipairs(matches) do
+          print_message("info", "  " .. match)
+        end
+        return false
       else
-        modules_to_process[module_name] = true
+        -- Check for exact module path
+        local module_path = tool_name .. "/dot.lua"
+        if is_file(module_path) then
+          process_module(tool_name, options)
+          return true
+        else
+          print_message("error", "Profile not found: " .. tool_name)
+          print_message("info", "Available profiles:")
+          for profile_name, _ in pairs(profiles) do
+            print_message("info", "  " .. profile_name)
+          end
+          return false
+        end
       end
     end
-
-    for module_name in pairs(modules_to_process) do
-      if not should_exclude(module_name, exclusions) then
-        process_module(module_name, options)
-      end
-    end
-
-    return true
   else
-    -- Try fuzzy matching for module
+    -- No profiles.lua file, try fuzzy matching for module
     local matches = find_modules_fuzzy(tool_name)
 
     if #matches == 1 then
