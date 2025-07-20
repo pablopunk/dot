@@ -189,7 +189,7 @@ if [ -f "%s/$1" ]; then
   echo "%s/$1"
   exit 0
 else
-  exit 1
+  /usr/bin/which "$1" 2>/dev/null || exit 1
 fi
 ]],
       bin_dir,
@@ -244,6 +244,17 @@ echo "COMMAND_EXECUTED: mkdir $@" >> %q
     pl_file.write(pl_path.join(bin_dir, "fake_mkdir"), mkdir_script)
     os.execute(string.format("chmod +x %q", pl_path.join(bin_dir, "fake_mkdir")))
 
+    -- Create a real mkdir command that actually works
+    local real_mkdir_script = string.format(
+      [[#!/bin/sh
+echo "COMMAND_EXECUTED: mkdir $@" >> %q
+/bin/mkdir "$@"
+]],
+      command_log_file
+    )
+    pl_file.write(pl_path.join(bin_dir, "mkdir"), real_mkdir_script)
+    os.execute(string.format("chmod +x %q", pl_path.join(bin_dir, "mkdir")))
+
     local ln_script = string.format(
       [[#!/bin/sh
 echo "COMMAND_EXECUTED: ln $@" >> %q
@@ -254,6 +265,17 @@ echo "COMMAND_EXECUTED: ln $@" >> %q
     )
     pl_file.write(pl_path.join(bin_dir, "fake_ln"), ln_script)
     os.execute(string.format("chmod +x %q", pl_path.join(bin_dir, "fake_ln")))
+
+    -- Create a real ln command that actually works
+    local real_ln_script = string.format(
+      [[#!/bin/sh
+echo "COMMAND_EXECUTED: ln $@" >> %q
+/bin/ln "$@"
+]],
+      command_log_file
+    )
+    pl_file.write(pl_path.join(bin_dir, "ln"), real_ln_script)
+    os.execute(string.format("chmod +x %q", pl_path.join(bin_dir, "ln")))
 
     local echo_script = string.format(
       [[#!/bin/sh

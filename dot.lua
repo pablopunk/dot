@@ -114,12 +114,14 @@ end
 local function execute(cmd)
   -- For ln commands, don't capture output at all
   if cmd:match "^ln " then
-    print("DEBUG: Found ln command: " .. cmd)
     local exit_code = os.execute(cmd .. " > /dev/null 2>&1")
     return exit_code, ""
   end
 
   local handle = io.popen(cmd .. " 2>&1; echo $?")
+  if not handle then
+    return 1, "Failed to execute command"
+  end
   local result = handle:read "*a"
   handle:close()
   local lines = {}
@@ -678,9 +680,7 @@ local function handle_links(config, module_dir, options)
         end
 
         local cmd = string.format('ln -sf "%s" "%s"', source, output)
-        print("DEBUG: Executing command: " .. cmd)
         local exit_code, error_output = execute(cmd)
-        print("DEBUG: Command output: " .. (error_output or "nil"))
         if exit_code ~= 0 then
           print_message("error", "link → failed to create symlink: " .. error_output)
         else
