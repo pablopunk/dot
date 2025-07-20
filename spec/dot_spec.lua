@@ -2054,16 +2054,18 @@ return {
     pl_dir.makepath(pl_path.join(dotfiles_dir, "test_os_array", "config"))
     pl_file.write(pl_path.join(dotfiles_dir, "test_os_array", "config", "test.conf"), "test config")
 
-    -- Run dot.lua for both modules
-    assert.is_true(run_dot "test_os_string")
-    assert.is_true(run_dot "test_os_array")
-
     -- Check that install commands were executed based on OS support
     local current_os = os_name()
     if current_os == "Darwin" then
       -- On macOS, both modules should work
-      assert.is_true(was_command_executed "fake_apt", "install command should have been executed for string OS")
-      assert.is_true(was_command_executed "fake_apt", "install command should have been executed for array OS")
+      assert.is_true(run_dot "test_os_string")
+      assert.is_true(run_dot "test_os_array")
+
+      -- Both should have executed the command
+      assert.is_true(
+        was_command_executed "fake_apt",
+        "install command should have been executed for both modules on macOS"
+      )
 
       -- Check that symlinks were created
       local config_path1 = pl_path.join(home_dir, ".config", "test_string")
@@ -2072,7 +2074,18 @@ return {
       assert.is_true(is_link(config_path2), "Symlink should have been created for array OS")
     elseif current_os == "Linux" then
       -- On Linux, only the array module should work
+      -- Clear command log before testing
+      pl_file.write(command_log_file, "")
+
+      -- Test string OS module (should be skipped)
+      assert.is_true(run_dot "test_os_string")
       assert.is_false(was_command_executed "fake_apt", "install command should not be executed for string OS on Linux")
+
+      -- Clear command log before testing array module
+      pl_file.write(command_log_file, "")
+
+      -- Test array OS module (should work)
+      assert.is_true(run_dot "test_os_array")
       assert.is_true(was_command_executed "fake_apt", "install command should have been executed for array OS")
 
       -- Check that only array symlink was created
