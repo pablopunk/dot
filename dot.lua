@@ -670,7 +670,7 @@ local function handle_links(config, module_dir, options)
           -- Copy source to output
           local success, err = copy_path(source, output)
           if success then
-            print_message("success", "link → copied " .. source_rel .. " to " .. output_pattern)
+            print_message("success", "link → " .. source_rel .. " → " .. output_pattern .. " (copied)")
           else
             print_message("error", "link → " .. err)
           end
@@ -683,7 +683,8 @@ local function handle_links(config, module_dir, options)
     else
       -- Normal installation: create symlink
       if is_symlink_correct(source, output) then
-        -- Link is already correct, do nothing (minimal output)
+        -- Link is already correct, show it
+        print_message("success", "link → " .. source_rel .. " → " .. output_pattern)
       else
         all_links_correct = false
         if attr then
@@ -713,7 +714,7 @@ local function handle_links(config, module_dir, options)
         if exit_code ~= 0 then
           print_message("error", "link → failed to create symlink: " .. error_output)
         else
-          print_message("success", "link → created symlink " .. output_pattern)
+          print_message("success", "link → " .. source_rel .. " → " .. output_pattern)
           link_happened = true
         end
       end
