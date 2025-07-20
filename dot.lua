@@ -123,8 +123,23 @@ local function execute(cmd)
   table.remove(lines)
   local output = table.concat(lines, "\n")
 
-  -- Show output transparently if there's any
-  if output ~= "" and not cmd:match "^test " and not cmd:match "^which " then
+  -- Show output transparently if there's any (but filter out debug info and brew output)
+  if
+    output ~= ""
+    and not cmd:match "^test "
+    and not cmd:match "^which "
+    and not cmd:match "^wc "
+    and not cmd:match "^du "
+    and not cmd:match "brew "
+    and not cmd:match "Warning:"
+    and not cmd:match "==>"
+    and not cmd:match "🍺"
+    and not cmd:match "Error:"
+    and not cmd:match "chown:"
+    and not cmd:match "installer:"
+    and not cmd:match "sudo:"
+    and not cmd:match "Please enter"
+  then
     print(output)
   end
 
@@ -190,13 +205,8 @@ local function is_symlink_correct(source, output)
   local cmd = string.format('readlink "%s"', output)
   local exit_code, link_target = execute(cmd)
   if exit_code == 0 then
-    local source_info = get_file_info(source)
-    local target_info = get_file_info(link_target)
-    return source_info
-      and target_info
-      and source_info.is_file == target_info.is_file
-      and source_info.is_dir == target_info.is_dir
-      and source_info.size == target_info.size
+    -- Just check if the symlink points to the source
+    return link_target == source
   end
   return false
 end
@@ -458,7 +468,7 @@ local function process_install(config)
           end
         end
       end
-      
+
       if all_succeeded then
         print_message("success", "install → completed")
         install_happened = true
@@ -493,15 +503,30 @@ local function process_defaults(config, options)
   local defaults_processed = false
 
   for app_id, plist_path in pairs(config.defaults) do
+    -- Handle both old format (table with plist/app keys) and new format (app_id = plist_path)
+    local actual_app_id = app_id
+    local actual_plist_path = plist_path
+
+    if type(plist_path) == "table" and plist_path.plist and plist_path.app then
+      -- Old format: { plist = "./file.xml", app = "com.example.app" }
+      actual_app_id = plist_path.app
+      actual_plist_path = plist_path.plist
+    end
+
     -- Make relative paths relative to current working directory
-    local full_plist_path = plist_path
-    if not full_plist_path:match "^/" then
-      full_plist_path = os.getenv "PWD" .. "/" .. plist_path:gsub("^./", "")
+    local full_plist_path = actual_plist_path or ""
+    if actual_plist_path and full_plist_path ~= "" and not full_plist_path:match "^/" then
+      full_plist_path = os.getenv "PWD" .. "/" .. full_plist_path:gsub("^./", "")
+    end
+
+    if not full_plist_path or full_plist_path == "" then
+      print_message("error", "defaults → invalid plist path for " .. actual_app_id)
+      goto continue
     end
 
     if options.defaults_export then
       -- Export defaults to plist file
-      print_message("info", "defaults → exporting " .. app_id .. " to " .. full_plist_path)
+      print_message("info", "defaults → exporting " .. actual_app_id .. " to " .. full_plist_path)
 
       -- Ensure parent directory exists
       local success, err = ensure_parent_directory(full_plist_path)
@@ -512,15 +537,15 @@ local function process_defaults(config, options)
 
       -- Determine output format based on file extension
       local format_flag = ""
-      if full_plist_path:match "%.xml$" then
+      if full_plist_path and full_plist_path:match "%.xml$" then
         format_flag = " -format xml1"
       end
 
-      local export_cmd = string.format('defaults export "%s" "%s"%s', app_id, full_plist_path, format_flag)
+      local export_cmd = string.format('defaults export "%s" "%s"%s', actual_app_id, full_plist_path, format_flag)
       local exit_code, output = execute(export_cmd)
 
       if exit_code == 0 then
-        print_message("success", "defaults → exported " .. app_id)
+        print_message("success", "defaults → exported " .. actual_app_id)
         defaults_processed = true
       else
         print_message("error", "defaults → export failed: " .. (output or "unknown error"))
@@ -532,13 +557,13 @@ local function process_defaults(config, options)
         goto continue
       end
 
-      print_message("info", "defaults → importing " .. app_id .. " from " .. full_plist_path)
+      print_message("info", "defaults → importing " .. actual_app_id .. " from " .. full_plist_path)
 
-      local import_cmd = string.format('defaults import "%s" "%s"', app_id, full_plist_path)
+      local import_cmd = string.format('defaults import "%s" "%s"', actual_app_id, full_plist_path)
       local exit_code, output = execute(import_cmd)
 
       if exit_code == 0 then
-        print_message("success", "defaults → imported " .. app_id)
+        print_message("success", "defaults → imported " .. actual_app_id)
         defaults_processed = true
       else
         print_message("error", "defaults → import failed: " .. (output or "unknown error"))
@@ -546,13 +571,13 @@ local function process_defaults(config, options)
     else
       -- Regular processing (import during normal dot run)
       if is_file(full_plist_path) then
-        print_message("info", "defaults → importing " .. app_id .. " from " .. full_plist_path)
+        print_message("info", "defaults → importing " .. actual_app_id .. " from " .. full_plist_path)
 
-        local import_cmd = string.format('defaults import "%s" "%s"', app_id, full_plist_path)
+        local import_cmd = string.format('defaults import "%s" "%s"', actual_app_id, full_plist_path)
         local exit_code, output = execute(import_cmd)
 
         if exit_code == 0 then
-          print_message("success", "defaults → imported " .. app_id)
+          print_message("success", "defaults → imported " .. actual_app_id)
           defaults_processed = true
         else
           print_message("error", "defaults → import failed: " .. (output or "unknown error"))
@@ -599,7 +624,7 @@ local function handle_links(config, module_dir, options)
           -- Copy source to output
           local success, err = copy_path(source, output)
           if success then
-            print_message("success", "link → copied " .. source .. " to " .. output)
+            print_message("success", "link → copied " .. source_rel .. " to " .. output_pattern)
           else
             print_message("error", "link → " .. err)
           end
@@ -642,7 +667,7 @@ local function handle_links(config, module_dir, options)
         if exit_code ~= 0 then
           print_message("error", "link → failed to create symlink: " .. error_output)
         else
-          print_message("success", "link → created symlink " .. output)
+          print_message("success", "link → created symlink " .. output_pattern)
           link_happened = true
         end
       end
