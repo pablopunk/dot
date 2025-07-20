@@ -33,17 +33,6 @@ curl -fsSL https://raw.githubusercontent.com/pablopunk/dot/main/install.sh | bas
 brew install pablopunk/brew/dot
 ```
 
-The curl installer will:
-- Detect your OS (macOS, Linux)
-- Install Lua if not present
-- Download and install the `dot` tool (or update if newer version available)
-- Add it to your PATH
-
-**To update the tool later, just run the installer again:**
-```bash
-curl -fsSL https://raw.githubusercontent.com/pablopunk/dot/main/install.sh | bash
-```
-
 ## Quick Start
 
 ```bash
