@@ -381,6 +381,10 @@ local function get_all_modules()
       end
     end
   end
+
+  -- Sort modules alphabetically
+  table.sort(modules)
+
   return modules
 end
 
@@ -478,7 +482,7 @@ local function process_install(config, options)
       handle:close()
       local exit_code = tonumber(result:match "(%d+)")
       if exit_code == 0 then
-        print_message("info", "install → already installed")
+        -- Don't print anything when already installed
         return false
       end
     end
@@ -621,7 +625,7 @@ local function process_defaults(config, options, module_dir)
             print_message("info", "  Use -e to export current settings to " .. full_plist_path)
             print_message("info", "  Use -i to import settings from " .. full_plist_path)
           else
-            print_message("info", "defaults → settings are up to date for " .. app_id)
+            -- Don't print anything when settings are up to date
           end
         else
           print_message("warning", "defaults → could not check current settings for " .. app_id)
@@ -683,8 +687,7 @@ local function handle_links(config, module_dir, options)
     else
       -- Normal installation: create symlink
       if is_symlink_correct(source, output) then
-        -- Link is already correct, show it
-        print_message("success", "link → " .. source_rel .. " → " .. output_pattern)
+        -- Link is already correct, don't show anything
       else
         all_links_correct = false
         if attr then
@@ -697,7 +700,7 @@ local function handle_links(config, module_dir, options)
               return false
             end
           else
-            print_message("error", "link → file already exists at " .. output .. ". Use -f to force.")
+            -- Don't print error when file exists, just return false
             return false
           end
         end
@@ -719,10 +722,6 @@ local function handle_links(config, module_dir, options)
         end
       end
     end
-  end
-
-  if all_links_correct and not options.unlink_mode then
-    -- Don't print anything for minimal output when nothing changed
   end
 
   return link_happened
@@ -747,20 +746,20 @@ end
 
 -- Process each module by installing dependencies and managing symlinks
 local function process_module(module_name, options)
-  print_section(module_name)
-
   local module_dir = module_name
   local dot_file = module_dir .. "/dot.lua"
 
   -- Load the dot.lua file
   local config_func, load_err = loadfile(dot_file)
   if not config_func then
+    print_section(module_name)
     print_message("error", "Error loading configuration: " .. load_err)
     return
   end
 
   local success, config = pcall(config_func)
   if not success or not config then
+    print_section(module_name)
     print_message("error", "Error executing configuration: " .. tostring(config))
     return
   end
@@ -789,6 +788,7 @@ local function process_module(module_name, options)
     end
 
     if not os_supported then
+      print_section(module_name)
       print_message("info", "Skipping module: not supported on " .. OS_NAME)
       return
     end
@@ -797,36 +797,45 @@ local function process_module(module_name, options)
   local install_happened = false
   local link_happened = false
   local defaults_happened = false
+  local any_output = false
 
   -- Process installation
   if process_install(config, options) then
     install_happened = true
+    any_output = true
   end
 
   -- Process links
   if handle_links(config, module_dir, options) then
     link_happened = true
+    any_output = true
   end
 
   -- Process defaults
   if process_defaults(config, options, module_dir) then
     defaults_happened = true
+    any_output = true
   end
 
   -- Run new hook system
   if install_happened or options.postinstall_mode then
     if config.postinstall then
       run_hook(config.postinstall, "postinstall")
+      any_output = true
     end
   end
 
   if link_happened or options.postlink_mode then
     if not options.unlink_mode and config.postlink then
       run_hook(config.postlink, "postlink")
+      any_output = true
     end
   end
 
-  print "" -- Add a blank line between modules
+  -- Show module name if nothing happened
+  if not any_output then
+    print_section(module_name)
+  end
 end
 
 -- Check if a module should be excluded
@@ -881,7 +890,14 @@ local function process_tool(tool_name, options)
         end
       end
 
+      -- Convert modules_to_process to an array and sort it
+      local modules_array = {}
       for module_name in pairs(modules_to_process) do
+        table.insert(modules_array, module_name)
+      end
+      table.sort(modules_array)
+      
+      for _, module_name in ipairs(modules_array) do
         if not should_exclude(module_name, exclusions) then
           process_module(module_name, options)
         end
