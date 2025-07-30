@@ -11,7 +11,7 @@ if ! [[ "$1" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
 fi
 
 # Check if git status is clean
-if ! git status --porcelain | grep -q '^[MADRCU]'; then
+if git status --porcelain | grep -q '^[MADRCU]'; then
   echo "Git status is not clean"
   exit 1
 fi
