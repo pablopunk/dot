@@ -47,7 +47,7 @@ Usage: dot [options] [module/profile]
 
 Options:
   -f                Force mode: replace existing configurations, backing them up to <config>.before-dot
-  --install         Force installation: skip check commands and run install commands directly
+  --install         Force installation: ignore install-lock and run installers again
   --version         Display the version of dot
 
   --unlink          Unlink mode: remove symlinks but keep the config files in their destination
@@ -466,68 +466,188 @@ local function run_hook(hook_script, hook_type)
   return true
 end
 
+-- Persistent lock file helpers -------------------------------------------------
+-- Path to lock file in user's cache directory (~/.cache/dot/lock.yaml)
+local function get_lock_file_path()
+  local home = os.getenv "HOME" or ""
+  local cache_dir = home .. "/.cache/dot"
+  -- ensure directory exists (best-effort)
+  os.execute(string.format('mkdir -p "%s" 2>/dev/null', cache_dir))
+  return cache_dir .. "/lock.yaml"
+end
+
+-- Load lock data into a table { profile = str, modules = { module = { install = { cmd = str } } } }
+local function load_lock_data()
+  local data = { profile = nil, modules = {} }
+  local path = get_lock_file_path()
+  local file = io.open(path, "r")
+  if file then
+    local current_module = nil
+    local in_install_section = false
+    local in_modules_section = false
+
+    for line in file:lines() do
+      local trimmed = line:match "^%s*(.-)%s*$"
+      if trimmed and trimmed ~= "" then
+        -- Count leading spaces to determine level
+        local leading_spaces = line:match "^(%s*)"
+        local space_count = #leading_spaces
+
+        if space_count == 0 then
+          -- Top level (profile or modules)
+          if trimmed == "modules:" then
+            in_modules_section = true
+            current_module = nil
+            in_install_section = false
+          else
+            local profile_name = trimmed:match "^profile:%s*(.+)$"
+            if profile_name then
+              data.profile = profile_name:match "^%s*(.-)%s*$" -- Trim whitespace
+            end
+          end
+        elseif space_count == 2 and in_modules_section then
+          -- Module level (2 spaces)
+          current_module = trimmed:gsub(":$", "")
+          data.modules[current_module] = data.modules[current_module] or {}
+          in_install_section = false
+        elseif space_count == 4 and trimmed == "install:" then
+          -- Install section (4 spaces)
+          in_install_section = true
+        elseif space_count == 6 and in_install_section then
+          -- Install command (6 spaces)
+          local cmd_name, cmd_str = trimmed:match "^%s*([^:]+):%s*(.+)$"
+          if cmd_name and cmd_str and current_module then
+            data.modules[current_module].install = data.modules[current_module].install or {}
+            data.modules[current_module].install[cmd_name] = cmd_str
+          end
+        end
+      end
+    end
+    file:close()
+  end
+  return data, path
+end
+
+-- Save lock data table back to disk in YAML format
+local function save_lock_data(data)
+  local path = get_lock_file_path()
+  local file = io.open(path, "w")
+  if not file then
+    return -- silently ignore write errors
+  end
+
+  -- Write profile if it exists
+  if data.profile then
+    file:write("profile: " .. data.profile .. "\n")
+  end
+
+  -- Write modules section
+  file:write "modules:\n"
+  for module, module_data in pairs(data.modules) do
+    file:write("  " .. module .. ":\n")
+    if module_data.install then
+      file:write "    install:\n"
+      for cmd_name, cmd_str in pairs(module_data.install) do
+        file:write("      " .. cmd_name .. ": " .. cmd_str .. "\n")
+      end
+    end
+  end
+  file:close()
+end
+
+-- Global lock data shared across modules
+local LOCK_DATA = load_lock_data()
+local CURRENT_PROFILE = nil
+
 -- Process new install system
-local function process_install(config, options)
+local function process_install(module_name, config, options)
   if not config.install then
     return false
   end
 
   local install_happened = false
 
-  -- Check if tool is already installed (if check field is provided and not forcing install)
-  if config.check and not options.force_install then
-    local handle = io.popen(config.check .. " >/dev/null 2>&1; echo $?")
-    if handle then
-      local result = handle:read "*a"
-      handle:close()
-      local exit_code = tonumber(result:match "(%d+)")
-      if exit_code == 0 then
-        -- Don't print anything when already installed
-        return false
-      end
-    end
-  elseif config.check and options.force_install then
-    print_message("info", "install → forcing installation (skipping check)")
+  -- Determine which install command will be used (first available)
+  local install_keys = {}
+  for k in pairs(config.install) do
+    table.insert(install_keys, k)
   end
+  table.sort(install_keys)
 
-  -- Find the first available command and run it
-  for cmd_name, cmd_line in pairs(config.install) do
+  local selected_cmd_name, selected_cmd_line
+  for _, cmd_name in ipairs(install_keys) do
+    local cmd_line = config.install[cmd_name]
     if command_exists(cmd_name) then
-      print_message("info", "install → using " .. cmd_name)
-
-      -- Handle multi-line commands
-      local cmd_lines = str_split(cmd_line, "\n")
-      cmd_lines = table_remove_empty(cmd_lines)
-
-      local all_succeeded = true
-      for _, line in ipairs(cmd_lines) do
-        local trimmed_line = str_trim(line)
-        if trimmed_line ~= "" then
-          -- For install commands, use os.execute to handle interactive prompts properly
-          print_message("info", "install → running: " .. trimmed_line)
-          local result = os.execute(trimmed_line)
-          if result ~= true then
-            print_message("error", "install → failed")
-            all_succeeded = false
-            break
-          end
-        end
-      end
-
-      if all_succeeded then
-        print_message("success", "install → completed")
-        install_happened = true
-      end
-      break -- Only use the first available package manager
+      selected_cmd_name = cmd_name
+      selected_cmd_line = cmd_line
+      break
     end
   end
 
-  if not install_happened then
+  if not selected_cmd_name then
     local available_cmds = {}
     for cmd_name, _ in pairs(config.install) do
       table.insert(available_cmds, cmd_name)
     end
-    print_message("warning", "install → no available commands from: " .. table.concat(available_cmds, ", "))
+    -- print_message("warning", "install → no available commands from: " .. table.concat(available_cmds, ", "))
+    return false
+  end
+
+  -- Flatten install string for lock comparison (use \n placeholder for multi-line)
+  local function normalize_cmd(cmd)
+    cmd = str_trim(cmd or "")
+    cmd = cmd:gsub("\n", " ")
+    return cmd
+  end
+
+  local selected_cmd_string = normalize_cmd(selected_cmd_line)
+
+  -- Get current profile name (or "default" if none)
+  local profile_name = CURRENT_PROFILE or "default"
+
+  -- Ensure module exists in lock data
+  LOCK_DATA.modules[module_name] = LOCK_DATA.modules[module_name] or {}
+  LOCK_DATA.modules[module_name].install = LOCK_DATA.modules[module_name].install or {}
+
+  -- Skip installation if lock says it's already installed with same command and not forcing install
+  if not options.force_install then
+    local stored_cmd = LOCK_DATA.modules[module_name].install[selected_cmd_name]
+    if stored_cmd and stored_cmd == selected_cmd_string then
+      -- Already installed, nothing to do
+      return false
+    end
+  end
+
+  -- If not forcing install and lock is missing or changed, we proceed.
+  if options.force_install then
+    print_message("info", "install → forcing installation (ignoring lock)")
+  end
+
+  -- Run installation using the selected command
+  print_message("info", "install → using " .. selected_cmd_name)
+  local cmd_lines = str_split(selected_cmd_line, "\n")
+  cmd_lines = table_remove_empty(cmd_lines)
+
+  local all_succeeded = true
+  for _, line in ipairs(cmd_lines) do
+    local trimmed_line = str_trim(line)
+    if trimmed_line ~= "" then
+      print_message("info", "install → running: " .. trimmed_line)
+      local result = os.execute(trimmed_line)
+      if result ~= true then
+        print_message("error", "install → failed")
+        all_succeeded = false
+        break
+      end
+    end
+  end
+
+  if all_succeeded then
+    print_message("success", "install → completed")
+    install_happened = true
+    -- Update lock file
+    LOCK_DATA.modules[module_name].install[selected_cmd_name] = selected_cmd_string
+    save_lock_data(LOCK_DATA)
   end
 
   return install_happened
@@ -800,7 +920,7 @@ local function process_module(module_name, options)
   local any_output = false
 
   -- Process installation
-  if process_install(config, options) then
+  if process_install(module_name, config, options) then
     install_happened = true
     any_output = true
   end
@@ -848,6 +968,26 @@ local function should_exclude(module_name, exclusions)
   return false
 end
 
+local function save_last_profile(profile_name)
+  local lock_data, path = load_lock_data()
+  lock_data.profile = profile_name
+  save_lock_data(lock_data)
+  -- Update the global LOCK_DATA to keep it in sync
+  LOCK_DATA = lock_data
+end
+
+local function get_last_profile()
+  local lock_data, path = load_lock_data()
+  return lock_data.profile
+end
+
+local function remove_last_profile()
+  local lock_data, path = load_lock_data()
+  lock_data.profile = nil
+  save_lock_data(lock_data)
+  return true
+end
+
 -- Process a single tool or profile
 local function process_tool(tool_name, options)
   local profiles_path = "profiles.lua"
@@ -874,6 +1014,12 @@ local function process_tool(tool_name, options)
         return false
       end
 
+      -- Save the profile to lock file
+      save_last_profile(tool_name)
+
+      -- Set current profile for lock tracking
+      CURRENT_PROFILE = tool_name
+
       local modules_to_process = {}
       local exclusions = {}
 
@@ -896,12 +1042,15 @@ local function process_tool(tool_name, options)
         table.insert(modules_array, module_name)
       end
       table.sort(modules_array)
-      
+
       for _, module_name in ipairs(modules_array) do
         if not should_exclude(module_name, exclusions) then
           process_module(module_name, options)
         end
       end
+
+      -- Clear current profile
+      CURRENT_PROFILE = nil
 
       return true
     else
@@ -976,50 +1125,6 @@ local function process_tool(tool_name, options)
   end
 end
 
-local function save_last_profile(profile_name)
-  local file_path = ".git/dot"
-  if not is_dir ".git" then
-    file_path = ".dot"
-  end
-  local file = io.open(file_path, "w")
-  if file then
-    file:write(profile_name)
-    file:close()
-  end
-end
-
-local function get_last_profile()
-  local file_path = ".git/dot"
-  if not is_dir ".git" then
-    file_path = ".dot"
-  end
-  local file = io.open(file_path, "r")
-  if file then
-    local profile_name = file:read "*a"
-    file:close()
-    return profile_name:match "^%s*(.-)%s*$" -- Trim whitespace
-  end
-  return nil
-end
-
-local function remove_last_profile()
-  local file_path = ".git/dot"
-  if not is_dir ".git" then
-    file_path = ".dot"
-  end
-  if is_file(file_path) then
-    local success, err = os.remove(file_path)
-    if not success then
-      print_message("error", "Failed to remove profile: " .. err)
-      return false
-    end
-    return true
-  end
-  return true
-end
-
-
-
 -- Main function
 local function main()
   local options = parse_args()
@@ -1030,8 +1135,6 @@ local function main()
     return
   end
 
-
-
   local tool_name = options.args[1]
 
   if not tool_name then
@@ -1041,27 +1144,20 @@ local function main()
       print_message("log", "dot <another-profile> # use another profile")
       print_message("log", "dot --remove-profile  # remove the current profile")
     end
-  else
-    local profiles_path = "profiles.lua"
-    if is_file(profiles_path) then
-      local profiles_func, load_err = loadfile(profiles_path)
-      if profiles_func then
-        local success, profiles = pcall(profiles_func)
-        if success and profiles and profiles[tool_name] then
-          save_last_profile(tool_name)
-        end
-      end
-    end
   end
 
   local success = true
 
   if tool_name then
+    -- Set current profile to nil for individual module processing
+    CURRENT_PROFILE = nil
     success = process_tool(tool_name, options)
     if success == false then
       os.exit(1)
     end
   else
+    -- Set current profile to nil for all modules processing
+    CURRENT_PROFILE = nil
     local modules = get_all_modules()
     if #modules == 0 then
       print_message("error", "no modules found")

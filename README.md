@@ -74,7 +74,6 @@ return {
     brew = "brew install neovim ripgrep",
     apt = "sudo apt install -y neovim ripgrep"
   },
-  check = "which nvim", -- Check if neovim is already installed
   link = {
     ["./config"] = "~/.config/nvim" -- link the whole directory or just one file, your choice
   }
@@ -98,31 +97,42 @@ return {
 
 In this example, if `brew` is available, it will use that. If not, it will try `apt`, then `yum`.
 
-#### Smart Installation with `check`
+#### Smart Installation
 
-To avoid reinstalling tools that are already installed, add a `check` field:
+`dot` keeps a lock file at `~/.cache/dot/lock.yaml` recording the **exact command** used to install each module. On the next run it will _only_ re-run the install step if:
+
+1. The module has never been installed before, or
+2. The stored install command changed (e.g. you added a new dependency), or
+3. You pass `--install` to force it.
+
+That means your package manager won't be invoked on every run, making `dot` much faster and your `dot.lua` definitions cleaner.
+
+The lock file also stores the last used profile for persistent behavior across sessions.
 
 ```lua
--- neovim/dot.lua
 return {
   install = {
     brew = "brew install neovim ripgrep",
-    apt = "sudo apt install -y neovim ripgrep"
+    apt  = "sudo apt install -y neovim ripgrep",
   },
-  check = "which nvim", -- Check if neovim is already installed
-  link = {
-    ["./config"] = "~/.config/nvim"
-  }
 }
 ```
 
-The `check` field specifies a command to verify if the tool is already installed. If the command succeeds, `dot` will skip the installation step.
+#### Multi-line Commands
 
-**Examples:**
-- `check = "which nvim && which rg"`
-- `check = "which git && which gh"`
-- `check = "node --version"`
-- `check = "which docker"`
+Install commands support multi-line syntax for complex installations:
+
+```lua
+return {
+  install = {
+    brew = [[
+      brew install neovim
+      brew install ripgrep
+      brew install fd
+    ]],
+  },
+}
+```
 
 ### Linking Files
 
@@ -242,6 +252,18 @@ return {
 - `"!module_name"`: Exclude a specific module and its submodules
 - `"module_name"`: Include a specific module
 
+#### Fuzzy Module Matching
+
+When specifying individual modules, `dot` supports fuzzy matching:
+
+```bash
+$ dot neovim    # Exact match
+$ dot nvim      # Fuzzy match for neovim
+$ dot st        # Matches test_startup_module, test_stats_module
+```
+
+If multiple modules match, all matching modules are installed.
+
 #### Persistent Profiles
 
 Profiles are remembered between runs:
@@ -306,10 +328,10 @@ $ dot -f neovim   # Force install the 'neovim' module
 ```
 
 ### Force Install Mode
-Skip `check` commands and run install commands directly:
+Ignore the install lock and run installers again:
 ```bash
-$ dot --install           # Force install all modules (skip checks)
-$ dot --install karabiner # Force install karabiner (skip checks)
+$ dot --install           # Force install all modules (ignore lock)
+$ dot --install karabiner # Force install karabiner (ignore lock)
 ```
 
 ### Unlink Mode
@@ -332,7 +354,7 @@ $ dot --postlink          # Run postlink hooks even if symlinks haven't changed
 
 ### Other Options
 ```bash
-$ dot --install           # Skip check commands and run install commands directly
+$ dot --install           # Force reinstall all modules (ignore lock)
 $ dot --remove-profile    # Remove the last used profile
 $ dot --version           # Show version
 $ dot -h                  # Show help

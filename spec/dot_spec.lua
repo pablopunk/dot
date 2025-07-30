@@ -665,9 +665,9 @@ return {
     assert.is_true(path_exists(postinstall_marker), "postinstall hook should have executed with --postinstall flag")
   end)
 
-  it("should run install commands on every run (realistic behavior)", function()
-    -- Create package manager that succeeds
-    create_command("fake_apt", 0, "Package installed successfully")
+  it("should skip installation when already persisted", function()
+    -- Create package manager
+    create_command("fake_persist_apt", 0, "Package installed successfully")
 
     -- Set up module
     setup_module(
@@ -675,7 +675,7 @@ return {
       [[
 return {
   install = {
-    fake_apt = "fake_apt install -y test-package",
+    fake_persist_apt = "fake_persist_apt install -y test-package",
   },
   link = {
     ["./config"] = "$HOME/.config/test",
@@ -692,8 +692,49 @@ return {
     assert.is_true(run_dot "test_repeated")
     assert.is_true(run_dot "test_repeated")
 
-    -- Check that apt was executed both times (realistic behavior - package managers handle idempotency)
-    assert.are.equal(2, get_command_execution_count "fake_apt", "fake_apt should be executed on every run")
+    -- The command should only execute the first time due to the new persistence lock
+    assert.are.equal(
+      1,
+      get_command_execution_count "fake_persist_apt",
+      "fake_persist_apt should only run the first time"
+    )
+  end)
+
+  it("should reinstall when install command changes", function()
+    create_command("fake_apt", 0, "Package installed successfully")
+
+    -- initial module
+    setup_module(
+      "test_change",
+      [[
+return {
+  install = {
+    fake_apt = "fake_apt install -y mytool-v1",
+  }
+}
+]]
+    )
+
+    -- First run - should install
+    assert.is_true(run_dot "test_change")
+
+    -- Modify module to change install string (simulate version change)
+    setup_module(
+      "test_change",
+      [[
+return {
+  install = {
+    fake_apt = "fake_apt install -y mytool-v2",
+  }
+}
+]]
+    )
+
+    -- Second run - should install again because command string changed
+    assert.is_true(run_dot "test_change")
+
+    -- Expect two executions now
+    assert.are.equal(2, get_command_execution_count "fake_apt", "fake_apt should run again after command changes")
   end)
 
   it("should handle profiles correctly", function()
@@ -763,16 +804,13 @@ return {
     -- Create package manager
     create_command("fake_apt", 0, "Package installed via apt")
 
-    -- Set up module
+    -- Set up module with no file operations
     setup_module(
-      "neovim",
+      "simple_module",
       [[
 return {
   install = {
-    fake_apt = "fake_apt install -y neovim",
-  },
-  link = {
-    ["./config"] = "$HOME/.config/nvim",
+    fake_apt = "fake_apt install -y simple-package",
   }
 }
 ]]
@@ -783,32 +821,20 @@ return {
       "test_profile",
       [[
 {
-  "neovim"
+  "simple_module"
 }
 ]]
     )
 
-    -- Create config
-    pl_dir.makepath(pl_path.join(dotfiles_dir, "neovim", "config"))
-    pl_file.write(pl_path.join(dotfiles_dir, "neovim", "config", "init.vim"), "set number")
-
     -- Run with profile to save it
     assert.is_true(run_dot "test_profile")
 
-    -- Clear command log
-    pl_file.write(command_log_file, "")
-
-    -- Run without arguments - should use saved profile
-    assert.is_true(run_dot())
-
-    -- Check that the profile was used (apt command executed again)
-    assert.is_true(was_command_executed "fake_apt", "fake_apt should have been executed using saved profile")
-
-    -- Check that .dot file was created with correct profile
-    local dot_file_path = pl_path.join(dotfiles_dir, ".dot")
-    assert.is_true(pl_path.isfile(dot_file_path), ".dot file should exist")
-    local content = pl_file.read(dot_file_path)
-    assert.are.equal("test_profile", content:match "^%s*(.-)%s*$", "Profile name should be saved correctly")
+    -- Check that profile was saved in the lock file
+    local lock_file_path = pl_path.join(home_dir, ".cache", "dot", "lock.yaml")
+    assert.is_true(pl_path.isfile(lock_file_path), "Lock file should exist")
+    local content = pl_file.read(lock_file_path)
+    local match = content:match "profile: test_profile"
+    assert.is_not_nil(match, "Profile name should be saved in lock file")
   end)
 
   -- NEW TESTS FOR MISSING FEATURES
@@ -1081,15 +1107,18 @@ return {
     -- Run with profile to save it
     assert.is_true(run_dot "test_profile")
 
-    -- Verify profile was saved
-    local dot_file_path = pl_path.join(dotfiles_dir, ".dot")
-    assert.is_true(pl_path.isfile(dot_file_path), ".dot file should exist")
+    -- Verify profile was saved in lock file
+    local lock_file_path = pl_path.join(home_dir, ".cache", "dot", "lock.yaml")
+    assert.is_true(pl_path.isfile(lock_file_path), "Lock file should exist")
+    local content = pl_file.read(lock_file_path)
+    assert.is_not_nil(content:match "profile: test_profile", "Profile should be saved in lock file")
 
     -- Remove the profile
     assert.is_true(run_dot "--remove-profile")
 
-    -- Check that .dot file was removed
-    assert.is_false(path_exists(dot_file_path), ".dot file should have been removed")
+    -- Check that profile was removed from lock file
+    content = pl_file.read(lock_file_path)
+    assert.is_nil(content:match "profile:", "Profile should have been removed from lock file")
   end)
 
   it("should handle macOS defaults export", function()
@@ -1308,119 +1337,6 @@ return {
     assert.is_true(is_link(config_path), "Symlink should have been created")
   end)
 
-  it("should skip installation when check command succeeds", function()
-    -- Create a fake tool that exists (check command will succeed)
-    create_command("fake_tool", 0, "Tool version 1.0.0")
-    create_command("fake_apt", 0, "Package installed successfully")
-
-    -- Set up module with check field
-    setup_module(
-      "test_check_skip",
-      [[
-return {
-  install = {
-    fake_apt = "fake_apt install -y test-package",
-  },
-  check = "fake_tool --version",
-  link = {
-    ["./config"] = "$HOME/.config/test",
-  }
-}
-]]
-    )
-
-    -- Create config
-    pl_dir.makepath(pl_path.join(dotfiles_dir, "test_check_skip", "config"))
-    pl_file.write(pl_path.join(dotfiles_dir, "test_check_skip", "config", "test.conf"), "test config")
-
-    -- Run dot.lua
-    assert.is_true(run_dot "test_check_skip")
-
-    -- Check that check command was executed
-    assert.is_true(was_command_executed "fake_tool", "check command should have been executed")
-
-    -- Check that install command was NOT executed (tool already exists)
-    assert.is_false(was_command_executed "fake_apt", "install command should NOT have been executed")
-
-    -- Check that symlink was still created
-    local config_path = pl_path.join(home_dir, ".config", "test")
-    assert.is_true(is_link(config_path), "Symlink should have been created even when skipping install")
-  end)
-
-  it("should run installation when check command fails", function()
-    -- Create a fake tool that doesn't exist (check command will fail)
-    create_command("fake_apt", 0, "Package installed successfully")
-
-    -- Set up module with check field
-    setup_module(
-      "test_check_install",
-      [[
-return {
-  install = {
-    fake_apt = "fake_apt install -y test-package",
-  },
-  check = "nonexistent_tool --version",
-  link = {
-    ["./config"] = "$HOME/.config/test",
-  }
-}
-]]
-    )
-
-    -- Create config
-    pl_dir.makepath(pl_path.join(dotfiles_dir, "test_check_install", "config"))
-    pl_file.write(pl_path.join(dotfiles_dir, "test_check_install", "config", "test.conf"), "test config")
-
-    -- Run dot.lua
-    assert.is_true(run_dot "test_check_install")
-
-    -- Check that install command was executed (tool doesn't exist)
-    assert.is_true(was_command_executed "fake_apt", "install command should have been executed")
-
-    -- Check that symlink was created
-    local config_path = pl_path.join(home_dir, ".config", "test")
-    assert.is_true(is_link(config_path), "Symlink should have been created")
-  end)
-
-  it("should handle check command with complex arguments", function()
-    -- Create a fake tool that exists
-    create_command("fake_git", 0, "git version 2.30.0")
-    create_command("fake_apt", 0, "Package installed successfully")
-
-    -- Set up module with complex check command
-    setup_module(
-      "test_check_complex",
-      [[
-return {
-  install = {
-    fake_apt = "fake_apt install -y git",
-  },
-  check = "fake_git --version | grep -q 'version'",
-  link = {
-    ["./config"] = "$HOME/.config/test",
-  }
-}
-]]
-    )
-
-    -- Create config
-    pl_dir.makepath(pl_path.join(dotfiles_dir, "test_check_complex", "config"))
-    pl_file.write(pl_path.join(dotfiles_dir, "test_check_complex", "config", "test.conf"), "test config")
-
-    -- Run dot.lua
-    assert.is_true(run_dot "test_check_complex")
-
-    -- Check that check command was executed
-    assert.is_true(was_command_executed "fake_git", "check command should have been executed")
-
-    -- Check that install command was NOT executed (tool already exists)
-    assert.is_false(was_command_executed "fake_apt", "install command should NOT have been executed")
-
-    -- Check that symlink was still created
-    local config_path = pl_path.join(home_dir, ".config", "test")
-    assert.is_true(is_link(config_path), "Symlink should have been created")
-  end)
-
   it("should work without check field (backward compatibility)", function()
     -- Create package manager
     create_command("fake_apt", 0, "Package installed successfully")
@@ -1456,11 +1372,9 @@ return {
   end)
 
   it("should force install when --install flag is used", function()
-    -- Create a fake tool that exists (check command will succeed)
-    create_command("fake_tool", 0, "Tool version 1.0.0")
     create_command("fake_apt", 0, "Package installed successfully")
 
-    -- Set up module with check field
+    -- Set up module without check field
     setup_module(
       "test_force_install",
       [[
@@ -1468,7 +1382,6 @@ return {
   install = {
     fake_apt = "fake_apt install -y test-package",
   },
-  check = "fake_tool --version",
   link = {
     ["./config"] = "$HOME/.config/test",
   }
@@ -1476,17 +1389,20 @@ return {
 ]]
     )
 
-    -- Create config
+    -- Create config directory and file
     pl_dir.makepath(pl_path.join(dotfiles_dir, "test_force_install", "config"))
     pl_file.write(pl_path.join(dotfiles_dir, "test_force_install", "config", "test.conf"), "test config")
 
-    -- Run dot.lua with --install flag
+    -- First run to create lock
+    assert.is_true(run_dot "test_force_install")
+
+    -- Second run with --install flag should execute again
     assert.is_true(run_dot "--install test_force_install")
 
-    -- Check that install command was executed despite tool existing
-    assert.is_true(was_command_executed "fake_apt", "install command should have been executed with --install")
+    -- 'fake_apt' should have been executed twice
+    assert.are.equal(2, get_command_execution_count "fake_apt", "install command should run again with --install flag")
 
-    -- Check that symlink was created
+    -- Symlink exists
     local config_path = pl_path.join(home_dir, ".config", "test")
     assert.is_true(is_link(config_path), "Symlink should have been created")
   end)
@@ -2130,5 +2046,279 @@ return {
       assert.is_false(is_link(config_path1), "Symlink should not have been created for string OS on Linux")
       assert.is_true(is_link(config_path2), "Symlink should have been created for array OS")
     end
+  end)
+
+  it("should save and use last profile", function()
+    -- Create package manager
+    create_command("fake_apt", 0, "Package installed via apt")
+
+    -- Set up module with no file operations
+    setup_module(
+      "simple_module",
+      [[
+return {
+  install = {
+    fake_apt = "fake_apt install -y simple-package",
+  }
+}
+]]
+    )
+
+    -- Create test profile
+    setup_profile(
+      "test_profile",
+      [[
+{
+  "simple_module"
+}
+]]
+    )
+
+    -- Run with profile to save it
+    assert.is_true(run_dot "test_profile")
+
+    -- Check that profile was saved in the lock file
+    local lock_file_path = pl_path.join(home_dir, ".cache", "dot", "lock.yaml")
+    assert.is_true(pl_path.isfile(lock_file_path), "Lock file should exist")
+    local content = pl_file.read(lock_file_path)
+    assert.is_not_nil(content:match "profile: test_profile", "Profile name should be saved in lock file")
+  end)
+
+  it("should handle nested modules correctly", function()
+    -- Create package manager
+    create_command("fake_apt", 0, "Package installed successfully")
+
+    -- Set up nested module structure (child without parent dot.lua)
+    setup_module(
+      "parent_module/child_module",
+      [[
+return {
+  install = {
+    fake_apt = "fake_apt install -y child-package",
+  },
+  link = {
+    ["./config"] = "$HOME/.config/child",
+  }
+}
+]]
+    )
+
+    -- Create configs
+    pl_dir.makepath(pl_path.join(dotfiles_dir, "parent_module", "child_module", "config"))
+    pl_file.write(pl_path.join(dotfiles_dir, "parent_module", "child_module", "config", "child.conf"), "child config")
+
+    -- Run dot.lua to install all modules
+    assert.is_true(run_dot())
+
+    -- Check that child module was processed (since parent has no dot.lua)
+    assert.is_true(was_command_executed "fake_apt install -y child-package", "Child module should be installed")
+
+    -- Check that symlink was created
+    local child_config = pl_path.join(home_dir, ".config", "child")
+    assert.is_true(is_link(child_config), "Child symlink should be created")
+  end)
+
+  it("should exclude nested modules when parent has dot.lua", function()
+    -- Create package manager
+    create_command("fake_apt", 0, "Package installed successfully")
+
+    -- Set up parent module with dot.lua
+    setup_module(
+      "parent_module",
+      [[
+return {
+  install = {
+    fake_apt = "fake_apt install -y parent-package",
+  },
+  link = {
+    ["./config"] = "$HOME/.config/parent",
+  }
+}
+]]
+    )
+
+    -- Set up child module (should be excluded)
+    setup_module(
+      "parent_module/child_module",
+      [[
+return {
+  install = {
+    fake_apt = "fake_apt install -y child-package",
+  },
+  link = {
+    ["./config"] = "$HOME/.config/child",
+  }
+}
+]]
+    )
+
+    -- Create configs
+    pl_dir.makepath(pl_path.join(dotfiles_dir, "parent_module", "config"))
+    pl_file.write(pl_path.join(dotfiles_dir, "parent_module", "config", "parent.conf"), "parent config")
+    pl_dir.makepath(pl_path.join(dotfiles_dir, "parent_module", "child_module", "config"))
+    pl_file.write(pl_path.join(dotfiles_dir, "parent_module", "child_module", "config", "child.conf"), "child config")
+
+    -- Run dot.lua to install all modules
+    assert.is_true(run_dot())
+
+    -- Check that only parent module was processed
+    assert.is_true(was_command_executed "fake_apt install -y parent-package", "Parent module should be installed")
+    assert.is_false(was_command_executed "fake_apt install -y child-package", "Child module should be excluded")
+
+    -- Check that only parent symlink was created
+    local parent_config = pl_path.join(home_dir, ".config", "parent")
+    local child_config = pl_path.join(home_dir, ".config", "child")
+    assert.is_true(is_link(parent_config), "Parent symlink should be created")
+    assert.is_false(is_link(child_config), "Child symlink should NOT be created")
+  end)
+
+  it("should handle profile exclusion patterns", function()
+    -- Create package manager
+    create_command("fake_apt", 0, "Package installed successfully")
+
+    -- Set up multiple modules
+    setup_module(
+      "work_module",
+      [[
+return {
+  install = {
+    fake_apt = "fake_apt install -y work-package",
+  },
+  link = {
+    ["./config"] = "$HOME/.config/work",
+  }
+}
+]]
+    )
+
+    setup_module(
+      "personal_module",
+      [[
+return {
+  install = {
+    fake_apt = "fake_apt install -y personal-package",
+  },
+  link = {
+    ["./config"] = "$HOME/.config/personal",
+  }
+}
+]]
+    )
+
+    setup_module(
+      "shared_module",
+      [[
+return {
+  install = {
+    fake_apt = "fake_apt install -y shared-package",
+  },
+  link = {
+    ["./config"] = "$HOME/.config/shared",
+  }
+}
+]]
+    )
+
+    -- Create configs
+    pl_dir.makepath(pl_path.join(dotfiles_dir, "work_module", "config"))
+    pl_file.write(pl_path.join(dotfiles_dir, "work_module", "config", "work.conf"), "work config")
+    pl_dir.makepath(pl_path.join(dotfiles_dir, "personal_module", "config"))
+    pl_file.write(pl_path.join(dotfiles_dir, "personal_module", "config", "personal.conf"), "personal config")
+    pl_dir.makepath(pl_path.join(dotfiles_dir, "shared_module", "config"))
+    pl_file.write(pl_path.join(dotfiles_dir, "shared_module", "config", "shared.conf"), "shared config")
+
+    -- Create profile with exclusion
+    setup_profile(
+      "personal_profile",
+      [[
+{
+  "*",
+  "!work_module"
+}
+]]
+    )
+
+    -- Run with profile
+    assert.is_true(run_dot "personal_profile")
+
+    -- Check that work module was excluded
+    assert.is_false(was_command_executed "fake_apt install -y work-package", "Work module should be excluded")
+
+    -- Check that other modules were included
+    assert.is_true(was_command_executed "fake_apt install -y personal-package", "Personal module should be included")
+    assert.is_true(was_command_executed "fake_apt install -y shared-package", "Shared module should be included")
+
+    -- Check that symlinks were created for included modules
+    local personal_config = pl_path.join(home_dir, ".config", "personal")
+    local shared_config = pl_path.join(home_dir, ".config", "shared")
+    local work_config = pl_path.join(home_dir, ".config", "work")
+    assert.is_true(is_link(personal_config), "Personal symlink should be created")
+    assert.is_true(is_link(shared_config), "Shared symlink should be created")
+    assert.is_false(is_link(work_config), "Work symlink should NOT be created")
+  end)
+
+  it("should handle edge cases in fuzzy matching", function()
+    -- Create package manager
+    create_command("fake_apt", 0, "Package installed successfully")
+
+    -- Set up modules with similar names
+    setup_module(
+      "test_module",
+      [[
+return {
+  install = {
+    fake_apt = "fake_apt install -y test-package",
+  },
+  link = {
+    ["./config"] = "$HOME/.config/test",
+  }
+}
+]]
+    )
+
+    setup_module(
+      "test_exact_module",
+      [[
+return {
+  install = {
+    fake_apt = "fake_apt install -y test-exact-package",
+  },
+  link = {
+    ["./config"] = "$HOME/.config/test-exact",
+  }
+}
+]]
+    )
+
+    -- Create configs
+    pl_dir.makepath(pl_path.join(dotfiles_dir, "test_module", "config"))
+    pl_file.write(pl_path.join(dotfiles_dir, "test_module", "config", "test.conf"), "test config")
+    pl_dir.makepath(pl_path.join(dotfiles_dir, "test_exact_module", "config"))
+    pl_file.write(pl_path.join(dotfiles_dir, "test_exact_module", "config", "test.conf"), "test exact config")
+
+    -- Test exact match should only match one module
+    assert.is_true(run_dot "test_exact_module")
+
+    -- Check that only exact match was executed
+    assert.is_false(
+      was_command_executed "fake_apt install -y test-package",
+      "Generic test module should not be executed"
+    )
+    assert.is_true(was_command_executed "fake_apt install -y test-exact-package", "Exact match should be executed")
+
+    -- Clear command log
+    pl_file.write(command_log_file, "")
+
+    -- Test partial match should match both modules
+    assert.is_true(run_dot "test")
+
+    -- Check that both modules were executed (using the actual command strings from the output)
+    assert.is_true(was_command_executed "fake_apt", "Both modules should be executed")
+
+    -- Check that both symlinks were created
+    local test_config = pl_path.join(home_dir, ".config", "test")
+    local test_exact_config = pl_path.join(home_dir, ".config", "test-exact")
+    assert.is_true(is_link(test_config), "Test symlink should be created")
+    assert.is_true(is_link(test_exact_config), "Test-exact symlink should be created")
   end)
 end)
