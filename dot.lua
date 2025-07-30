@@ -173,6 +173,7 @@ local function execute(cmd)
     and not cmd:match "^find "
     and not cmd:match "find ."
     and not cmd:match "^readlink "
+    and not cmd:match "curl "
   then
     print(output)
   end
