@@ -28,9 +28,21 @@
 curl -fsSL https://raw.githubusercontent.com/pablopunk/dot/main/install.sh | bash
 ```
 
+To upgrade it:
+
+```bash
+$ dot --upgrade
+```
+
 **Option 2: Using Homebrew**
 ```bash
 brew install pablopunk/brew/dot
+```
+
+To upgrade it:
+
+```bash
+$ brew update && brew install dot
 ```
 
 ## Quick Start
@@ -356,6 +368,7 @@ $ dot --postlink          # Run postlink hooks even if symlinks haven't changed
 ```bash
 $ dot --install           # Force reinstall all modules (ignore lock)
 $ dot --remove-profile    # Remove the last used profile
+$ dot --upgrade           # Self-upgrade dot to the latest version
 $ dot --version           # Show version
 $ dot -h                  # Show help
 ```

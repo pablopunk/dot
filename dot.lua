@@ -12,7 +12,7 @@ local function parse_args()
   local defaults_export = false
   local defaults_import = false
   local remove_profile = false
-  local update_mode = false
+  local upgrade_mode = false
   local args = {}
 
   local i = 1
@@ -40,7 +40,8 @@ local function parse_args()
       postlink_mode = true
     elseif arg[i] == "--remove-profile" then
       remove_profile = true
-
+    elseif arg[i] == "--upgrade" then
+      upgrade_mode = true
     elseif arg[i] == "-h" then
       print [[
 Usage: dot [options] [module/profile]
@@ -58,6 +59,7 @@ Options:
   --postinstall     Run postinstall hooks even if dependencies haven't changed
   --postlink        Run postlink hooks even if symlinks haven't changed
   --remove-profile  Remove the last used profile
+  --upgrade         Self-upgrade dot to the latest version
   -h                Display this help message
 ]]
       os.exit(0)
@@ -76,6 +78,7 @@ Options:
     postinstall_mode = postinstall_mode,
     postlink_mode = postlink_mode,
     remove_profile = remove_profile,
+    upgrade_mode = upgrade_mode,
 
     args = args,
   }
@@ -1125,6 +1128,81 @@ local function process_tool(tool_name, options)
   end
 end
 
+-- Self-upgrade function
+local function perform_upgrade()
+  print_section "upgrade"
+  print_message("info", "Checking for updates...")
+
+  -- Get the current script path
+  local current_script = arg[0]
+  if not current_script or current_script == "" then
+    print_message("error", "Could not determine current script path")
+    return false
+  end
+
+  -- Resolve the full path
+  local cmd = string.format('readlink -f "%s"', current_script)
+  local exit_code, output = execute(cmd)
+  if exit_code ~= 0 then
+    print_message("error", "Could not resolve script path")
+    return false
+  end
+
+  local script_path = output:gsub("\n", "")
+
+  -- Check if the script is in ~/.local/bin (curl installation)
+  local home = os.getenv "HOME" or ""
+  local local_bin_path = home .. "/.local/bin/dot"
+
+  if script_path ~= local_bin_path then
+    print_message("warning", "Script is not in ~/.local/bin/dot")
+    print_message("info", "Current location: " .. script_path)
+    print_message("info", "Expected location: " .. local_bin_path)
+    print_message("info", "Upgrade only works for curl installations")
+    return false
+  end
+
+  print_message("info", "Downloading latest version...")
+
+  -- Download the latest version
+  local download_cmd = "curl -fsSL https://raw.githubusercontent.com/pablopunk/dot/main/dot.lua"
+  local exit_code, output = execute(download_cmd)
+  if exit_code ~= 0 then
+    print_message("error", "Failed to download latest version")
+    return false
+  end
+
+  -- Create a backup of the current version
+  local backup_path = script_path .. ".backup"
+  local backup_cmd = string.format('cp "%s" "%s"', script_path, backup_path)
+  local exit_code, _ = execute(backup_cmd)
+  if exit_code ~= 0 then
+    print_message("error", "Failed to create backup")
+    return false
+  end
+
+  -- Write the new version
+  local file = io.open(script_path, "w")
+  if not file then
+    print_message("error", "Failed to write new version")
+    return false
+  end
+
+  file:write(output)
+  file:close()
+
+  -- Make sure the file is executable
+  local chmod_cmd = string.format('chmod +x "%s"', script_path)
+  local exit_code, _ = execute(chmod_cmd)
+  if exit_code ~= 0 then
+    print_message("warning", "Failed to make script executable")
+  end
+
+  print_message("success", "dot upgraded successfully")
+  print_message("info", "Backup saved to: " .. backup_path)
+  return true
+end
+
 -- Main function
 local function main()
   local options = parse_args()
@@ -1132,6 +1210,14 @@ local function main()
   if options.remove_profile then
     remove_last_profile()
     print_message("info", "Profile removed.")
+    return
+  end
+
+  if options.upgrade_mode then
+    local success = perform_upgrade()
+    if not success then
+      os.exit(1)
+    end
     return
   end
 

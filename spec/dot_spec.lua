@@ -2321,4 +2321,79 @@ return {
     assert.is_true(is_link(test_config), "Test symlink should be created")
     assert.is_true(is_link(test_exact_config), "Test-exact symlink should be created")
   end)
+
+  it("should handle upgrade command", function()
+    -- Create fake curl command that returns a mock dot.lua content
+    local curl_script = string.format(
+      [[#!/bin/sh
+echo "COMMAND_EXECUTED: curl $@" >> %q
+echo "#!/usr/bin/env lua"
+echo ""
+echo "local version = '2.0.0'"
+echo ""
+echo "print('dot version ' .. version)"
+echo "os.exit(0)"
+]],
+      command_log_file
+    )
+    pl_file.write(pl_path.join(bin_dir, "curl"), curl_script)
+    os.execute(string.format("chmod +x %q", pl_path.join(bin_dir, "curl")))
+
+    -- Create fake readlink command that returns the expected path
+    local readlink_script = string.format(
+      [[#!/bin/sh
+echo "COMMAND_EXECUTED: readlink $@" >> %q
+echo "%s"
+]],
+      command_log_file,
+      dot_executable
+    )
+    pl_file.write(pl_path.join(bin_dir, "readlink"), readlink_script)
+    os.execute(string.format("chmod +x %q", pl_path.join(bin_dir, "readlink")))
+
+    -- Create fake cp command
+    local cp_script = string.format(
+      [[#!/bin/sh
+echo "COMMAND_EXECUTED: cp $@" >> %q
+/bin/cp "$@"
+]],
+      command_log_file
+    )
+    pl_file.write(pl_path.join(bin_dir, "cp"), cp_script)
+    os.execute(string.format("chmod +x %q", pl_path.join(bin_dir, "cp")))
+
+    -- Create fake chmod command
+    local chmod_script = string.format(
+      [[#!/bin/sh
+echo "COMMAND_EXECUTED: chmod $@" >> %q
+/bin/chmod "$@"
+]],
+      command_log_file
+    )
+    pl_file.write(pl_path.join(bin_dir, "chmod"), chmod_script)
+    os.execute(string.format("chmod +x %q", pl_path.join(bin_dir, "chmod")))
+
+    -- Run upgrade command
+    assert.is_true(run_dot "--upgrade")
+
+    -- Check that curl was executed to download the new version
+    assert.is_true(was_command_executed "curl", "curl should have been executed to download new version")
+
+    -- Check that readlink was executed to resolve script path
+    assert.is_true(was_command_executed "readlink", "readlink should have been executed to resolve script path")
+
+    -- Check that cp was executed to create backup
+    assert.is_true(was_command_executed "cp", "cp should have been executed to create backup")
+
+    -- Check that chmod was executed to make script executable
+    assert.is_true(was_command_executed "chmod", "chmod should have been executed to make script executable")
+
+    -- Check that backup file was created
+    local backup_file = dot_executable .. ".backup"
+    assert.is_true(path_exists(backup_file), "Backup file should have been created")
+
+    -- Check that the script was updated with new content
+    local script_content = pl_file.read(dot_executable)
+    assert.is_not_nil(script_content:match "version = '2.0.0'", "Script should have been updated with new version")
+  end)
 end)
