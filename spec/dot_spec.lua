@@ -2376,7 +2376,7 @@ echo "COMMAND_EXECUTED: chmod $@" >> %q
     -- Create the expected directory structure for upgrade
     local local_bin_dir = pl_path.join(home_dir, ".local", "bin")
     pl_dir.makepath(local_bin_dir)
-    
+
     -- Create a fake dot script in the expected location
     local expected_dot_path = pl_path.join(local_bin_dir, "dot")
     pl_file.write(expected_dot_path, "#!/usr/bin/env lua\nprint('fake dot')\n")
