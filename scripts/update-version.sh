@@ -33,8 +33,8 @@ git add dot.lua
 git checkout -b "$APP_VERSION"
 git commit -m "bump version to $APP_VERSION"
 git tag "$APP_VERSION"
-git push origin "$APP_VERSION"
-git push origin --tags
+git push
+git push --tags
 git checkout main
 git pull origin main
 
