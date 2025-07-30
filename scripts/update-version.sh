@@ -14,6 +14,9 @@ APP_VERSION="$1"
 
 git checkout -b "$APP_VERSION"
 
+# replace version in dot.lua
+sed -i '' "s/version = '.*'/version = '$APP_VERSION'/g" dot.lua
+
 git commit -m "bump version to $APP_VERSION"
 
 git tag "$APP_VERSION"
