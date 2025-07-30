@@ -21,9 +21,9 @@ APP_VERSION="$1"
 # replace version in dot.lua
 sed -i '' "s/version = \".*\"/version = \"$APP_VERSION\"/g" dot.lua
 
-# check if version was changed
-if ! git diff --quiet -- dot.lua; then
-  echo "Version was not changed"
+version=$(./dot.lua --version)
+if [ "$version" != "dot version $APP_VERSION" ]; then
+  echo "Version in dot.lua does not match $APP_VERSION"
   exit 1
 fi
 
