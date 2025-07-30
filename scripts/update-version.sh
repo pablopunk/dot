@@ -35,6 +35,8 @@ git commit -m "bump version to $APP_VERSION"
 git tag "$APP_VERSION"
 git push origin "$APP_VERSION"
 git push origin --tags
+git checkout main
+git pull origin main
 
 set +x
 
