@@ -25,7 +25,7 @@
 
 **Option 1: Using curl (installs Lua and dot)**
 ```bash
-curl -fsSL https://raw.githubusercontent.com/pablopunk/dot/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/pablopunk/dot/main/scripts/install.sh | bash
 ```
 
 To upgrade it:
