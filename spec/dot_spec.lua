@@ -2339,14 +2339,14 @@ echo "os.exit(0)"
     pl_file.write(pl_path.join(bin_dir, "curl"), curl_script)
     os.execute(string.format("chmod +x %q", pl_path.join(bin_dir, "curl")))
 
-    -- Create fake readlink command that returns the expected path
+    -- Create fake readlink command that returns the expected path for upgrade
     local readlink_script = string.format(
       [[#!/bin/sh
 echo "COMMAND_EXECUTED: readlink $@" >> %q
 echo "%s"
 ]],
       command_log_file,
-      dot_executable
+      home_dir .. "/.local/bin/dot"
     )
     pl_file.write(pl_path.join(bin_dir, "readlink"), readlink_script)
     os.execute(string.format("chmod +x %q", pl_path.join(bin_dir, "readlink")))
@@ -2373,6 +2373,15 @@ echo "COMMAND_EXECUTED: chmod $@" >> %q
     pl_file.write(pl_path.join(bin_dir, "chmod"), chmod_script)
     os.execute(string.format("chmod +x %q", pl_path.join(bin_dir, "chmod")))
 
+    -- Create the expected directory structure for upgrade
+    local local_bin_dir = pl_path.join(home_dir, ".local", "bin")
+    pl_dir.makepath(local_bin_dir)
+    
+    -- Create a fake dot script in the expected location
+    local expected_dot_path = pl_path.join(local_bin_dir, "dot")
+    pl_file.write(expected_dot_path, "#!/usr/bin/env lua\nprint('fake dot')\n")
+    os.execute(string.format("chmod +x %q", expected_dot_path))
+
     -- Run upgrade command
     assert.is_true(run_dot "--upgrade")
 
@@ -2389,11 +2398,11 @@ echo "COMMAND_EXECUTED: chmod $@" >> %q
     assert.is_true(was_command_executed "chmod", "chmod should have been executed to make script executable")
 
     -- Check that backup file was created
-    local backup_file = dot_executable .. ".backup"
+    local backup_file = expected_dot_path .. ".backup"
     assert.is_true(path_exists(backup_file), "Backup file should have been created")
 
     -- Check that the script was updated with new content
-    local script_content = pl_file.read(dot_executable)
+    local script_content = pl_file.read(expected_dot_path)
     assert.is_not_nil(script_content:match "version = '2.0.0'", "Script should have been updated with new version")
   end)
 end)
