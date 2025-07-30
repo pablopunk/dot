@@ -10,6 +10,12 @@ if ! [[ "$1" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
   exit 1
 fi
 
+# Check if we're on main
+if [ "$(git rev-parse --abbrev-ref HEAD)" != "main" ]; then
+  echo "Not on main branch"
+  exit 1
+fi
+
 # Check if git status is clean
 if git status --porcelain | grep -q '^[MADRCU]'; then
   echo "Git status is not clean"
@@ -30,13 +36,10 @@ fi
 set -x
 
 git add dot.lua
-git checkout -b "$APP_VERSION"
 git commit -m "bump version to $APP_VERSION"
 git tag "$APP_VERSION"
 git push
 git push --tags
-git checkout main
-git pull origin main
 
 set +x
 
