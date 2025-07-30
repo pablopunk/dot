@@ -2,13 +2,11 @@
 
 set -e # exit on error
 
-## APP_VERSION=0.9.11 gck -b "$APP_VERSION" && gcam "$APP_VERSION" && g tag "$APP_VERSION" && gp && gp --tags
-
 # check $1 if it's a valid version number
 if ! [[ "$1" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
   echo "Invalid version number"
   echo "Usage: $0 <version>"
-  echo "Example: $0 0.9.11"
+  echo "Example: $0 2.0.0"
   exit 1
 fi
 
