@@ -88,6 +88,25 @@ profiles:
       os: ["mac"]     # OS restrictions (mac/darwin, linux)
       defaults:       # macOS system defaults (macOS only)
         "com.apple.dock": "macos/dock.plist"
+        
+    # Recursive modules - organizational containers
+    cli:              # Group related tools
+      tools:
+        fzf:
+          install:
+            brew: "brew install fzf"
+            apt: "apt install -y fzf"
+          link:
+            "fzf/.fzfrc": "~/.fzfrc"
+        ripgrep:
+          install:
+            brew: "brew install ripgrep"
+            apt: "apt install -y ripgrep"
+      editors:
+        vim:
+          link:
+            "vim/.vimrc": "~/.vimrc"
+            "vim/.vim/": "~/.vim/"
 ```
 
 ### Special Profiles
@@ -117,6 +136,49 @@ profiles:
       install:
         brew: "brew install tool"
         apt: "apt install -y tool"
+```
+
+### Advanced Features
+
+#### Recursive Module Organization
+
+Group related components using nested structures:
+
+```yaml
+profiles:
+  "*":
+    development:
+      languages:
+        go:
+          install:
+            brew: "brew install go"
+            apt: "apt install -y golang"
+        node:
+          install:
+            brew: "brew install node"
+            apt: "apt install -y nodejs npm"
+      tools:
+        git:
+          link:
+            "git/.gitconfig": "~/.gitconfig"
+          install:
+            brew: "brew install git"
+            apt: "apt install -y git"
+```
+
+#### Fuzzy Search
+
+Install specific components by name without specifying profiles:
+
+```bash
+# Install any component matching "git"
+dot git
+
+# Install components matching multiple terms
+dot git vim
+
+# Cannot mix profiles and fuzzy search
+dot work git  # Error: cannot mix profile names with fuzzy search terms
 ```
 
 ## Usage
@@ -224,8 +286,8 @@ profiles:
 
 ### Hook Types
 
-- **`postinstall`**: Runs after package installation succeeds
-- **`postlink`**: Runs after symlink creation succeeds
+- **`postinstall`**: Runs only if package installation was executed and succeeded in the current run
+- **`postlink`**: Runs only if symlink creation was performed and succeeded in the current run
 
 ### Running Hooks Independently
 
@@ -280,11 +342,15 @@ dot maintains a state file at `~/.local/state/dot/lock.yaml` to track:
 - Active profiles
 - Link mappings
 - Hook execution status
+- Install commands used for each component
+- Uninstall commands for removed components
 
 This enables:
 - **Incremental updates**: Only install/link what's changed
 - **Automatic cleanup**: Remove components deleted from config
 - **State persistence**: Remember active profiles across runs
+- **Efficient linking**: Skip symlinks that already exist and point correctly
+- **Smart uninstalls**: Run uninstall commands for components removed from config
 
 ## Examples
 

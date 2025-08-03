@@ -113,13 +113,16 @@ profiles:
 
 ## 5. User Interaction
 
-- CLI interface with commands such as:
-  - `dot install` to install and link components.
-  - `dot uninstall` to uninstall removed components.
-  - `dot dry-run` to preview actions.
+- CLI interface with flags and commands such as:
+  - `dot` to install and link components.
+  - `dot --install` to force reinstall regardless of changes.
+  - `dot --uninstall` to uninstall removed components.
+  - `dot --dry-run [profiles]` to preview actions without making changes.
   - `dot --profiles` to list available profiles.
   - `dot --upgrade` to upgrade the tool.
   - `dot --remove-profile [profile]` to remove a profile from the active set.
+  - `dot --postinstall` to run only postinstall hooks.
+  - `dot --postlink` to run only postlink hooks.
 - Profiles:
   - The default profile `"*"` is always installed.
   - Named profiles are installed only if explicitly specified.
@@ -131,9 +134,9 @@ profiles:
   - `-v` or `--verbose` prints detailed info.
   - Default output is minimal, showing only modules being processed.
 - Install/uninstall behavior:
-  - By default, install only runs if files/configs differ from the last run.
+  - By default (`dot`), install only runs if files/configs differ from the last run.
   - Linking only runs if symlinks don't exist or don't point to the correct target.
-  - Uninstall runs only for components present in the lock file but removed from the repo, or if `--uninstall` is specified.
+  - Uninstall runs automatically for removed components, or explicitly with `--uninstall`.
   - `--install` forces reinstall and relinking regardless of changes.
 
 ## 6. Hooks
