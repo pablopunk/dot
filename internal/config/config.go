@@ -55,7 +55,6 @@ func (p Profile) GetComponents() ComponentMap {
 	return components
 }
 
-
 // extractComponents recursively traverses the profile structure to find components
 func extractComponents(value interface{}, path string, components ComponentMap) {
 	switch v := value.(type) {
@@ -115,7 +114,7 @@ func convertToComponent(m map[string]interface{}) (Component, error) {
 	if err != nil {
 		return Component{}, err
 	}
-	
+
 	var component Component
 	err = yaml.Unmarshal(data, &component)
 	return component, err
@@ -189,7 +188,7 @@ func (c *Component) MatchesOS(currentOS string) bool {
 // to better detect renames where the component functionality is the same
 func (c *Component) ContentHash() string {
 	h := sha256.New()
-	
+
 	// Sort and hash install commands
 	if len(c.Install) > 0 {
 		var installKeys []string
@@ -201,7 +200,7 @@ func (c *Component) ContentHash() string {
 			h.Write([]byte(fmt.Sprintf("install:%s:%s;", k, c.Install[k])))
 		}
 	}
-	
+
 	// Sort and hash uninstall commands
 	if len(c.Uninstall) > 0 {
 		var uninstallKeys []string
@@ -213,7 +212,7 @@ func (c *Component) ContentHash() string {
 			h.Write([]byte(fmt.Sprintf("uninstall:%s:%s;", k, c.Uninstall[k])))
 		}
 	}
-	
+
 	// Hash post-install and post-link hooks
 	if c.PostInstall != "" {
 		h.Write([]byte(fmt.Sprintf("postinstall:%s;", c.PostInstall)))
@@ -221,7 +220,7 @@ func (c *Component) ContentHash() string {
 	if c.PostLink != "" {
 		h.Write([]byte(fmt.Sprintf("postlink:%s;", c.PostLink)))
 	}
-	
+
 	// Sort and hash OS restrictions
 	if len(c.OS) > 0 {
 		osSlice := make([]string, len(c.OS))
@@ -231,7 +230,7 @@ func (c *Component) ContentHash() string {
 			h.Write([]byte(fmt.Sprintf("os:%s;", os)))
 		}
 	}
-	
+
 	// Sort and hash defaults
 	if len(c.Defaults) > 0 {
 		var defaultKeys []string
@@ -243,10 +242,10 @@ func (c *Component) ContentHash() string {
 			h.Write([]byte(fmt.Sprintf("defaults:%s:%s;", k, c.Defaults[k])))
 		}
 	}
-	
+
 	// NOTE: We intentionally exclude Link mapping from the hash because
 	// component moves/renames often involve path changes in links, but
 	// the core functionality (install commands, hooks) remains the same
-	
+
 	return fmt.Sprintf("%x", h.Sum(nil))
 }

@@ -24,12 +24,12 @@ func ColorEnabled() bool {
 	if runtime.GOOS == "windows" {
 		return os.Getenv("FORCE_COLOR") != ""
 	}
-	
+
 	// Check if output is a terminal
 	if os.Getenv("NO_COLOR") != "" {
 		return false
 	}
-	
+
 	// Enable colors by default on Unix-like systems
 	return true
 }

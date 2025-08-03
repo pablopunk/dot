@@ -10,7 +10,7 @@ func TestLoadConfig(t *testing.T) {
 	// Create a temporary config file
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "dot.yaml")
-	
+
 	configContent := `
 profiles:
   "*":
@@ -31,49 +31,49 @@ profiles:
         apt: "apt install -y docker.io"
       os: ["linux"]
 `
-	
+
 	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
 		t.Fatalf("Failed to write test config: %v", err)
 	}
-	
+
 	cfg, err := Load(configPath)
 	if err != nil {
 		t.Fatalf("Failed to load config: %v", err)
 	}
-	
+
 	// Test profiles exist
 	if len(cfg.Profiles) != 2 {
 		t.Errorf("Expected 2 profiles, got %d", len(cfg.Profiles))
 	}
-	
+
 	// Test default profile
 	defaultProfile, exists := cfg.Profiles["*"]
 	if !exists {
 		t.Error("Default profile '*' not found")
 	}
-	
+
 	defaultComponents := defaultProfile.GetComponents()
 	bashComponent, exists := defaultComponents["bash"]
 	if !exists {
 		t.Error("bash component not found in default profile")
 	}
-	
+
 	if len(bashComponent.Link) != 1 {
 		t.Errorf("Expected 1 link in bash component, got %d", len(bashComponent.Link))
 	}
-	
+
 	// Test work profile
 	workProfile, exists := cfg.Profiles["work"]
 	if !exists {
 		t.Error("work profile not found")
 	}
-	
+
 	workComponents := workProfile.GetComponents()
 	vpnComponent, exists := workComponents["vpn"]
 	if !exists {
 		t.Error("vpn component not found in work profile")
 	}
-	
+
 	if len(vpnComponent.OS) != 1 || vpnComponent.OS[0] != "mac" {
 		t.Errorf("Expected vpn component to have OS restriction 'mac', got %v", vpnComponent.OS)
 	}
@@ -126,16 +126,16 @@ profiles:
 			wantError: true,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tmpDir := t.TempDir()
 			configPath := filepath.Join(tmpDir, "dot.yaml")
-			
+
 			if err := os.WriteFile(configPath, []byte(tt.config), 0644); err != nil {
 				t.Fatalf("Failed to write test config: %v", err)
 			}
-			
+
 			_, err := Load(configPath)
 			if (err != nil) != tt.wantError {
 				t.Errorf("Load() error = %v, wantError %v", err, tt.wantError)
@@ -188,7 +188,7 @@ func TestComponentMatchesOS(t *testing.T) {
 			want:      true,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := tt.component.MatchesOS(tt.currentOS); got != tt.want {

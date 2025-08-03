@@ -20,20 +20,19 @@ type Manager struct {
 	linkManager     *link.Manager
 	execManager     *exec.Manager
 	defaultsManager *system.DefaultsManager
-	packageManagers map[string]system.PackageManager
 	verbose         bool
 	dryRun          bool
 }
 
 type InstallResult struct {
-	Component       profile.ComponentInfo
-	InstallResult   *exec.ExecResult
-	LinkResults     []link.LinkResult
+	Component         profile.ComponentInfo
+	InstallResult     *exec.ExecResult
+	LinkResults       []link.LinkResult
 	PostInstallResult *exec.ExecResult
-	PostLinkResult  *exec.ExecResult
-	DefaultsResults []system.DefaultsResult
-	Skipped         bool
-	Error           error
+	PostLinkResult    *exec.ExecResult
+	DefaultsResults   []system.DefaultsResult
+	Skipped           bool
+	Error             error
 }
 
 func NewManager(cfg *config.Config, baseDir string, verbose, dryRun bool) (*Manager, error) {
@@ -49,7 +48,6 @@ func NewManager(cfg *config.Config, baseDir string, verbose, dryRun bool) (*Mana
 		linkManager:     link.NewManager(baseDir, dryRun, verbose),
 		execManager:     exec.NewManager(dryRun, verbose),
 		defaultsManager: system.NewDefaultsManager(baseDir, dryRun, verbose),
-		packageManagers: system.DiscoverPackageManagers(),
 		verbose:         verbose,
 		dryRun:          dryRun,
 	}, nil
@@ -154,7 +152,7 @@ func (m *Manager) installComponent(comp profile.ComponentInfo, forceInstall bool
 	hasLinks := len(comp.Component.Link) > 0
 	// Check if any links need to be created/updated (only run linking if needed)
 	needsLinking := hasLinks && (forceInstall || m.linkManager.NeedsLinking(comp.Component.Link))
-	
+
 	// Check if defaults need updating (only on macOS)
 	hasDefaults := len(comp.Component.Defaults) > 0 && system.IsMacOS()
 	needsDefaults := false
@@ -188,7 +186,7 @@ func (m *Manager) installComponent(comp profile.ComponentInfo, forceInstall bool
 		if m.verbose {
 			fmt.Printf("   Installing packages for %s...\n", comp.FullName())
 		}
-		
+
 		commandName, command, available := system.GetFirstAvailableCommand(comp.Component.Install)
 		if !available {
 			result.Error = fmt.Errorf("no available command for component %s (tried: %v)", comp.FullName(), getCommandNames(comp.Component.Install))
@@ -286,7 +284,7 @@ func (m *Manager) installComponent(comp profile.ComponentInfo, forceInstall bool
 
 func (m *Manager) installComponentWithProgress(comp profile.ComponentInfo, forceInstall bool, progressManager *ui.ProgressManager) InstallResult {
 	result := InstallResult{Component: comp}
-	
+
 	// Create progress tracker for this component
 	progress := progressManager.NewComponentProgress(comp.ComponentName)
 
@@ -295,7 +293,7 @@ func (m *Manager) installComponentWithProgress(comp profile.ComponentInfo, force
 	hasLinks := len(comp.Component.Link) > 0
 	// Check if any links need to be created/updated (only run linking if needed)
 	needsLinking := hasLinks && (forceInstall || m.linkManager.NeedsLinking(comp.Component.Link))
-	
+
 	// Check if defaults need updating (only on macOS)
 	hasDefaults := len(comp.Component.Defaults) > 0 && system.IsMacOS()
 	needsDefaults := false
@@ -499,7 +497,7 @@ func (m *Manager) uninstallComponent(comp profile.ComponentInfo, componentState 
 				}
 			}
 		}
-		
+
 		// Clean up links
 		if len(componentState.Links) > 0 {
 			linkResults, err := m.linkManager.RemoveLinks(componentState.Links)
@@ -629,7 +627,7 @@ func (m *Manager) RunPostInstallHooks(activeProfiles []string, fuzzySearch strin
 			if m.verbose {
 				fmt.Printf("   Running postinstall hook for %s...\n", comp.FullName())
 			}
-			
+
 			postInstallResult := m.execManager.ExecuteShellCommand(comp.Component.PostInstall)
 			result.PostInstallResult = &postInstallResult
 
@@ -663,7 +661,7 @@ func (m *Manager) RunPostLinkHooks(activeProfiles []string, fuzzySearch string) 
 			if m.verbose {
 				fmt.Printf("   Running postlink hook for %s...\n", comp.FullName())
 			}
-			
+
 			postLinkResult := m.execManager.ExecuteShellCommand(comp.Component.PostLink)
 			result.PostLinkResult = &postLinkResult
 

@@ -257,9 +257,9 @@ func TestReset(t *testing.T) {
 	manager := &Manager{
 		lockFilePath: filepath.Join(tmpDir, "lock.yaml"),
 		lockFile: &LockFile{
-			Version:             LockFileVersion,
-			LastUpdated:         time.Now(),
-			ActiveProfiles:      []string{"work"},
+			Version:        LockFileVersion,
+			LastUpdated:    time.Now(),
+			ActiveProfiles: []string{"work"},
 			InstalledComponents: map[string]ComponentState{
 				"work.git": {
 					ProfileName:   "work",

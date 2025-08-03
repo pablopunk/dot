@@ -116,13 +116,13 @@ func TestProgressSectionAnimatedMode(t *testing.T) {
 
 	// Test lifecycle - these should not panic
 	section.Start()
-	
+
 	// Small delay to let spinner start
 	time.Sleep(10 * time.Millisecond)
-	
+
 	section.Update("Updated message")
 	time.Sleep(10 * time.Millisecond)
-	
+
 	section.Complete("Completed")
 
 	// Test failure case
@@ -145,7 +145,7 @@ func TestProgressSectionAnimatedMode(t *testing.T) {
 func TestNewComponentProgress(t *testing.T) {
 	pm := NewProgressManager(false)
 	componentName := "test-component"
-	
+
 	cp := pm.NewComponentProgress(componentName)
 	if cp == nil {
 		t.Fatal("NewComponentProgress() returned nil")
@@ -182,33 +182,33 @@ func TestComponentProgressLifecycle(t *testing.T) {
 
 			// Test complete lifecycle - these should not panic
 			cp.StartInstalling()
-			
+
 			if !tt.quiet {
 				time.Sleep(10 * time.Millisecond)
 			}
-			
+
 			cp.StartLinking()
-			
+
 			if !tt.quiet {
 				time.Sleep(10 * time.Millisecond)
 			}
-			
+
 			cp.StartPostHooks()
-			
+
 			if !tt.quiet {
 				time.Sleep(10 * time.Millisecond)
 			}
-			
+
 			cp.CompleteSuccess()
 
 			// Test failure case
 			cp2 := pm.NewComponentProgress("test-component-2")
 			cp2.StartInstalling()
-			
+
 			if !tt.quiet {
 				time.Sleep(10 * time.Millisecond)
 			}
-			
+
 			cp2.CompleteFailed(testError{})
 
 			// Test skip case
@@ -231,7 +231,7 @@ func TestComponentProgressPhases(t *testing.T) {
 	cp.StartInstalling()
 	time.Sleep(10 * time.Millisecond)
 
-	cp.StartLinking() 
+	cp.StartLinking()
 	time.Sleep(10 * time.Millisecond)
 
 	cp.StartPostHooks()
@@ -245,7 +245,7 @@ func TestMultipleSections(t *testing.T) {
 
 	// Create multiple sections
 	section1 := pm.NewSection("Section 1")
-	section2 := pm.NewSection("Section 2") 
+	section2 := pm.NewSection("Section 2")
 	section3 := pm.NewSection("Section 3")
 
 	if len(pm.sections) != 3 {
@@ -325,7 +325,7 @@ func TestComponentProgressErrors(t *testing.T) {
 		cp := pm.NewComponentProgress("test-component")
 		cp.StartInstalling()
 		cp.CompleteFailed(err) // Should not panic regardless of error type
-		
+
 		// Verify component name is preserved
 		if cp.component != "test-component" {
 			t.Errorf("Test %d: component name changed", i)
@@ -377,7 +377,7 @@ func TestEdgeCaseInputs(t *testing.T) {
 	section2.Start()
 	section2.Update(longStr)
 	section2.Complete(longStr)
-	
+
 	_ = section2 // Mark as used
 
 	pm.StopAll()

@@ -12,7 +12,7 @@
 
 - Support multiple profiles with components specifying installation, linking, and configuration.
 - Install software or tools using user-defined commands keyed by package manager/tool names (e.g., `brew`, `apt`).
-- Detect available package managers/tools by checking for their binaries (`which brew`, `which apt`), and use the first available command.
+- Detect user-specified binaries that are present on the system (`which brew`, `which apt`), and use the first available command.
 - Support OS restrictions for components: only install components matching the current OS (`mac`/`darwin` or `linux`). If no OS is specified, install on all.
 - Link configuration files/directories using `ln -s` without prompting or backing up existing files. Links are only created if they don't already exist or don't point to the correct target.
 - Run optional post-install and post-link shell commands.
@@ -60,7 +60,7 @@ profiles:
       install:
         brew: "brew install --cask spotify"
         apt: "snap install spotify"
-    
+
     # Example of recursive modules - 'cli' is an organizational container
     cli:
       tools:

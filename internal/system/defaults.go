@@ -22,25 +22,25 @@ func NewDefaultsManager(baseDir string, dryRun, verbose bool) *DefaultsManager {
 }
 
 type DefaultsResult struct {
-	AppID   string
+	AppID     string
 	PlistPath string
-	Action  string // "exported", "imported", "compared", "error", "skipped"
-	Changed bool
-	Error   error
+	Action    string // "exported", "imported", "compared", "error", "skipped"
+	Changed   bool
+	Error     error
 }
 
 func (dm *DefaultsManager) ExportDefaults(defaults map[string]string) ([]DefaultsResult, error) {
 	if !IsMacOS() {
 		return nil, fmt.Errorf("defaults operations are only supported on macOS")
 	}
-	
+
 	var results []DefaultsResult
-	
+
 	for appID, plistPath := range defaults {
 		result := dm.exportDefault(appID, plistPath)
 		results = append(results, result)
 	}
-	
+
 	return results, nil
 }
 
@@ -48,14 +48,14 @@ func (dm *DefaultsManager) ImportDefaults(defaults map[string]string) ([]Default
 	if !IsMacOS() {
 		return nil, fmt.Errorf("defaults operations are only supported on macOS")
 	}
-	
+
 	var results []DefaultsResult
-	
+
 	for appID, plistPath := range defaults {
 		result := dm.importDefault(appID, plistPath)
 		results = append(results, result)
 	}
-	
+
 	return results, nil
 }
 
@@ -63,24 +63,24 @@ func (dm *DefaultsManager) CompareDefaults(defaults map[string]string) ([]Defaul
 	if !IsMacOS() {
 		return nil, fmt.Errorf("defaults operations are only supported on macOS")
 	}
-	
+
 	var results []DefaultsResult
-	
+
 	for appID, plistPath := range defaults {
 		result := dm.compareDefault(appID, plistPath)
 		results = append(results, result)
 	}
-	
+
 	return results, nil
 }
 
 func (dm *DefaultsManager) exportDefault(appID, plistPath string) DefaultsResult {
 	resolvedPath := dm.resolvePlistPath(plistPath)
-	
+
 	if dm.verbose {
 		fmt.Printf("Exporting defaults for %s to %s\n", appID, resolvedPath)
 	}
-	
+
 	if dm.dryRun {
 		return DefaultsResult{
 			AppID:     appID,
@@ -88,7 +88,7 @@ func (dm *DefaultsManager) exportDefault(appID, plistPath string) DefaultsResult
 			Action:    "would_export",
 		}
 	}
-	
+
 	// Create parent directory if it doesn't exist
 	parentDir := filepath.Dir(resolvedPath)
 	if err := os.MkdirAll(parentDir, 0755); err != nil {
@@ -99,11 +99,11 @@ func (dm *DefaultsManager) exportDefault(appID, plistPath string) DefaultsResult
 			Error:     fmt.Errorf("failed to create parent directory: %w", err),
 		}
 	}
-	
+
 	// Export defaults using the defaults command
 	cmd := exec.Command("defaults", "export", appID, resolvedPath)
 	output, err := cmd.CombinedOutput()
-	
+
 	if err != nil {
 		return DefaultsResult{
 			AppID:     appID,
@@ -112,7 +112,7 @@ func (dm *DefaultsManager) exportDefault(appID, plistPath string) DefaultsResult
 			Error:     fmt.Errorf("defaults export failed: %w, output: %s", err, string(output)),
 		}
 	}
-	
+
 	return DefaultsResult{
 		AppID:     appID,
 		PlistPath: resolvedPath,
@@ -122,11 +122,11 @@ func (dm *DefaultsManager) exportDefault(appID, plistPath string) DefaultsResult
 
 func (dm *DefaultsManager) importDefault(appID, plistPath string) DefaultsResult {
 	resolvedPath := dm.resolvePlistPath(plistPath)
-	
+
 	if dm.verbose {
 		fmt.Printf("Importing defaults for %s from %s\n", appID, resolvedPath)
 	}
-	
+
 	// Check if plist file exists
 	if _, err := os.Stat(resolvedPath); os.IsNotExist(err) {
 		return DefaultsResult{
@@ -136,7 +136,7 @@ func (dm *DefaultsManager) importDefault(appID, plistPath string) DefaultsResult
 			Error:     fmt.Errorf("plist file does not exist: %s", resolvedPath),
 		}
 	}
-	
+
 	if dm.dryRun {
 		return DefaultsResult{
 			AppID:     appID,
@@ -144,11 +144,11 @@ func (dm *DefaultsManager) importDefault(appID, plistPath string) DefaultsResult
 			Action:    "would_import",
 		}
 	}
-	
+
 	// Import defaults using the defaults command
 	cmd := exec.Command("defaults", "import", appID, resolvedPath)
 	output, err := cmd.CombinedOutput()
-	
+
 	if err != nil {
 		return DefaultsResult{
 			AppID:     appID,
@@ -157,7 +157,7 @@ func (dm *DefaultsManager) importDefault(appID, plistPath string) DefaultsResult
 			Error:     fmt.Errorf("defaults import failed: %w, output: %s", err, string(output)),
 		}
 	}
-	
+
 	return DefaultsResult{
 		AppID:     appID,
 		PlistPath: resolvedPath,
@@ -167,11 +167,11 @@ func (dm *DefaultsManager) importDefault(appID, plistPath string) DefaultsResult
 
 func (dm *DefaultsManager) compareDefault(appID, plistPath string) DefaultsResult {
 	resolvedPath := dm.resolvePlistPath(plistPath)
-	
+
 	if dm.verbose {
 		fmt.Printf("Comparing defaults for %s with %s\n", appID, resolvedPath)
 	}
-	
+
 	// Check if plist file exists
 	if _, err := os.Stat(resolvedPath); os.IsNotExist(err) {
 		return DefaultsResult{
@@ -181,7 +181,7 @@ func (dm *DefaultsManager) compareDefault(appID, plistPath string) DefaultsResul
 			Error:     fmt.Errorf("plist file does not exist: %s", resolvedPath),
 		}
 	}
-	
+
 	// Export current defaults to a temporary file
 	tempFile, err := os.CreateTemp("", "dot-defaults-*.plist")
 	if err != nil {
@@ -194,7 +194,7 @@ func (dm *DefaultsManager) compareDefault(appID, plistPath string) DefaultsResul
 	}
 	defer os.Remove(tempFile.Name())
 	tempFile.Close()
-	
+
 	// Export current defaults
 	cmd := exec.Command("defaults", "export", appID, tempFile.Name())
 	if err := cmd.Run(); err != nil {
@@ -205,13 +205,13 @@ func (dm *DefaultsManager) compareDefault(appID, plistPath string) DefaultsResul
 			Error:     fmt.Errorf("failed to export current defaults: %w", err),
 		}
 	}
-	
+
 	// Compare files
 	cmd = exec.Command("diff", "-q", resolvedPath, tempFile.Name())
 	err = cmd.Run()
-	
+
 	changed := err != nil // diff returns non-zero exit code if files differ
-	
+
 	return DefaultsResult{
 		AppID:     appID,
 		PlistPath: resolvedPath,

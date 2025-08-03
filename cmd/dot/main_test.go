@@ -15,7 +15,7 @@ import (
 func TestApp_Run(t *testing.T) {
 	// Create a temporary directory for testing
 	tempDir := t.TempDir()
-	
+
 	// Create a test config file
 	configContent := `
 profiles:
@@ -33,7 +33,7 @@ profiles:
 	oldWd, _ := os.Getwd()
 	defer os.Chdir(oldWd)
 	os.Chdir(tempDir)
-	
+
 	// Set HOME to temp directory to avoid using existing state
 	originalHome := os.Getenv("HOME")
 	os.Setenv("HOME", tempDir)
@@ -91,7 +91,7 @@ profiles:
 			errContains: "only available on macOS",
 		},
 		{
-			name: "import defaults on non-macOS", 
+			name: "import defaults on non-macOS",
 			app: &App{
 				ImportDefaults: true,
 			},
@@ -124,12 +124,12 @@ profiles:
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Skip macOS-specific tests when running on macOS
-			if (strings.Contains(tt.name, "non-macOS") && runtime.GOOS == "darwin") {
+			if strings.Contains(tt.name, "non-macOS") && runtime.GOOS == "darwin" {
 				t.Skip("Skipping non-macOS test on macOS platform")
 			}
-			
+
 			err := tt.app.Run(tt.args)
-			
+
 			if tt.wantErr {
 				if err == nil {
 					t.Errorf("App.Run() expected error but got none")
@@ -140,7 +140,7 @@ profiles:
 				}
 				return
 			}
-			
+
 			if err != nil {
 				t.Errorf("App.Run() unexpected error = %v", err)
 			}
@@ -173,7 +173,7 @@ func TestApp_removeProfileCommand(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := app.removeProfileCommand(tt.profileName)
-			
+
 			if tt.wantErr {
 				if err == nil {
 					t.Errorf("removeProfileCommand() expected error but got none")
@@ -184,7 +184,7 @@ func TestApp_removeProfileCommand(t *testing.T) {
 				}
 				return
 			}
-			
+
 			if err != nil {
 				t.Errorf("removeProfileCommand() unexpected error = %v", err)
 			}
@@ -204,7 +204,7 @@ func TestUpgradeCommand(t *testing.T) {
 			wantErr: true, // Will fail because we can't actually download
 		},
 		{
-			name:    "quiet upgrade", 
+			name:    "quiet upgrade",
 			verbose: false,
 			wantErr: true, // Will fail because we can't actually download
 		},
@@ -213,7 +213,7 @@ func TestUpgradeCommand(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := upgradeCommand(tt.verbose)
-			
+
 			// We expect this to fail in tests since we can't actually download
 			if !tt.wantErr && err != nil {
 				t.Errorf("upgradeCommand() unexpected error = %v", err)
@@ -278,14 +278,14 @@ func TestApp_printResults(t *testing.T) {
 	os.Chdir(tempDir)
 
 	app := &App{Verbose: true}
-	
+
 	// This test mainly ensures the print functions don't crash
 	// We can't easily test output without complex stdout capturing
 	results := []component.InstallResult{} // Import will be needed
-	
+
 	// Test with empty results
 	app.printResults("Test", results)
-	
+
 	// Test summary results
 	app.printSummaryResults("Test", results)
 }
@@ -293,7 +293,7 @@ func TestApp_printResults(t *testing.T) {
 func TestApp_HookExecution(t *testing.T) {
 	// Create a temporary directory for testing
 	tempDir := t.TempDir()
-	
+
 	// Create a test config file with hooks
 	configContent := `
 profiles:
@@ -319,17 +319,17 @@ profiles:
 	oldWd, _ := os.Getwd()
 	defer os.Chdir(oldWd)
 	os.Chdir(tempDir)
-	
+
 	// Set HOME to temp directory to avoid using existing state
 	originalHome := os.Getenv("HOME")
 	os.Setenv("HOME", tempDir)
 	defer os.Setenv("HOME", originalHome)
 
 	tests := []struct {
-		name        string
-		app         *App
-		args        []string
-		wantErr     bool
+		name    string
+		app     *App
+		args    []string
+		wantErr bool
 	}{
 		{
 			name: "run postinstall hooks",
@@ -366,14 +366,14 @@ profiles:
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := tt.app.Run(tt.args)
-			
+
 			if tt.wantErr {
 				if err == nil {
 					t.Errorf("App.Run() expected error but got none")
 				}
 				return
 			}
-			
+
 			if err != nil {
 				t.Errorf("App.Run() unexpected error = %v", err)
 			}
@@ -412,9 +412,9 @@ func TestFlagParsing(t *testing.T) {
 			name: "multiple flags",
 			args: []string{"-v", "--dry-run", "--install"},
 			expected: map[string]bool{
-				"verbose":  true,
-				"dry-run":  true,
-				"install":  true,
+				"verbose": true,
+				"dry-run": true,
+				"install": true,
 			},
 		},
 		{
@@ -437,7 +437,7 @@ func TestFlagParsing(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Reset flag package state
 			flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
-			
+
 			// Redefine flags for this test
 			verbose := flag.Bool("v", false, "verbose output")
 			verboseLong := flag.Bool("verbose", false, "verbose output")
@@ -445,7 +445,7 @@ func TestFlagParsing(t *testing.T) {
 			install := flag.Bool("install", false, "force reinstall")
 			postinstall := flag.Bool("postinstall", false, "run only postinstall hooks")
 			postlink := flag.Bool("postlink", false, "run only postlink hooks")
-			
+
 			// Parse test args
 			os.Args = append([]string{"dot"}, tt.args...)
 			flag.Parse()
@@ -456,25 +456,25 @@ func TestFlagParsing(t *testing.T) {
 					t.Errorf("verbose flag = %v, want %v", (*verbose || *verboseLong), expected)
 				}
 			}
-			
+
 			if expected, exists := tt.expected["dry-run"]; exists {
 				if *dryRun != expected {
 					t.Errorf("dry-run flag = %v, want %v", *dryRun, expected)
 				}
 			}
-			
+
 			if expected, exists := tt.expected["install"]; exists {
 				if *install != expected {
 					t.Errorf("install flag = %v, want %v", *install, expected)
 				}
 			}
-			
+
 			if expected, exists := tt.expected["postinstall"]; exists {
 				if *postinstall != expected {
 					t.Errorf("postinstall flag = %v, want %v", *postinstall, expected)
 				}
 			}
-			
+
 			if expected, exists := tt.expected["postlink"]; exists {
 				if *postlink != expected {
 					t.Errorf("postlink flag = %v, want %v", *postlink, expected)

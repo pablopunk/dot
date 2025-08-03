@@ -43,7 +43,7 @@ func (m *Manager) GetActiveComponents(activeProfiles []string, fuzzySearch strin
 func (m *Manager) GetActiveComponentsWithSearchResult(activeProfiles []string, fuzzySearch string) (*SearchResult, error) {
 	var components []ComponentInfo
 	var unmatchedTerms []string
-	
+
 	// If fuzzy search is provided, track which terms match
 	var searchTerms []string
 	if fuzzySearch != "" {
@@ -51,18 +51,18 @@ func (m *Manager) GetActiveComponentsWithSearchResult(activeProfiles []string, f
 		unmatchedTerms = make([]string, len(searchTerms))
 		copy(unmatchedTerms, searchTerms)
 	}
-	
+
 	// Always include the "*" profile if it exists
 	if defaultProfile, exists := m.config.Profiles["*"]; exists {
 		profileComponents := defaultProfile.GetComponents()
-		
+
 		// Get sorted component paths to maintain consistent order
 		var paths []string
 		for componentPath := range profileComponents {
 			paths = append(paths, componentPath)
 		}
 		sort.Strings(paths)
-		
+
 		for _, componentPath := range paths {
 			component := profileComponents[componentPath]
 			if component.MatchesOS(m.currentOS) {
@@ -92,27 +92,27 @@ func (m *Manager) GetActiveComponentsWithSearchResult(activeProfiles []string, f
 			}
 		}
 	}
-	
+
 	// Add components from explicitly requested profiles
 	for _, profileName := range activeProfiles {
 		if profileName == "*" {
 			continue // Already handled above
 		}
-		
+
 		profile, exists := m.config.Profiles[profileName]
 		if !exists {
 			return nil, fmt.Errorf("profile '%s' not found", profileName)
 		}
-		
+
 		profileComponents := profile.GetComponents()
-		
+
 		// Get sorted component paths to maintain consistent order
 		var paths []string
 		for componentPath := range profileComponents {
 			paths = append(paths, componentPath)
 		}
 		sort.Strings(paths)
-		
+
 		for _, componentPath := range paths {
 			component := profileComponents[componentPath]
 			if component.MatchesOS(m.currentOS) {
@@ -142,7 +142,7 @@ func (m *Manager) GetActiveComponentsWithSearchResult(activeProfiles []string, f
 			}
 		}
 	}
-	
+
 	return &SearchResult{
 		Components:     components,
 		UnmatchedTerms: unmatchedTerms,
@@ -172,17 +172,17 @@ func (m *Manager) GetComponentsInProfile(profileName string) (config.ComponentMa
 
 func (m *Manager) FindComponentsByFuzzySearch(search string) []ComponentInfo {
 	var matches []ComponentInfo
-	
+
 	for profileName, profile := range m.config.Profiles {
 		profileComponents := profile.GetComponents()
-		
+
 		// Get sorted component paths to maintain consistent order
 		var paths []string
 		for componentPath := range profileComponents {
 			paths = append(paths, componentPath)
 		}
 		sort.Strings(paths)
-		
+
 		for _, componentPath := range paths {
 			component := profileComponents[componentPath]
 			if component.MatchesOS(m.currentOS) && m.matchesFuzzySearch(componentPath, search) {
@@ -194,7 +194,7 @@ func (m *Manager) FindComponentsByFuzzySearch(search string) []ComponentInfo {
 			}
 		}
 	}
-	
+
 	return matches
 }
 
@@ -202,32 +202,32 @@ func (m *Manager) matchesFuzzySearch(componentName, search string) bool {
 	if search == "" {
 		return true
 	}
-	
+
 	componentLower := strings.ToLower(componentName)
-	
+
 	// Split search into multiple terms
 	searchTerms := strings.Fields(strings.ToLower(search))
-	
+
 	// Check if component matches any of the search terms
 	for _, term := range searchTerms {
 		if m.matchesSingleTerm(componentLower, term) {
 			return true
 		}
 	}
-	
+
 	return false
 }
 
 // getMatchingTerm returns the first search term that matches the component, or empty string if none match
 func (m *Manager) getMatchingTerm(componentName string, searchTerms []string) string {
 	componentLower := strings.ToLower(componentName)
-	
+
 	for _, term := range searchTerms {
 		if m.matchesSingleTerm(componentLower, term) {
 			return term
 		}
 	}
-	
+
 	return ""
 }
 
@@ -236,12 +236,12 @@ func (m *Manager) matchesSingleTerm(componentName, searchTerm string) bool {
 	if componentName == searchTerm {
 		return true
 	}
-	
+
 	// Contains match
 	if strings.Contains(componentName, searchTerm) {
 		return true
 	}
-	
+
 	// Simple fuzzy matching - check if all characters of search appear in order
 	searchIdx := 0
 	for _, char := range componentName {
@@ -249,7 +249,7 @@ func (m *Manager) matchesSingleTerm(componentName, searchTerm string) bool {
 			searchIdx++
 		}
 	}
-	
+
 	return searchIdx == len(searchTerm)
 }
 

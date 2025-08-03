@@ -20,32 +20,32 @@ var version = "dev"
 
 func main() {
 	var (
-		listProfiles    = flag.Bool("profiles", false, "list available profiles")
-		upgrade         = flag.Bool("upgrade", false, "upgrade the tool")
-		version         = flag.Bool("version", false, "show version information")
-		removeProfile   = flag.String("remove-profile", "", "remove a profile from the active set")
-		verbose         = flag.Bool("v", false, "verbose output")
-		verboseLong     = flag.Bool("verbose", false, "verbose output")
-		dryRun          = flag.Bool("dry-run", false, "preview actions without making changes")
-		forceInstall    = flag.Bool("install", false, "force reinstall regardless of changes")
-		forceUninstall  = flag.Bool("uninstall", false, "uninstall components")
-		defaultsExport  = flag.Bool("defaults-export", false, "export macOS defaults to plist files")
+		listProfiles        = flag.Bool("profiles", false, "list available profiles")
+		upgrade             = flag.Bool("upgrade", false, "upgrade the tool")
+		version             = flag.Bool("version", false, "show version information")
+		removeProfile       = flag.String("remove-profile", "", "remove a profile from the active set")
+		verbose             = flag.Bool("v", false, "verbose output")
+		verboseLong         = flag.Bool("verbose", false, "verbose output")
+		dryRun              = flag.Bool("dry-run", false, "preview actions without making changes")
+		forceInstall        = flag.Bool("install", false, "force reinstall regardless of changes")
+		forceUninstall      = flag.Bool("uninstall", false, "uninstall components")
+		defaultsExport      = flag.Bool("defaults-export", false, "export macOS defaults to plist files")
 		defaultsExportShort = flag.Bool("e", false, "export macOS defaults to plist files")
-		defaultsImport  = flag.Bool("defaults-import", false, "import macOS defaults from plist files")
+		defaultsImport      = flag.Bool("defaults-import", false, "import macOS defaults from plist files")
 		defaultsImportShort = flag.Bool("i", false, "import macOS defaults from plist files")
-		runPostInstall  = flag.Bool("postinstall", false, "run only postinstall hooks")
-		runPostLink     = flag.Bool("postlink", false, "run only postlink hooks")
+		runPostInstall      = flag.Bool("postinstall", false, "run only postinstall hooks")
+		runPostLink         = flag.Bool("postlink", false, "run only postlink hooks")
 	)
-	
+
 	// Preprocess arguments to allow flexible flag/argument ordering
 	flags, positionalArgs := preprocessArgs(os.Args[1:])
-	
+
 	// Set os.Args to contain only the program name and flags for flag.Parse()
 	originalArgs := os.Args
 	os.Args = append([]string{os.Args[0]}, flags...)
-	
+
 	flag.Parse()
-	
+
 	// Restore os.Args after flag parsing
 	os.Args = originalArgs
 
@@ -104,21 +104,21 @@ func main() {
 func preprocessArgs(args []string) (flags []string, positional []string) {
 	flags = []string{}
 	positional = []string{}
-	
+
 	i := 0
 	for i < len(args) {
 		arg := args[i]
-		
+
 		// Handle -- separator (everything after is positional)
 		if arg == "--" {
 			positional = append(positional, args[i+1:]...)
 			break
 		}
-		
+
 		// Handle flags (start with -)
 		if len(arg) > 1 && arg[0] == '-' {
 			flags = append(flags, arg)
-			
+
 			// Handle flags with values (like --remove-profile value)
 			if i+1 < len(args) && len(arg) > 2 && arg[1] == '-' {
 				// Long flag, check if next arg is a value (doesn't start with -)
@@ -137,7 +137,7 @@ func preprocessArgs(args []string) (flags []string, positional []string) {
 		}
 		i++
 	}
-	
+
 	return flags, positional
 }
 
@@ -203,7 +203,7 @@ func (a *App) Run(args []string) error {
 	// Parse arguments - first check if they're profile names or fuzzy search
 	var foundProfiles []string
 	var foundFuzzyTerms []string
-	
+
 	for _, arg := range args {
 		if profileManager.ProfileExists(arg) {
 			foundProfiles = append(foundProfiles, arg)
@@ -211,12 +211,12 @@ func (a *App) Run(args []string) error {
 			foundFuzzyTerms = append(foundFuzzyTerms, arg)
 		}
 	}
-	
+
 	// Check if mixing profiles and fuzzy search terms
 	if len(foundProfiles) > 0 && len(foundFuzzyTerms) > 0 {
 		return fmt.Errorf("cannot mix profile names (%v) with fuzzy search terms (%v)", foundProfiles, foundFuzzyTerms)
 	}
-	
+
 	// Apply the results
 	if len(foundProfiles) > 0 {
 		activeProfiles = foundProfiles
@@ -230,7 +230,7 @@ func (a *App) Run(args []string) error {
 			fmt.Printf("🔍 Fuzzy search terms: %v\n", foundFuzzyTerms)
 		}
 	}
-	
+
 	// Check for unmatched fuzzy search terms and report errors
 	var unmatchedTerms []string
 	if fuzzySearch != "" {
@@ -239,7 +239,7 @@ func (a *App) Run(args []string) error {
 			return err
 		}
 		unmatchedTerms = result.UnmatchedTerms
-		
+
 		// Report unmatched terms as errors
 		for _, term := range unmatchedTerms {
 			fmt.Printf("❌ No components found matching '%s'\n", term)
@@ -255,7 +255,7 @@ func (a *App) Run(args []string) error {
 		activeProfiles = stateManager.GetActiveProfiles()
 		// profiles came from state, not user input
 		profilesFromUser = false
-		
+
 		if a.Verbose {
 			if len(activeProfiles) > 0 {
 				fmt.Printf("🔄 Loaded saved profiles from state: %s\n", strings.Join(activeProfiles, ", "))
@@ -294,7 +294,7 @@ func (a *App) Run(args []string) error {
 			}
 			fmt.Println()
 		}
-		
+
 		results, err := componentManager.RunPostInstallHooks(activeProfiles, fuzzySearch)
 		if err != nil {
 			return err
@@ -316,7 +316,7 @@ func (a *App) Run(args []string) error {
 			}
 			fmt.Println()
 		}
-		
+
 		results, err := componentManager.RunPostLinkHooks(activeProfiles, fuzzySearch)
 		if err != nil {
 			return err
@@ -353,7 +353,7 @@ func (a *App) Run(args []string) error {
 			fmt.Printf("   Dry run: enabled\n")
 		}
 		fmt.Println()
-		
+
 		// Use regular installation for verbose mode
 		var results []component.InstallResult
 		var err error
@@ -370,7 +370,7 @@ func (a *App) Run(args []string) error {
 		// Use animated progress for quiet mode
 		progressManager := ui.NewProgressManager(false)
 		defer progressManager.StopAll()
-		
+
 		var results []component.InstallResult
 		var err error
 		if profilesFromUser {
@@ -400,7 +400,7 @@ func (a *App) Run(args []string) error {
 					actualUninstalls = append(actualUninstalls, result)
 				}
 			}
-			
+
 			if len(actualUninstalls) > 0 {
 				if a.Verbose {
 					fmt.Printf("📦 Found %d removed components with uninstall commands\n", len(actualUninstalls))
@@ -433,7 +433,7 @@ func (a *App) printResults(operation string, results []component.InstallResult) 
 
 func (a *App) printVerboseResults(operation string, results []component.InstallResult) {
 	fmt.Printf("\n┌─ %s Results (%d components) ─\n", operation, len(results))
-	
+
 	for _, result := range results {
 		// Component header with better formatting
 		if result.Skipped {
@@ -442,10 +442,10 @@ func (a *App) printVerboseResults(operation string, results []component.InstallR
 		}
 
 		fmt.Printf("│\n├─ 📦 %s\n", result.Component.FullName())
-		
+
 		// Track timing and details
 		steps := 0
-		
+
 		// Install step
 		if result.InstallResult != nil {
 			steps++
@@ -520,11 +520,11 @@ func (a *App) printVerboseResults(operation string, results []component.InstallR
 			fmt.Printf("│  └─ %s Completed successfully (%d steps)\n", ui.GreenText("✅"), steps)
 		}
 	}
-	
+
 	successful := 0
 	failed := 0
 	skipped := 0
-	
+
 	for _, result := range results {
 		if result.Skipped {
 			skipped++
@@ -534,7 +534,7 @@ func (a *App) printVerboseResults(operation string, results []component.InstallR
 			failed++
 		}
 	}
-	
+
 	fmt.Printf("│\n└─ 📊 Summary: %d successful, %d failed, %d skipped\n\n", successful, failed, skipped)
 }
 
@@ -548,7 +548,7 @@ func (a *App) printSummaryResults(operation string, results []component.InstallR
 	successful := 0
 	failed := 0
 	skipped := 0
-	
+
 	// Print individual component results - show ALL components
 	for _, result := range results {
 		if result.Skipped {
@@ -561,7 +561,7 @@ func (a *App) printSummaryResults(operation string, results []component.InstallR
 			fmt.Printf("%s %s: %v\n", ui.Error(""), result.Component.FullName(), result.Error)
 			failed++
 		}
-		
+
 		// Show defaults results if any (especially changes/warnings)
 		for _, defaultsResult := range result.DefaultsResults {
 			if defaultsResult.Changed || defaultsResult.Error != nil {
@@ -569,7 +569,7 @@ func (a *App) printSummaryResults(operation string, results []component.InstallR
 			}
 		}
 	}
-	
+
 	// Final summary
 	if successful > 0 || failed > 0 || skipped > 0 {
 		fmt.Printf("\n%s completed: %d successful", operation, successful)
@@ -625,10 +625,10 @@ func upgradeCommand(verbose bool) error {
 		// Use animated progress for quiet mode
 		progressManager := ui.NewProgressManager(false)
 		defer progressManager.StopAll()
-		
+
 		upgradeProgress := progressManager.NewSection("Downloading and installing latest version...")
 		upgradeProgress.Start()
-		
+
 		// Download and run the install script
 		cmd := exec.Command("sh", "-c", "curl -fsSL https://raw.githubusercontent.com/pablopunk/dot/main/scripts/install.sh | bash")
 		cmd.Stdout = nil

@@ -220,7 +220,7 @@ func TestInstallComponentsForceInstall(t *testing.T) {
 	if !results2[0].Skipped {
 		t.Errorf("Second install should be skipped since links already exist correctly")
 	}
-	
+
 	// Should not have an error
 	if results2[0].Error != nil {
 		t.Errorf("Second install should not have error: %v", results2[0].Error)
@@ -304,7 +304,7 @@ func TestUninstallComponentWithCommand(t *testing.T) {
 	if err := os.MkdirAll(homeDir, 0755); err != nil {
 		t.Fatalf("Failed to create home dir: %v", err)
 	}
-	
+
 	// Create source files for linking
 	testFilePath := filepath.Join(dotfilesDir, "test")
 	if err := os.WriteFile(testFilePath, []byte("test content"), 0644); err != nil {
@@ -353,7 +353,7 @@ func TestUninstallComponentWithCommand(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Initial install error = %v", err)
 	}
-	
+
 	if len(installResults) != 2 {
 		t.Fatalf("Expected 2 install results, got %d", len(installResults))
 	}
@@ -393,24 +393,24 @@ func TestUninstallComponentWithCommand(t *testing.T) {
 			},
 		},
 	}
-	
+
 	// Create new profile manager but simulate removing these components from active use
 	// by calling GetActiveComponents with a profile that doesn't include them
 	originalProfileManager := manager.profileManager
 	manager.profileManager = profile.NewManager(configAfterRemoval)
-	
+
 	// Manually call GetRemovedComponents with empty current components to simulate removal
 	currentComponents := []profile.ComponentInfo{} // No current components = all existing ones are removed
 	removedComponents := manager.stateManager.GetRemovedComponents(currentComponents)
-	
+
 	// Test uninstalling these removed components
 	if len(removedComponents) != 2 {
 		t.Fatalf("Expected 2 removed components, got %d", len(removedComponents))
 	}
-	
+
 	// Restore original profile manager and create an empty current components list to trigger uninstall
 	manager.profileManager = originalProfileManager
-	
+
 	// Simulate the real scenario by using the public API with an empty profile
 	emptyConfig := &config.Config{
 		Profiles: map[string]config.Profile{
@@ -420,7 +420,7 @@ func TestUninstallComponentWithCommand(t *testing.T) {
 		},
 	}
 	manager.profileManager = profile.NewManager(emptyConfig)
-	
+
 	// Now call the real UninstallRemovedComponents method
 	results, err := manager.UninstallRemovedComponents()
 	if err != nil {
@@ -563,7 +563,7 @@ func TestInstallComponentWithProgress(t *testing.T) {
 
 	// Test install with progress
 	result := manager.installComponentWithProgress(comp, false, progressManager)
-	
+
 	if result.Error != nil {
 		t.Errorf("installComponentWithProgress() error = %v", result.Error)
 	}
@@ -583,7 +583,7 @@ func TestInstallComponentWithProgress(t *testing.T) {
 	if !result2.Skipped {
 		t.Error("Second install should be skipped since links already exist correctly")
 	}
-	
+
 	if result2.Error != nil {
 		t.Errorf("Second install should not have error: %v", result2.Error)
 	}
@@ -815,7 +815,7 @@ func TestManagerVerboseAndDryRun(t *testing.T) {
 func TestRunPostInstallHooks(t *testing.T) {
 	tmpDir := t.TempDir()
 	homeDir := filepath.Join(tmpDir, "home")
-	
+
 	// Set HOME for state manager
 	originalHome := os.Getenv("HOME")
 	os.Setenv("HOME", homeDir)
@@ -922,7 +922,7 @@ func TestRunPostInstallHooks(t *testing.T) {
 func TestRunPostLinkHooks(t *testing.T) {
 	tmpDir := t.TempDir()
 	homeDir := filepath.Join(tmpDir, "home")
-	
+
 	// Set HOME for state manager
 	originalHome := os.Getenv("HOME")
 	os.Setenv("HOME", homeDir)
@@ -1028,9 +1028,9 @@ func TestRunPostLinkHooks(t *testing.T) {
 
 // Helper function
 func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || (len(s) > len(substr) && 
-		(s[:len(substr)] == substr || s[len(s)-len(substr):] == substr || 
-		 findSubstring(s, substr))))
+	return len(s) >= len(substr) && (s == substr || (len(s) > len(substr) &&
+		(s[:len(substr)] == substr || s[len(s)-len(substr):] == substr ||
+			findSubstring(s, substr))))
 }
 
 func findSubstring(s, substr string) bool {

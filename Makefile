@@ -72,6 +72,10 @@ uninstall: ## Uninstall from ~/.local/bin
 	rm -f ~/.local/bin/$(APP_NAME)
 	@echo "Uninstalled $(APP_NAME)"
 
+format: ## Format Go code using gofmt
+	@echo "Formatting Go code..."
+	gofmt -w .
+
 lint: ## Run linter
 	@echo "Running linter..."
 	@if command -v golangci-lint >/dev/null 2>&1; then \

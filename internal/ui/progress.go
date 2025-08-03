@@ -32,7 +32,7 @@ func NewProgressManager(quiet bool) *ProgressManager {
 // NewSection creates a new progress section with a spinner
 func (pm *ProgressManager) NewSection(title string) *ProgressSection {
 	var section *ProgressSection
-	
+
 	if pm.quiet {
 		section = &ProgressSection{title: title}
 	} else {
@@ -180,7 +180,7 @@ func (cp *ComponentProgress) PauseForInteraction(message string) {
 	cp.section.PauseForInteraction(fmt.Sprintf("%s: %s", cp.component, message))
 }
 
-// ResumeAfterInteraction resumes spinner after interactive commands  
+// ResumeAfterInteraction resumes spinner after interactive commands
 func (cp *ComponentProgress) ResumeAfterInteraction() {
 	cp.section.ResumeAfterInteraction(fmt.Sprintf("Completing %s...", cp.component))
 }

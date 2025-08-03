@@ -10,7 +10,7 @@ func TestRecursiveModules(t *testing.T) {
 	// Create a temporary config file with recursive structure
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "dot.yaml")
-	
+
 	configContent := `
 profiles:
   laptop:
@@ -45,25 +45,25 @@ profiles:
           link:
             "nvim/": "~/.config/nvim/"
 `
-	
+
 	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
 		t.Fatalf("Failed to write test config: %v", err)
 	}
-	
+
 	cfg, err := Load(configPath)
 	if err != nil {
 		t.Fatalf("Failed to load config: %v", err)
 	}
-	
+
 	// Test that we have the laptop profile
 	laptopProfile, exists := cfg.Profiles["laptop"]
 	if !exists {
 		t.Fatal("laptop profile not found")
 	}
-	
+
 	// Extract all components from the recursive structure
 	components := laptopProfile.GetComponents()
-	
+
 	// Expected components with their full paths
 	expectedComponents := []string{
 		"spotify",           // Direct component
@@ -72,11 +72,11 @@ profiles:
 		"cli.editors.vim",   // Nested component
 		"cli.editors.nvim",  // Nested component
 	}
-	
+
 	if len(components) != len(expectedComponents) {
 		t.Errorf("Expected %d components, got %d", len(expectedComponents), len(components))
 	}
-	
+
 	// Check that all expected components exist
 	for _, expectedPath := range expectedComponents {
 		component, exists := components[expectedPath]
@@ -84,7 +84,7 @@ profiles:
 			t.Errorf("Expected component %s not found", expectedPath)
 			continue
 		}
-		
+
 		// Verify component has the required properties
 		switch expectedPath {
 		case "spotify":
@@ -120,7 +120,7 @@ profiles:
 func TestMixedRecursiveAndDirectComponents(t *testing.T) {
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "dot.yaml")
-	
+
 	configContent := `
 profiles:
   "*":
@@ -145,42 +145,42 @@ profiles:
           install:
             brew: "brew install visual-studio-code"
 `
-	
+
 	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
 		t.Fatalf("Failed to write test config: %v", err)
 	}
-	
+
 	cfg, err := Load(configPath)
 	if err != nil {
 		t.Fatalf("Failed to load config: %v", err)
 	}
-	
+
 	defaultProfile := cfg.Profiles["*"]
 	components := defaultProfile.GetComponents()
-	
+
 	expectedComponents := map[string]bool{
-		"git":                       true,
-		"development.languages.go":  true,
+		"git":                        true,
+		"development.languages.go":   true,
 		"development.languages.rust": true,
-		"development.editors.code":  true,
+		"development.editors.code":   true,
 	}
-	
+
 	if len(components) != len(expectedComponents) {
 		t.Errorf("Expected %d components, got %d", len(expectedComponents), len(components))
 	}
-	
+
 	for componentPath := range components {
 		if !expectedComponents[componentPath] {
 			t.Errorf("Unexpected component: %s", componentPath)
 		}
 	}
-	
+
 	// Verify specific component properties
 	gitComponent := components["git"]
 	if len(gitComponent.Install) != 1 || len(gitComponent.Link) != 1 {
 		t.Error("git component should have 1 install and 1 link")
 	}
-	
+
 	rustComponent := components["development.languages.rust"]
 	if len(rustComponent.Install) != 1 || len(rustComponent.Link) != 1 {
 		t.Error("rust component should have 1 install and 1 link")
@@ -190,7 +190,7 @@ profiles:
 func TestEmptyContainers(t *testing.T) {
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "dot.yaml")
-	
+
 	configContent := `
 profiles:
   test:
@@ -202,24 +202,24 @@ profiles:
     empty_container:
       nested_empty: {}
 `
-	
+
 	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
 		t.Fatalf("Failed to write test config: %v", err)
 	}
-	
+
 	cfg, err := Load(configPath)
 	if err != nil {
 		t.Fatalf("Failed to load config: %v", err)
 	}
-	
+
 	testProfile := cfg.Profiles["test"]
 	components := testProfile.GetComponents()
-	
+
 	// Should only have the valid component, empty containers should be ignored
 	if len(components) != 1 {
 		t.Errorf("Expected 1 component, got %d", len(components))
 	}
-	
+
 	if _, exists := components["valid"]; !exists {
 		t.Error("valid component not found")
 	}

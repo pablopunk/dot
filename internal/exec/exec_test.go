@@ -7,11 +7,11 @@ import (
 
 func TestNewManager(t *testing.T) {
 	manager := NewManager(true, false)
-	
+
 	if !manager.dryRun {
 		t.Error("Expected dryRun to be true")
 	}
-	
+
 	if manager.verbose {
 		t.Error("Expected verbose to be false")
 	}
@@ -49,12 +49,12 @@ func TestExecuteCommand(t *testing.T) {
 			wantError: true,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			manager := NewManager(tt.dryRun, false)
 			result := manager.ExecuteCommand(tt.command)
-			
+
 			if tt.dryRun {
 				if !result.Success {
 					t.Errorf("Dry run should always succeed, got success=%v", result.Success)
@@ -64,15 +64,15 @@ func TestExecuteCommand(t *testing.T) {
 				}
 				return
 			}
-			
+
 			if (result.Error != nil) != tt.wantError {
 				t.Errorf("ExecuteCommand() error = %v, wantError %v", result.Error, tt.wantError)
 			}
-			
+
 			if result.Success == tt.wantError {
 				t.Errorf("ExecuteCommand() success = %v, expected opposite of wantError %v", result.Success, tt.wantError)
 			}
-			
+
 			if result.Command != tt.command {
 				t.Errorf("ExecuteCommand() command = %v, want %v", result.Command, tt.command)
 			}
@@ -106,12 +106,12 @@ func TestExecuteShellCommand(t *testing.T) {
 			wantErr: true,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			manager := NewManager(tt.dryRun, false)
 			result := manager.ExecuteShellCommand(tt.command)
-			
+
 			if tt.dryRun {
 				if !result.Success {
 					t.Errorf("Dry run should always succeed")
@@ -121,7 +121,7 @@ func TestExecuteShellCommand(t *testing.T) {
 				}
 				return
 			}
-			
+
 			if (result.Error != nil) != tt.wantErr {
 				t.Errorf("ExecuteShellCommand() error = %v, wantErr %v", result.Error, tt.wantErr)
 			}
@@ -131,13 +131,13 @@ func TestExecuteShellCommand(t *testing.T) {
 
 func TestExecuteInstallCommand(t *testing.T) {
 	manager := NewManager(true, false) // dry run
-	
+
 	result := manager.ExecuteInstallCommand("brew", "brew install git")
-	
+
 	if !result.Success {
 		t.Error("Install command should succeed in dry run")
 	}
-	
+
 	if !strings.Contains(result.Output, "[brew]") {
 		t.Errorf("Install result should contain package manager name, got: %s", result.Output)
 	}
@@ -145,13 +145,13 @@ func TestExecuteInstallCommand(t *testing.T) {
 
 func TestExecuteUninstallCommand(t *testing.T) {
 	manager := NewManager(true, false) // dry run
-	
+
 	result := manager.ExecuteUninstallCommand("apt", "apt remove -y git")
-	
+
 	if !result.Success {
 		t.Error("Uninstall command should succeed in dry run")
 	}
-	
+
 	if !strings.Contains(result.Output, "[apt]") {
 		t.Errorf("Uninstall result should contain package manager name, got: %s", result.Output)
 	}
@@ -159,12 +159,12 @@ func TestExecuteUninstallCommand(t *testing.T) {
 
 func TestTestCommand(t *testing.T) {
 	manager := NewManager(false, false)
-	
+
 	// Test with a command that should exist
 	if !manager.TestCommand("echo hello") {
 		t.Error("TestCommand should return true for valid echo command")
 	}
-	
+
 	// Test with a command that shouldn't exist
 	if manager.TestCommand("nonexistent-command-xyz") {
 		t.Error("TestCommand should return false for invalid command")
@@ -173,12 +173,12 @@ func TestTestCommand(t *testing.T) {
 
 func TestCommandExists(t *testing.T) {
 	manager := NewManager(false, false)
-	
+
 	// Test with a command that should exist on most systems
 	if !manager.CommandExists("echo") {
 		t.Error("CommandExists should return true for echo")
 	}
-	
+
 	// Test with a command that shouldn't exist
 	if manager.CommandExists("nonexistent-command-xyz") {
 		t.Error("CommandExists should return false for nonexistent command")
@@ -207,7 +207,7 @@ func TestExecResultString(t *testing.T) {
 			want:   "✗ false",
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := tt.result.String()
