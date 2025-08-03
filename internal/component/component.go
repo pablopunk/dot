@@ -152,7 +152,8 @@ func (m *Manager) installComponent(comp profile.ComponentInfo, forceInstall bool
 	// Check if component needs install work
 	needsInstall := forceInstall || !m.stateManager.IsComponentInstalled(comp) || m.stateManager.HasInstallChanged(comp, comp.Component.Install)
 	hasLinks := len(comp.Component.Link) > 0
-	// Links always need to be processed - they're fast and ensure files are properly linked
+	// Check if any links need to be created/updated (only run linking if needed)
+	needsLinking := hasLinks && (forceInstall || m.linkManager.NeedsLinking(comp.Component.Link))
 	
 	// Check if defaults need updating (only on macOS)
 	hasDefaults := len(comp.Component.Defaults) > 0 && system.IsMacOS()
@@ -176,8 +177,8 @@ func (m *Manager) installComponent(comp profile.ComponentInfo, forceInstall bool
 		}
 	}
 
-	// If no install needed and no links and no defaults needed, mark as skipped
-	if !needsInstall && !hasLinks && !needsDefaults {
+	// If no install needed and no linking needed and no defaults needed, mark as skipped
+	if !needsInstall && !needsLinking && !needsDefaults {
 		result.Skipped = true
 		return result
 	}
@@ -213,8 +214,8 @@ func (m *Manager) installComponent(comp profile.ComponentInfo, forceInstall bool
 		}
 	}
 
-	// Create links if component has any links (always run - it's fast and ensures proper linking)
-	if hasLinks {
+	// Create links only if they need linking
+	if needsLinking {
 		linkResults, err := m.linkManager.CreateLinks(comp.Component.Link)
 		result.LinkResults = linkResults
 
@@ -292,7 +293,8 @@ func (m *Manager) installComponentWithProgress(comp profile.ComponentInfo, force
 	// Check if component needs install work
 	needsInstall := forceInstall || !m.stateManager.IsComponentInstalled(comp) || m.stateManager.HasInstallChanged(comp, comp.Component.Install)
 	hasLinks := len(comp.Component.Link) > 0
-	// Links always need to be processed - they're fast and ensure files are properly linked
+	// Check if any links need to be created/updated (only run linking if needed)
+	needsLinking := hasLinks && (forceInstall || m.linkManager.NeedsLinking(comp.Component.Link))
 	
 	// Check if defaults need updating (only on macOS)
 	hasDefaults := len(comp.Component.Defaults) > 0 && system.IsMacOS()
@@ -316,8 +318,8 @@ func (m *Manager) installComponentWithProgress(comp profile.ComponentInfo, force
 		}
 	}
 
-	// If no install needed and no links and no defaults needed, mark as skipped
-	if !needsInstall && !hasLinks && !needsDefaults {
+	// If no install needed and no linking needed and no defaults needed, mark as skipped
+	if !needsInstall && !needsLinking && !needsDefaults {
 		result.Skipped = true
 		progress.CompleteSuccess()
 		return result
@@ -354,8 +356,8 @@ func (m *Manager) installComponentWithProgress(comp profile.ComponentInfo, force
 		}
 	}
 
-	// Create links if component has any links (always run - it's fast and ensures proper linking)
-	if hasLinks {
+	// Create links only if they need linking
+	if needsLinking {
 		progress.StartLinking()
 		linkResults, err := m.linkManager.CreateLinks(comp.Component.Link)
 		result.LinkResults = linkResults
@@ -484,7 +486,21 @@ func (m *Manager) uninstallComponent(comp profile.ComponentInfo, componentState 
 
 	originalComponent, exists := components[comp.ComponentName]
 	if !exists {
-		// Component was removed from config, we can only clean up links
+		// Component was removed from config, use stored uninstall commands if available
+		if len(componentState.UninstallCommands) > 0 {
+			commandName, command, available := system.GetFirstAvailableCommand(componentState.UninstallCommands)
+			if available {
+				uninstallResult := m.execManager.ExecuteUninstallCommand(commandName, command)
+				result.InstallResult = &uninstallResult
+
+				if !uninstallResult.Success {
+					result.Error = fmt.Errorf("uninstall failed: %w", uninstallResult.Error)
+					return result
+				}
+			}
+		}
+		
+		// Clean up links
 		if len(componentState.Links) > 0 {
 			linkResults, err := m.linkManager.RemoveLinks(componentState.Links)
 			result.LinkResults = linkResults
@@ -502,9 +518,9 @@ func (m *Manager) uninstallComponent(comp profile.ComponentInfo, componentState 
 
 	// Run uninstall command if available
 	if len(originalComponent.Uninstall) > 0 {
-		packageManager, command, available := system.GetFirstAvailablePackageManager(originalComponent.Uninstall, m.packageManagers)
+		commandName, command, available := system.GetFirstAvailableCommand(originalComponent.Uninstall)
 		if available {
-			uninstallResult := m.execManager.ExecuteUninstallCommand(packageManager, command)
+			uninstallResult := m.execManager.ExecuteUninstallCommand(commandName, command)
 			result.InstallResult = &uninstallResult
 
 			if !uninstallResult.Success {

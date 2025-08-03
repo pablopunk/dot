@@ -3,6 +3,7 @@ package component
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/pablopunk/dot/internal/config"
@@ -291,6 +292,189 @@ func TestUninstallRemovedComponents(t *testing.T) {
 
 	if results[0].Component.ComponentName != "removed" {
 		t.Errorf("Uninstalled component = %v, want removed", results[0].Component.ComponentName)
+	}
+}
+
+func TestUninstallComponentWithCommand(t *testing.T) {
+	// Create a test configuration with a component that has uninstall commands
+	tmpDir := t.TempDir()
+	dotfilesDir := filepath.Join(tmpDir, "dotfiles")
+	homeDir := filepath.Join(tmpDir, "home")
+
+	// Create directories
+	if err := os.MkdirAll(dotfilesDir, 0755); err != nil {
+		t.Fatalf("Failed to create dotfiles dir: %v", err)
+	}
+	if err := os.MkdirAll(homeDir, 0755); err != nil {
+		t.Fatalf("Failed to create home dir: %v", err)
+	}
+	
+	// Create source files for linking
+	testFilePath := filepath.Join(dotfilesDir, "test")
+	if err := os.WriteFile(testFilePath, []byte("test content"), 0644); err != nil {
+		t.Fatalf("Failed to create test file: %v", err)
+	}
+
+	// Set HOME for state manager
+	originalHome := os.Getenv("HOME")
+	os.Setenv("HOME", homeDir)
+	t.Cleanup(func() { os.Setenv("HOME", originalHome) })
+
+	cfg := &config.Config{
+		Profiles: map[string]config.Profile{
+			"test": {
+				"uninstallable": config.Component{
+					Install: map[string]string{
+						"echo": "echo 'installing uninstallable'",
+					},
+					Uninstall: map[string]string{
+						"echo": "echo 'uninstalling uninstallable'",
+					},
+					Link: map[string]string{
+						"test": filepath.Join(homeDir, ".test"),
+					},
+				},
+				"no-uninstall": config.Component{
+					Install: map[string]string{
+						"echo": "echo 'installing no-uninstall'",
+					},
+					// No uninstall commands
+					Link: map[string]string{
+						"test": filepath.Join(homeDir, ".notest"),
+					},
+				},
+			},
+		},
+	}
+
+	manager, err := NewManager(cfg, dotfilesDir, false, false) // not dry-run mode
+	if err != nil {
+		t.Fatalf("Failed to create component manager: %v", err)
+	}
+
+	// Install components first
+	installResults, err := manager.InstallComponents([]string{"test"}, "", false)
+	if err != nil {
+		t.Fatalf("Initial install error = %v", err)
+	}
+	
+	if len(installResults) != 2 {
+		t.Fatalf("Expected 2 install results, got %d", len(installResults))
+	}
+
+	// Verify components are in state
+	installedComponents := manager.stateManager.GetInstalledComponents()
+	if len(installedComponents) != 2 {
+		t.Fatalf("Expected 2 components in state, got %d", len(installedComponents))
+	}
+
+	// Now simulate components being removed from the "test" profile
+	// The state still has them as installed under "test", but the config no longer has them in "test"
+	configAfterRemoval := &config.Config{
+		Profiles: map[string]config.Profile{
+			"test": {
+				// Profile exists but components were removed from it
+				"uninstallable": config.Component{
+					Install: map[string]string{
+						"echo": "echo 'installing uninstallable'",
+					},
+					Uninstall: map[string]string{
+						"echo": "echo 'uninstalling uninstallable'",
+					},
+					Link: map[string]string{
+						"test": filepath.Join(homeDir, ".test"),
+					},
+				},
+				"no-uninstall": config.Component{
+					Install: map[string]string{
+						"echo": "echo 'installing no-uninstall'",
+					},
+					// No uninstall commands
+					Link: map[string]string{
+						"test": filepath.Join(homeDir, ".notest"),
+					},
+				},
+			},
+		},
+	}
+	
+	// Create new profile manager but simulate removing these components from active use
+	// by calling GetActiveComponents with a profile that doesn't include them
+	originalProfileManager := manager.profileManager
+	manager.profileManager = profile.NewManager(configAfterRemoval)
+	
+	// Manually call GetRemovedComponents with empty current components to simulate removal
+	currentComponents := []profile.ComponentInfo{} // No current components = all existing ones are removed
+	removedComponents := manager.stateManager.GetRemovedComponents(currentComponents)
+	
+	// Test uninstalling these removed components
+	if len(removedComponents) != 2 {
+		t.Fatalf("Expected 2 removed components, got %d", len(removedComponents))
+	}
+	
+	// Restore original profile manager and create an empty current components list to trigger uninstall
+	manager.profileManager = originalProfileManager
+	
+	// Simulate the real scenario by using the public API with an empty profile
+	emptyConfig := &config.Config{
+		Profiles: map[string]config.Profile{
+			"test": {
+				// Empty profile - components were removed
+			},
+		},
+	}
+	manager.profileManager = profile.NewManager(emptyConfig)
+	
+	// Now call the real UninstallRemovedComponents method
+	results, err := manager.UninstallRemovedComponents()
+	if err != nil {
+		t.Fatalf("UninstallRemovedComponents() error = %v", err)
+	}
+
+	if len(results) != 2 {
+		t.Fatalf("Expected 2 uninstall results, got %d", len(results))
+	}
+
+	// Verify results - one should have InstallResult (actual uninstall command), one should not
+	var withUninstall, withoutUninstall *InstallResult
+	for i := range results {
+		if results[i].Component.ComponentName == "uninstallable" {
+			withUninstall = &results[i]
+		} else if results[i].Component.ComponentName == "no-uninstall" {
+			withoutUninstall = &results[i]
+		}
+	}
+
+	if withUninstall == nil {
+		t.Fatal("Did not find uninstallable component in results")
+	}
+	if withoutUninstall == nil {
+		t.Fatal("Did not find no-uninstall component in results")
+	}
+
+	// Component with uninstall commands should have InstallResult set
+	if withUninstall.InstallResult == nil {
+		t.Error("Component with uninstall commands should have InstallResult set")
+	} else {
+		if !withUninstall.InstallResult.Success {
+			t.Errorf("Uninstall command should succeed in dry-run mode")
+		}
+		if !strings.Contains(withUninstall.InstallResult.Output, "uninstalling uninstallable") {
+			t.Errorf("Uninstall output should contain command output, got: %s", withUninstall.InstallResult.Output)
+		}
+	}
+
+	// Component without uninstall commands should not have InstallResult set
+	if withoutUninstall.InstallResult != nil {
+		t.Error("Component without uninstall commands should not have InstallResult set")
+	}
+
+	// Both should have link results (link removal)
+	if len(withUninstall.LinkResults) == 0 {
+		t.Error("Component with uninstall should still have link removal results")
+	}
+	if len(withoutUninstall.LinkResults) == 0 {
+		t.Error("Component without uninstall should have link removal results")
 	}
 }
 

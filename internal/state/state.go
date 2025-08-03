@@ -19,15 +19,16 @@ type LockFile struct {
 }
 
 type ComponentState struct {
-	ProfileName     string            `yaml:"profile_name"`
-	ComponentName   string            `yaml:"component_name"`
-	InstalledAt     time.Time         `yaml:"installed_at"`
-	PackageManager  string            `yaml:"package_manager,omitempty"`
-	InstallCommand  string            `yaml:"install_command,omitempty"`
-	Links           map[string]string `yaml:"links,omitempty"`
-	PostInstallRan  bool              `yaml:"post_install_ran"`
-	PostLinkRan     bool              `yaml:"post_link_ran"`
-	ContentHash     string            `yaml:"content_hash,omitempty"` // Hash of component content for rename detection
+	ProfileName      string            `yaml:"profile_name"`
+	ComponentName    string            `yaml:"component_name"`
+	InstalledAt      time.Time         `yaml:"installed_at"`
+	PackageManager   string            `yaml:"package_manager,omitempty"`
+	InstallCommand   string            `yaml:"install_command,omitempty"`
+	UninstallCommands map[string]string `yaml:"uninstall_commands,omitempty"` // Store uninstall commands for when component is removed
+	Links            map[string]string `yaml:"links,omitempty"`
+	PostInstallRan   bool              `yaml:"post_install_ran"`
+	PostLinkRan      bool              `yaml:"post_link_ran"`
+	ContentHash      string            `yaml:"content_hash,omitempty"` // Hash of component content for rename detection
 }
 
 type Manager struct {
@@ -35,7 +36,7 @@ type Manager struct {
 	lockFile     *LockFile
 }
 
-const LockFileVersion = "1.1"
+const LockFileVersion = "1.2"
 
 func NewManager() (*Manager, error) {
 	homeDir, err := os.UserHomeDir()
@@ -119,15 +120,16 @@ func (m *Manager) IsComponentInstalled(componentInfo profile.ComponentInfo) bool
 func (m *Manager) MarkComponentInstalled(componentInfo profile.ComponentInfo, packageManager, installCommand string, links map[string]string) {
 	key := componentInfo.FullName()
 	m.lockFile.InstalledComponents[key] = ComponentState{
-		ProfileName:    componentInfo.ProfileName,
-		ComponentName:  componentInfo.ComponentName,
-		InstalledAt:    time.Now(),
-		PackageManager: packageManager,
-		InstallCommand: installCommand,
-		Links:          links,
-		PostInstallRan: false,
-		PostLinkRan:    false,
-		ContentHash:    componentInfo.Component.ContentHash(),
+		ProfileName:      componentInfo.ProfileName,
+		ComponentName:    componentInfo.ComponentName,
+		InstalledAt:      time.Now(),
+		PackageManager:   packageManager,
+		InstallCommand:   installCommand,
+		UninstallCommands: componentInfo.Component.Uninstall, // Store uninstall commands for later use
+		Links:            links,
+		PostInstallRan:   false,
+		PostLinkRan:      false,
+		ContentHash:      componentInfo.Component.ContentHash(),
 	}
 }
 
@@ -258,8 +260,9 @@ func (m *Manager) HasInstallChanged(componentInfo profile.ComponentInfo, install
 }
 
 func (m *Manager) migrate() error {
-	// Migrate from 1.0 to 1.1: no structural changes needed, 
-	// ContentHash field will be populated on next component update
+	// Migrate from 1.0 to 1.1: ContentHash field added
+	// Migrate from 1.1 to 1.2: UninstallCommands field added
+	// Both fields will be populated on next component update
 	m.lockFile.Version = LockFileVersion
 	return m.Save()
 }
@@ -276,15 +279,16 @@ func (m *Manager) migrateRenamedComponent(oldKey string, newComponent profile.Co
 	// Create new state preserving installation state but resetting link state
 	// This ensures that links will be re-created for the new component location
 	newState := ComponentState{
-		ProfileName:    newComponent.ProfileName,
-		ComponentName:  newComponent.ComponentName,
-		InstalledAt:    oldState.InstalledAt,
-		PackageManager: oldState.PackageManager,
-		InstallCommand: oldState.InstallCommand,
-		Links:          map[string]string{}, // Reset links so they get re-created
-		PostInstallRan: oldState.PostInstallRan,
-		PostLinkRan:    false, // Reset post-link state since links will be re-created
-		ContentHash:    newComponent.Component.ContentHash(),
+		ProfileName:      newComponent.ProfileName,
+		ComponentName:    newComponent.ComponentName,
+		InstalledAt:      oldState.InstalledAt,
+		PackageManager:   oldState.PackageManager,
+		InstallCommand:   oldState.InstallCommand,
+		UninstallCommands: newComponent.Component.Uninstall, // Update uninstall commands to new component's
+		Links:            map[string]string{}, // Reset links so they get re-created
+		PostInstallRan:   oldState.PostInstallRan,
+		PostLinkRan:      false, // Reset post-link state since links will be re-created
+		ContentHash:      newComponent.Component.ContentHash(),
 	}
 	
 	// Remove old entry and add new one

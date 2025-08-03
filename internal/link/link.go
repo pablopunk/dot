@@ -39,6 +39,53 @@ func (m *Manager) CreateLinks(linkMap map[string]string) ([]LinkResult, error) {
 	return results, nil
 }
 
+// NeedsLinking checks if any of the links in linkMap need to be created or updated
+// Returns true if at least one link needs work, false if all links already exist correctly
+func (m *Manager) NeedsLinking(linkMap map[string]string) bool {
+	for source, target := range linkMap {
+		if m.needsLinking(source, target) {
+			return true
+		}
+	}
+	return false
+}
+
+// needsLinking checks if a single link needs to be created or updated
+func (m *Manager) needsLinking(source, target string) bool {
+	// Resolve source path relative to base directory
+	sourcePath := filepath.Join(m.baseDir, source)
+	
+	// Expand target path (handle ~ for home directory)
+	expandedTarget, err := expandPath(target)
+	if err != nil {
+		return true // Error expanding path means we need to try linking
+	}
+	
+	// Check if source exists
+	if _, err := os.Stat(sourcePath); os.IsNotExist(err) {
+		return true // Source doesn't exist, we'll need to handle this
+	}
+	
+	// Check if target already exists and is the correct symlink
+	if linkInfo, err := os.Lstat(expandedTarget); err == nil {
+		if linkInfo.Mode()&os.ModeSymlink != 0 {
+			// It's a symlink, check if it points to the right place
+			currentTarget, err := os.Readlink(expandedTarget)
+			if err == nil {
+				// Resolve to absolute path for comparison
+				absCurrentTarget, _ := filepath.Abs(currentTarget)
+				absSourcePath, _ := filepath.Abs(sourcePath)
+				
+				if absCurrentTarget == absSourcePath {
+					return false // Link already exists and points to correct location
+				}
+			}
+		}
+	}
+	
+	return true // Link needs to be created or updated
+}
+
 func (m *Manager) createLink(source, target string) LinkResult {
 	// Resolve source path relative to base directory
 	sourcePath := filepath.Join(m.baseDir, source)
