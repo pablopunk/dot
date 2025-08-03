@@ -89,8 +89,8 @@ profiles:
       defaults:       # macOS system defaults (macOS only)
         "com.apple.dock": "macos/dock.plist"
         
-    # Recursive modules - organizational containers
-    cli:              # Group related tools
+    # Recursive modules - organize yourself
+    cli:
       tools:
         fzf:
           install:
