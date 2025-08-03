@@ -1,4 +1,4 @@
-# dot - One repo to define all your computers
+# dot - all your computers in one repo
 
 > All your tools, apps, and configs with 0 dependencies
 
@@ -89,8 +89,8 @@ profiles:
       defaults:       # macOS system defaults (macOS only)
         "com.apple.dock": "macos/dock.plist"
         
-    # Recursive modules - organizational containers
-    cli:              # Group related tools
+    # Recursive modules - organize yourself
+    cli:
       tools:
         fzf:
           install:
