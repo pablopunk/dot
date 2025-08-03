@@ -9,8 +9,8 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-# Function to print colored output
-print_status() {
+# Print functions
+print_info() {
     echo -e "${BLUE}[INFO]${NC} $1"
 }
 
@@ -26,210 +26,256 @@ print_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
-# Detect OS
-detect_os() {
-    case "$(uname -s)" in
-        Darwin*)    echo "macos";;
-        Linux*)     echo "linux";;
-        *)          echo "unknown";;
-    esac
-}
-
-# Check if command exists
-command_exists() {
-    command -v "$1" >/dev/null 2>&1
-}
-
-# Install Lua on macOS
-install_lua_macos() {
-    if command_exists brew; then
-        print_status "Installing Lua via Homebrew..."
-        brew install lua
-    else
-        print_error "Homebrew not found. Please install Homebrew first:"
-        echo "  /bin/bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\""
-        exit 1
-    fi
-}
-
-# Install Lua on Linux
-install_lua_linux() {
-    if command_exists apt-get; then
-        print_status "Installing Lua via apt..."
-        sudo apt-get update
-        sudo apt-get install -y lua5.4
-    elif command_exists yum; then
-        print_status "Installing Lua via yum..."
-        sudo yum install -y lua
-    elif command_exists dnf; then
-        print_status "Installing Lua via dnf..."
-        sudo dnf install -y lua
-    elif command_exists pacman; then
-        print_status "Installing Lua via pacman..."
-        sudo pacman -S --noconfirm lua
-    elif command_exists zypper; then
-        print_status "Installing Lua via zypper..."
-        sudo zypper install -y lua
-    else
-        print_error "No supported package manager found. Please install Lua manually."
-        exit 1
-    fi
-}
-
-
-
-# Get version from dot.lua file
-get_version_from_file() {
-    local file_path="$1"
-    if [[ -f "$file_path" ]]; then
-        local version_line=$(grep "local version = " "$file_path" 2>/dev/null)
-        if [[ -n "$version_line" ]]; then
-            echo "$version_line" | sed 's/local version = "\([^"]*\)"/\1/'
-        fi
-    fi
-}
-
-# Get latest version from GitHub
-get_latest_version() {
-    local version_url="https://raw.githubusercontent.com/pablopunk/dot/main/dot.lua"
-    local version_line=$(curl -fsSL "$version_url" 2>/dev/null | grep "local version = " | head -1)
-    if [[ -n "$version_line" ]]; then
-        echo "$version_line" | sed 's/local version = "\([^"]*\)"/\1/'
-    fi
-}
-
-# Compare versions
-version_compare() {
-    local version1="$1"
-    local version2="$2"
+# Detect OS and architecture
+detect_os_arch() {
+    OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+    ARCH=$(uname -m)
     
-    # Convert versions to comparable numbers (e.g., 1.2.3 -> 1002003)
-    local v1=$(echo "$version1" | awk -F. '{print $1*1000000 + $2*1000 + $3}')
-    local v2=$(echo "$version2" | awk -F. '{print $1*1000000 + $2*1000 + $3}')
-    
-    if [[ "$v1" -lt "$v2" ]]; then
-        echo "older"
-    elif [[ "$v1" -gt "$v2" ]]; then
-        echo "newer"
-    else
-        echo "same"
-    fi
-}
-
-# Install dot tool
-install_dot() {
-    local os=$(detect_os)
-    local install_dir="$HOME/.local/bin"
-    local dot_path="$install_dir/dot"
-    
-    # Create install directory
-    mkdir -p "$install_dir"
-    
-    # Check if dot is already installed
-    local current_version=""
-    local latest_version=""
-    local update_needed=false
-    
-    if [[ -f "$dot_path" ]]; then
-        current_version=$(get_version_from_file "$dot_path")
-        latest_version=$(get_latest_version)
-        
-        if [[ -n "$current_version" && -n "$latest_version" ]]; then
-            local comparison=$(version_compare "$current_version" "$latest_version")
-            if [[ "$comparison" == "older" ]]; then
-                print_status "Current version: $current_version"
-                print_status "Latest version: $latest_version"
-                print_status "Updating dot tool..."
-                update_needed=true
-            elif [[ "$comparison" == "same" ]]; then
-                print_success "dot tool is already up to date (version $current_version)"
-                # Still check PATH and show usage info
-            else
-                print_warning "Local version ($current_version) is newer than remote ($latest_version)"
-                print_warning "This might be a development version"
-            fi
-        else
-            print_status "Installing dot tool..."
-            update_needed=true
-        fi
-    else
-        print_status "Installing dot tool..."
-        update_needed=true
-    fi
-    
-    # Download/update the dot.lua file
-    if [[ "$update_needed" == true ]]; then
-        print_status "Downloading dot tool..."
-        if command_exists curl; then
-            curl -fsSL "https://raw.githubusercontent.com/pablopunk/dot/main/dot.lua" -o "$dot_path"
-        elif command_exists wget; then
-            wget -qO "$dot_path" "https://raw.githubusercontent.com/pablopunk/dot/main/dot.lua"
-        else
-            print_error "Neither curl nor wget found. Please install one of them."
+    case $OS in
+        darwin)
+            OS="darwin"
+            ;;
+        linux)
+            OS="linux"
+            ;;
+        *)
+            print_error "Unsupported operating system: $OS"
             exit 1
-        fi
-        
-        # Make it executable
-        chmod +x "$dot_path"
-        
-        # Get the new version
-        local new_version=$(get_version_from_file "$dot_path")
-        if [[ -n "$new_version" ]]; then
-            print_success "dot tool updated to version $new_version"
-        else
-            print_success "dot tool installed successfully"
-        fi
-    fi
+            ;;
+    esac
     
-    # Check if directory is already in PATH
-    if [[ ":$PATH:" == *":$install_dir:"* ]]; then
-        print_success "PATH already includes $install_dir"
-    else
-        print_warning "The dot tool is installed to $install_dir"
-        print_warning "To use it, either:"
-        echo "  1. Add $install_dir to your PATH manually"
-        echo "  2. Run the tool directly: $install_dir/dot"
-        echo "  3. Create a symlink: ln -s $install_dir/dot /usr/local/bin/dot"
-    fi
+    case $ARCH in
+        x86_64)
+            ARCH="amd64"
+            ;;
+        arm64|aarch64)
+            ARCH="arm64"
+            ;;
+        armv7l)
+            ARCH="arm"
+            ;;
+        *)
+            print_error "Unsupported architecture: $ARCH"
+            exit 1
+            ;;
+    esac
     
-    print_success "dot tool installed to $dot_path"
+    print_info "Detected OS: $OS, Architecture: $ARCH"
 }
 
-# Main installation process
-main() {
-    print_status "Starting dot tool installation..."
+# Get the latest release version from GitHub
+get_latest_version() {
+    print_info "Fetching latest version..."
     
-    local os=$(detect_os)
-    print_status "Detected OS: $os"
-    
-    # Check if Lua is installed
-    if ! command_exists lua; then
-        print_status "Lua not found. Installing Lua..."
-        case "$os" in
-            macos) install_lua_macos;;
-            linux) install_lua_linux;;
-            *) print_error "Unsupported OS: $os"; exit 1;;
-        esac
+    if command -v curl >/dev/null 2>&1; then
+        VERSION=$(curl -s https://api.github.com/repos/pablopunk/dot/releases/latest | grep -o '"tag_name": "[^"]*' | cut -d'"' -f4)
+    elif command -v wget >/dev/null 2>&1; then
+        VERSION=$(wget -qO- https://api.github.com/repos/pablopunk/dot/releases/latest | grep -o '"tag_name": "[^"]*' | cut -d'"' -f4)
     else
-        print_success "Lua already installed"
+        print_error "Neither curl nor wget is available. Please install one of them."
+        exit 1
     fi
     
-    # Install dot tool
-    install_dot
+    if [ -z "$VERSION" ]; then
+        print_error "Failed to fetch latest version"
+        exit 1
+    fi
     
-    print_success "Installation complete!"
-    echo
-    print_status "Installation details:"
-    echo "  Location: $HOME/.local/bin/dot"
-    echo
-    print_status "Usage:"
-    echo "  $HOME/.local/bin/dot            # Install all modules"
-    echo "  $HOME/.local/bin/dot neovim     # Install only the 'neovim' module"
-    echo "  $HOME/.local/bin/dot work       # Install only the 'work' profile"
-    echo "  $HOME/.local/bin/dot -h         # Show help"
-    echo
-    print_status "To make 'dot' available as a command, add $HOME/.local/bin to your PATH"
+    print_info "Latest version: $VERSION"
 }
+
+# Download the binary
+download_binary() {
+    BINARY_NAME="dot-${OS}-${ARCH}"
+    if [ "$OS" = "darwin" ]; then
+        BINARY_NAME="dot-${OS}-${ARCH}"
+    fi
+    
+    DOWNLOAD_URL="https://github.com/pablopunk/dot/releases/download/${VERSION}/${BINARY_NAME}"
+    
+    print_info "Downloading from: $DOWNLOAD_URL"
+    
+    # Create temporary directory
+    TMP_DIR=$(mktemp -d)
+    TMP_FILE="${TMP_DIR}/dot"
+    
+    if command -v curl >/dev/null 2>&1; then
+        curl -L -o "$TMP_FILE" "$DOWNLOAD_URL"
+    elif command -v wget >/dev/null 2>&1; then
+        wget -O "$TMP_FILE" "$DOWNLOAD_URL"
+    else
+        print_error "Neither curl nor wget is available"
+        exit 1
+    fi
+    
+    if [ ! -f "$TMP_FILE" ]; then
+        print_error "Failed to download binary"
+        exit 1
+    fi
+    
+    print_success "Binary downloaded successfully"
+}
+
+# Install the binary
+install_binary() {
+    # Create ~/.local/bin if it doesn't exist
+    LOCAL_BIN="$HOME/.local/bin"
+    if [ ! -d "$LOCAL_BIN" ]; then
+        print_info "Creating $LOCAL_BIN directory"
+        mkdir -p "$LOCAL_BIN"
+    fi
+    
+    # Move binary to ~/.local/bin
+    DOT_PATH="$LOCAL_BIN/dot"
+    print_info "Installing binary to $DOT_PATH"
+    
+    mv "$TMP_FILE" "$DOT_PATH"
+    chmod +x "$DOT_PATH"
+    
+    print_success "Binary installed to $DOT_PATH"
+}
+
+# Update PATH in shell profile
+update_path() {
+    LOCAL_BIN="$HOME/.local/bin"
+    
+    # Check if ~/.local/bin is already in PATH
+    if echo "$PATH" | grep -q "$LOCAL_BIN"; then
+        print_info "~/.local/bin is already in PATH"
+        return
+    fi
+    
+    # Detect shell and update appropriate profile
+    SHELL_NAME=$(basename "$SHELL")
+    
+    case $SHELL_NAME in
+        bash)
+            PROFILE_FILES=("$HOME/.bashrc" "$HOME/.bash_profile" "$HOME/.profile")
+            ;;
+        zsh)
+            PROFILE_FILES=("$HOME/.zshrc" "$HOME/.zprofile" "$HOME/.profile")
+            ;;
+        fish)
+            FISH_CONFIG="$HOME/.config/fish/config.fish"
+            if [ ! -d "$(dirname "$FISH_CONFIG")" ]; then
+                mkdir -p "$(dirname "$FISH_CONFIG")"
+            fi
+            PROFILE_FILES=("$FISH_CONFIG")
+            ;;
+        *)
+            PROFILE_FILES=("$HOME/.profile")
+            ;;
+    esac
+    
+    # Find the first existing profile file or create .profile
+    PROFILE_FILE=""
+    for file in "${PROFILE_FILES[@]}"; do
+        if [ -f "$file" ]; then
+            PROFILE_FILE="$file"
+            break
+        fi
+    done
+    
+    if [ -z "$PROFILE_FILE" ]; then
+        PROFILE_FILE="$HOME/.profile"
+        print_info "Creating $PROFILE_FILE"
+        touch "$PROFILE_FILE"
+    fi
+    
+    # Add PATH export to profile
+    print_info "Adding ~/.local/bin to PATH in $PROFILE_FILE"
+    
+    if [ "$SHELL_NAME" = "fish" ]; then
+        echo 'set -gx PATH $HOME/.local/bin $PATH' >> "$PROFILE_FILE"
+    else
+        echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$PROFILE_FILE"
+    fi
+    
+    print_success "Updated PATH in $PROFILE_FILE"
+    print_warning "Please restart your shell or run: source $PROFILE_FILE"
+}
+
+# Verify installation
+verify_installation() {
+    DOT_PATH="$HOME/.local/bin/dot"
+    
+    if [ -x "$DOT_PATH" ]; then
+        print_success "Installation verified: $DOT_PATH is executable"
+        
+        # Try to run the binary
+        if "$DOT_PATH" --help >/dev/null 2>&1; then
+            print_success "Binary runs successfully"
+        else
+            print_warning "Binary exists but may not run correctly"
+        fi
+    else
+        print_error "Installation failed: $DOT_PATH is not executable"
+        exit 1
+    fi
+}
+
+# Cleanup
+cleanup() {
+    if [ -n "$TMP_DIR" ] && [ -d "$TMP_DIR" ]; then
+        rm -rf "$TMP_DIR"
+    fi
+}
+
+# Main installation function
+main() {
+    print_info "Starting dot installation..."
+    
+    # Set up cleanup trap
+    trap cleanup EXIT
+    
+    detect_os_arch
+    get_latest_version
+    download_binary
+    install_binary
+    update_path
+    verify_installation
+    
+    print_success "dot installation completed successfully!"
+    print_info "You can now use 'dot' command (restart your shell first if needed)"
+    print_info "For help, run: dot --help"
+    print_info "To get started, create a dot.yaml file in your dotfiles directory"
+}
+
+# Handle command line arguments
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -h|--help)
+            echo "dot installation script"
+            echo ""
+            echo "Usage: $0 [options]"
+            echo ""
+            echo "Options:"
+            echo "  -h, --help     Show this help message"
+            echo "  -v, --verbose  Enable verbose output"
+            echo ""
+            echo "This script will:"
+            echo "  1. Detect your OS and architecture"
+            echo "  2. Download the latest dot binary from GitHub"
+            echo "  3. Install it to ~/.local/bin/dot"
+            echo "  4. Update your shell profile to include ~/.local/bin in PATH"
+            echo ""
+            echo "Requirements:"
+            echo "  - curl or wget"
+            echo "  - Internet connection"
+            echo ""
+            exit 0
+            ;;
+        -v|--verbose)
+            set -x
+            shift
+            ;;
+        *)
+            print_error "Unknown option: $1"
+            echo "Use -h or --help for usage information"
+            exit 1
+            ;;
+    esac
+done
 
 # Run main function
-main "$@" 
+main
