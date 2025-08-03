@@ -409,6 +409,13 @@ func (a *App) printSummaryResults(operation string, results []component.InstallR
 			fmt.Printf("%s %s: %v\n", ui.Error(""), result.Component.FullName(), result.Error)
 			failed++
 		}
+		
+		// Show defaults results if any (especially changes/warnings)
+		for _, defaultsResult := range result.DefaultsResults {
+			if defaultsResult.Changed || defaultsResult.Error != nil {
+				fmt.Printf("   %s\n", defaultsResult.String())
+			}
+		}
 	}
 	
 	// Final summary

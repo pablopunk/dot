@@ -153,9 +153,31 @@ func (m *Manager) installComponent(comp profile.ComponentInfo, forceInstall bool
 	needsInstall := forceInstall || !m.stateManager.IsComponentInstalled(comp) || m.stateManager.HasInstallChanged(comp, comp.Component.Install)
 	hasLinks := len(comp.Component.Link) > 0
 	needsLinking := hasLinks && (forceInstall || !m.stateManager.IsComponentInstalled(comp) || m.stateManager.HasChangedSince(comp, comp.Component.Link))
+	
+	// Check if defaults need updating (only on macOS)
+	hasDefaults := len(comp.Component.Defaults) > 0 && system.IsMacOS()
+	needsDefaults := false
+	if hasDefaults {
+		// For force install or first-time install, always check defaults
+		if forceInstall || !m.stateManager.IsComponentInstalled(comp) {
+			needsDefaults = true
+		} else {
+			// Compare current defaults with saved files to detect changes
+			defaultsResults, err := m.defaultsManager.CompareDefaults(comp.Component.Defaults)
+			if err == nil {
+				// Check if any defaults have changed
+				for _, result := range defaultsResults {
+					if result.Changed {
+						needsDefaults = true
+						break
+					}
+				}
+			}
+		}
+	}
 
-	// If no install needed and no linking needed, mark as skipped
-	if !needsInstall && !needsLinking {
+	// If no install needed and no linking needed and no defaults needed, mark as skipped
+	if !needsInstall && !needsLinking && !needsDefaults {
 		result.Skipped = true
 		return result
 	}
@@ -271,9 +293,31 @@ func (m *Manager) installComponentWithProgress(comp profile.ComponentInfo, force
 	needsInstall := forceInstall || !m.stateManager.IsComponentInstalled(comp) || m.stateManager.HasInstallChanged(comp, comp.Component.Install)
 	hasLinks := len(comp.Component.Link) > 0
 	needsLinking := hasLinks && (forceInstall || !m.stateManager.IsComponentInstalled(comp) || m.stateManager.HasChangedSince(comp, comp.Component.Link))
+	
+	// Check if defaults need updating (only on macOS)
+	hasDefaults := len(comp.Component.Defaults) > 0 && system.IsMacOS()
+	needsDefaults := false
+	if hasDefaults {
+		// For force install or first-time install, always check defaults
+		if forceInstall || !m.stateManager.IsComponentInstalled(comp) {
+			needsDefaults = true
+		} else {
+			// Compare current defaults with saved files to detect changes
+			defaultsResults, err := m.defaultsManager.CompareDefaults(comp.Component.Defaults)
+			if err == nil {
+				// Check if any defaults have changed
+				for _, result := range defaultsResults {
+					if result.Changed {
+						needsDefaults = true
+						break
+					}
+				}
+			}
+		}
+	}
 
-	// If no install needed and no linking needed, mark as skipped
-	if !needsInstall && !needsLinking {
+	// If no install needed and no linking needed and no defaults needed, mark as skipped
+	if !needsInstall && !needsLinking && !needsDefaults {
 		result.Skipped = true
 		progress.CompleteSuccess()
 		return result

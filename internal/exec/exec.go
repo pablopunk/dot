@@ -121,6 +121,27 @@ func (m *Manager) ExecuteShellCommandWithProgress(command string, progress Progr
 	} else {
 		// For non-interactive commands, capture output
 		output, err = cmd.CombinedOutput()
+		
+		// In verbose mode, display the output after execution
+		if m.verbose && len(output) > 0 {
+			// Pause progress indicator for output display
+			if progress != nil {
+				progress.PauseForInteraction("showing command output")
+			}
+			
+			fmt.Printf("   Command output:\n")
+			// Indent the output for better readability
+			for _, line := range strings.Split(strings.TrimSpace(string(output)), "\n") {
+				if line != "" {
+					fmt.Printf("   │ %s\n", line)
+				}
+			}
+			
+			// Resume progress indicator
+			if progress != nil {
+				progress.ResumeAfterInteraction()
+			}
+		}
 	}
 	
 	outputStr := strings.TrimSpace(string(output))
