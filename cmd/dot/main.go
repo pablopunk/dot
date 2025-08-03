@@ -357,11 +357,23 @@ func (a *App) Run(args []string) error {
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Warning: failed to uninstall removed components: %v\n", err)
 		} else if len(uninstallResults) > 0 {
-			if a.Verbose {
-				fmt.Printf("📦 Found %d removed components to uninstall\n", len(uninstallResults))
+			// Only show "Uninstalled removed components" if actual uninstall commands were executed
+			var actualUninstalls []component.InstallResult
+			for _, result := range uninstallResults {
+				if result.InstallResult != nil {
+					actualUninstalls = append(actualUninstalls, result)
+				}
 			}
-			fmt.Println("\nUninstalled removed components:")
-			a.printResults("Uninstall", uninstallResults)
+			
+			if len(actualUninstalls) > 0 {
+				if a.Verbose {
+					fmt.Printf("📦 Found %d removed components with uninstall commands\n", len(actualUninstalls))
+				}
+				fmt.Println("\nUninstalled removed components:")
+				a.printResults("Uninstall", actualUninstalls)
+			} else if a.Verbose {
+				fmt.Printf("✓ Cleaned up %d removed components (links only)\n", len(uninstallResults))
+			}
 		} else if a.Verbose {
 			fmt.Printf("✓ No removed components found\n")
 		}
