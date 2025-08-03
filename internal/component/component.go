@@ -152,7 +152,7 @@ func (m *Manager) installComponent(comp profile.ComponentInfo, forceInstall bool
 	// Check if component needs install work
 	needsInstall := forceInstall || !m.stateManager.IsComponentInstalled(comp) || m.stateManager.HasInstallChanged(comp, comp.Component.Install)
 	hasLinks := len(comp.Component.Link) > 0
-	needsLinking := hasLinks && (forceInstall || !m.stateManager.IsComponentInstalled(comp) || m.stateManager.HasChangedSince(comp, comp.Component.Link))
+	// Links always need to be processed - they're fast and ensure files are properly linked
 	
 	// Check if defaults need updating (only on macOS)
 	hasDefaults := len(comp.Component.Defaults) > 0 && system.IsMacOS()
@@ -176,8 +176,8 @@ func (m *Manager) installComponent(comp profile.ComponentInfo, forceInstall bool
 		}
 	}
 
-	// If no install needed and no linking needed and no defaults needed, mark as skipped
-	if !needsInstall && !needsLinking && !needsDefaults {
+	// If no install needed and no links and no defaults needed, mark as skipped
+	if !needsInstall && !hasLinks && !needsDefaults {
 		result.Skipped = true
 		return result
 	}
@@ -213,8 +213,8 @@ func (m *Manager) installComponent(comp profile.ComponentInfo, forceInstall bool
 		}
 	}
 
-	// Create links only if linking is needed
-	if needsLinking {
+	// Create links if component has any links (always run - it's fast and ensures proper linking)
+	if hasLinks {
 		linkResults, err := m.linkManager.CreateLinks(comp.Component.Link)
 		result.LinkResults = linkResults
 
@@ -292,7 +292,7 @@ func (m *Manager) installComponentWithProgress(comp profile.ComponentInfo, force
 	// Check if component needs install work
 	needsInstall := forceInstall || !m.stateManager.IsComponentInstalled(comp) || m.stateManager.HasInstallChanged(comp, comp.Component.Install)
 	hasLinks := len(comp.Component.Link) > 0
-	needsLinking := hasLinks && (forceInstall || !m.stateManager.IsComponentInstalled(comp) || m.stateManager.HasChangedSince(comp, comp.Component.Link))
+	// Links always need to be processed - they're fast and ensure files are properly linked
 	
 	// Check if defaults need updating (only on macOS)
 	hasDefaults := len(comp.Component.Defaults) > 0 && system.IsMacOS()
@@ -316,8 +316,8 @@ func (m *Manager) installComponentWithProgress(comp profile.ComponentInfo, force
 		}
 	}
 
-	// If no install needed and no linking needed and no defaults needed, mark as skipped
-	if !needsInstall && !needsLinking && !needsDefaults {
+	// If no install needed and no links and no defaults needed, mark as skipped
+	if !needsInstall && !hasLinks && !needsDefaults {
 		result.Skipped = true
 		progress.CompleteSuccess()
 		return result
@@ -354,8 +354,8 @@ func (m *Manager) installComponentWithProgress(comp profile.ComponentInfo, force
 		}
 	}
 
-	// Create links only if linking is needed
-	if needsLinking {
+	// Create links if component has any links (always run - it's fast and ensures proper linking)
+	if hasLinks {
 		progress.StartLinking()
 		linkResults, err := m.linkManager.CreateLinks(comp.Component.Link)
 		result.LinkResults = linkResults

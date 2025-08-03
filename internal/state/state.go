@@ -269,21 +269,22 @@ func (m *Manager) GetLockFilePath() string {
 }
 
 // migrateRenamedComponent moves a component from old name to new name in the state
-// This handles the case where a component was renamed/moved but has identical content
+// This handles the case where a component was renamed/moved but has identical core functionality
 func (m *Manager) migrateRenamedComponent(oldKey string, newComponent profile.ComponentInfo, oldState ComponentState) {
 	newKey := newComponent.FullName()
 	
-	// Create new state with updated names but preserve everything else
+	// Create new state preserving installation state but resetting link state
+	// This ensures that links will be re-created for the new component location
 	newState := ComponentState{
 		ProfileName:    newComponent.ProfileName,
 		ComponentName:  newComponent.ComponentName,
 		InstalledAt:    oldState.InstalledAt,
 		PackageManager: oldState.PackageManager,
 		InstallCommand: oldState.InstallCommand,
-		Links:          oldState.Links,
+		Links:          map[string]string{}, // Reset links so they get re-created
 		PostInstallRan: oldState.PostInstallRan,
-		PostLinkRan:    oldState.PostLinkRan,
-		ContentHash:    oldState.ContentHash, // Keep the same content hash
+		PostLinkRan:    false, // Reset post-link state since links will be re-created
+		ContentHash:    newComponent.Component.ContentHash(),
 	}
 	
 	// Remove old entry and add new one

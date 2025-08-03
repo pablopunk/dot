@@ -184,8 +184,9 @@ func (c *Component) MatchesOS(currentOS string) bool {
 	return false
 }
 
-// ContentHash generates a hash of the component's actual content (install, link, etc.)
-// excluding the component name/path. This allows detecting renames/moves.
+// ContentHash generates a hash of the component's core functionality
+// This focuses on install/uninstall commands and hooks, but excludes links and paths
+// to better detect renames where the component functionality is the same
 func (c *Component) ContentHash() string {
 	h := sha256.New()
 	
@@ -210,18 +211,6 @@ func (c *Component) ContentHash() string {
 		sort.Strings(uninstallKeys)
 		for _, k := range uninstallKeys {
 			h.Write([]byte(fmt.Sprintf("uninstall:%s:%s;", k, c.Uninstall[k])))
-		}
-	}
-	
-	// Sort and hash link commands
-	if len(c.Link) > 0 {
-		var linkKeys []string
-		for k := range c.Link {
-			linkKeys = append(linkKeys, k)
-		}
-		sort.Strings(linkKeys)
-		for _, k := range linkKeys {
-			h.Write([]byte(fmt.Sprintf("link:%s:%s;", k, c.Link[k])))
 		}
 	}
 	
@@ -254,6 +243,10 @@ func (c *Component) ContentHash() string {
 			h.Write([]byte(fmt.Sprintf("defaults:%s:%s;", k, c.Defaults[k])))
 		}
 	}
+	
+	// NOTE: We intentionally exclude Link mapping from the hash because
+	// component moves/renames often involve path changes in links, but
+	// the core functionality (install commands, hooks) remains the same
 	
 	return fmt.Sprintf("%x", h.Sum(nil))
 }
