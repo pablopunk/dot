@@ -1,5 +1,7 @@
 package main
 
+var version = "dev"
+
 import (
 	"flag"
 	"fmt"
@@ -655,14 +657,6 @@ func upgradeCommand(verbose bool) error {
 }
 
 func versionCommand() error {
-	cmd := exec.Command("git", "describe", "--tags", "--abbrev=0")
-	output, err := cmd.Output()
-	if err != nil {
-		fmt.Println("unknown")
-		return nil
-	}
-	
-	version := strings.TrimSpace(string(output))
 	fmt.Println(version)
 	return nil
 }

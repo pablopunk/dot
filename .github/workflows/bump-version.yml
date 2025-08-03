@@ -40,50 +40,13 @@ jobs:
             exit 1
           fi
       
-      - name: Create version bump branch
+      - name: Create and push tag
         run: |
-          git checkout -b version-bump-${{ inputs.version }}
+          git tag ${{ inputs.version }}
+          git push origin ${{ inputs.version }}
+          echo "Created and pushed tag: ${{ inputs.version }}"
       
-      - name: Update version in files
+      - name: Verify tag creation
         run: |
-          # Create or update VERSION file
-          echo "${{ inputs.version }}" > VERSION
-          git add VERSION
-          
-          # If there are other files that need version updates, add them here
-          # For example, if you have a version constant in Go code:
-          # sed -i 's/const Version = ".*"/const Version = "${{ inputs.version }}"/' internal/version/version.go
-      
-      - name: Commit changes
-        run: |
-          git commit -m "bump version to ${{ inputs.version }}
-
-          🤖 Generated with [Claude Code](https://claude.ai/code)
-
-          Co-Authored-By: Claude <noreply@anthropic.com>"
-      
-      - name: Push branch
-        run: |
-          git push origin version-bump-${{ inputs.version }}
-      
-      - name: Create Pull Request
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh pr create \
-            --title "Bump version to ${{ inputs.version }}" \
-            --body "$(cat <<'EOF'
-          ## Summary
-          - Bump version to ${{ inputs.version }}
-          
-          ## Changes
-          - Updated VERSION file
-          
-          This PR was created automatically by the bump-version workflow.
-          When merged, this will trigger the tag-release workflow to create the git tag and release.
-          
-          🤖 Generated with [Claude Code](https://claude.ai/code)
-          EOF
-          )" \
-            --base main \
-            --head version-bump-${{ inputs.version }}
+          echo "Tag created successfully! This will now trigger the release workflow."
+          echo "Release workflow should start building for tag: ${{ inputs.version }}"
