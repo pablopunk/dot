@@ -27,10 +27,12 @@ jobs:
         GOOS: ${{ matrix.goos }}
         GOARCH: ${{ matrix.goarch }}
       run: |
+        VERSION=${{ github.ref_name }}
+        LDFLAGS="-X main.version=$VERSION -s -w"
         if [ "$GOOS" = "windows" ]; then
-          go build -o dot-${{ matrix.goos }}-${{ matrix.goarch }}.exe ./cmd/dot
+          go build -ldflags "$LDFLAGS" -o dot-${{ matrix.goos }}-${{ matrix.goarch }}.exe ./cmd/dot
         else
-          go build -o dot-${{ matrix.goos }}-${{ matrix.goarch }} ./cmd/dot
+          go build -ldflags "$LDFLAGS" -o dot-${{ matrix.goos }}-${{ matrix.goarch }} ./cmd/dot
         fi
 
     - name: Upload artifacts

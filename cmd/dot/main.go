@@ -16,10 +16,13 @@ import (
 	"github.com/pablopunk/dot/internal/ui"
 )
 
+var version = "dev"
+
 func main() {
 	var (
 		listProfiles    = flag.Bool("profiles", false, "list available profiles")
 		upgrade         = flag.Bool("upgrade", false, "upgrade the tool")
+		version         = flag.Bool("version", false, "show version information")
 		removeProfile   = flag.String("remove-profile", "", "remove a profile from the active set")
 		verbose         = flag.Bool("v", false, "verbose output")
 		verboseLong     = flag.Bool("verbose", false, "verbose output")
@@ -52,6 +55,14 @@ func main() {
 	// Handle defaults flags (either short or long form)
 	shouldExportDefaults := *defaultsExport || *defaultsExportShort
 	shouldImportDefaults := *defaultsImport || *defaultsImportShort
+
+	if *version {
+		if err := versionCommand(); err != nil {
+			fmt.Fprintf(os.Stderr, "%s\n", ui.Error(err.Error()))
+			os.Exit(1)
+		}
+		return
+	}
 
 	if *upgrade {
 		if err := upgradeCommand(isVerbose); err != nil {
@@ -642,6 +653,11 @@ func upgradeCommand(verbose bool) error {
 	}
 
 	fmt.Printf("\n%s\n", ui.Success("Upgrade completed successfully!"))
+	return nil
+}
+
+func versionCommand() error {
+	fmt.Println(version)
 	return nil
 }
 
