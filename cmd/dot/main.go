@@ -30,8 +30,21 @@ func main() {
 		defaultsExportShort = flag.Bool("e", false, "export macOS defaults to plist files")
 		defaultsImport  = flag.Bool("defaults-import", false, "import macOS defaults from plist files")
 		defaultsImportShort = flag.Bool("i", false, "import macOS defaults from plist files")
+		runPostInstall  = flag.Bool("postinstall", false, "run only postinstall hooks")
+		runPostLink     = flag.Bool("postlink", false, "run only postlink hooks")
 	)
+	
+	// Preprocess arguments to allow flexible flag/argument ordering
+	flags, positionalArgs := preprocessArgs(os.Args[1:])
+	
+	// Set os.Args to contain only the program name and flags for flag.Parse()
+	originalArgs := os.Args
+	os.Args = append([]string{os.Args[0]}, flags...)
+	
 	flag.Parse()
+	
+	// Restore os.Args after flag parsing
+	os.Args = originalArgs
 
 	// Handle verbose flag (either -v or --verbose)
 	isVerbose := *verbose || *verboseLong
@@ -64,13 +77,57 @@ func main() {
 		ExportDefaults: shouldExportDefaults,
 		ImportDefaults: shouldImportDefaults,
 		RemoveProfile:  *removeProfile,
+		RunPostInstall: *runPostInstall,
+		RunPostLink:    *runPostLink,
 	}
 
-	args := flag.Args()
+	// Use the preprocessed positional arguments instead of flag.Args()
+	args := positionalArgs
 	if err := app.Run(args); err != nil {
 		fmt.Fprintf(os.Stderr, "%s\n", ui.Error(err.Error()))
 		os.Exit(1)
 	}
+}
+
+// preprocessArgs separates flags from positional arguments to allow flexible ordering
+func preprocessArgs(args []string) (flags []string, positional []string) {
+	flags = []string{}
+	positional = []string{}
+	
+	i := 0
+	for i < len(args) {
+		arg := args[i]
+		
+		// Handle -- separator (everything after is positional)
+		if arg == "--" {
+			positional = append(positional, args[i+1:]...)
+			break
+		}
+		
+		// Handle flags (start with -)
+		if len(arg) > 1 && arg[0] == '-' {
+			flags = append(flags, arg)
+			
+			// Handle flags with values (like --remove-profile value)
+			if i+1 < len(args) && len(arg) > 2 && arg[1] == '-' {
+				// Long flag, check if next arg is a value (doesn't start with -)
+				next := args[i+1]
+				if len(next) > 0 && next[0] != '-' {
+					// Check if this flag expects a value by looking at known string flags
+					if arg == "--remove-profile" {
+						flags = append(flags, next)
+						i++ // Skip the value argument
+					}
+				}
+			}
+		} else {
+			// Positional argument
+			positional = append(positional, arg)
+		}
+		i++
+	}
+	
+	return flags, positional
 }
 
 type App struct {
@@ -81,6 +138,8 @@ type App struct {
 	ExportDefaults bool
 	ImportDefaults bool
 	RemoveProfile  string
+	RunPostInstall bool
+	RunPostLink    bool
 }
 
 func (a *App) Run(args []string) error {
@@ -183,6 +242,51 @@ func (a *App) Run(args []string) error {
 			return fmt.Errorf("defaults import is only available on macOS")
 		}
 		return componentManager.ImportDefaults(activeProfiles)
+	}
+
+	// Handle hook-only operations
+	if a.RunPostInstall {
+		if a.Verbose {
+			fmt.Printf("🪝 Running postinstall hooks only...\n")
+			if len(activeProfiles) > 0 {
+				fmt.Printf("   Active profiles: %s\n", strings.Join(activeProfiles, ", "))
+			} else {
+				fmt.Printf("   Active profiles: * (default)\n")
+			}
+			if fuzzySearch != "" {
+				fmt.Printf("   Fuzzy search: %s\n", fuzzySearch)
+			}
+			fmt.Println()
+		}
+		
+		results, err := componentManager.RunPostInstallHooks(activeProfiles, fuzzySearch)
+		if err != nil {
+			return err
+		}
+		a.printResults("PostInstall Hook", results)
+		return nil
+	}
+
+	if a.RunPostLink {
+		if a.Verbose {
+			fmt.Printf("🪝 Running postlink hooks only...\n")
+			if len(activeProfiles) > 0 {
+				fmt.Printf("   Active profiles: %s\n", strings.Join(activeProfiles, ", "))
+			} else {
+				fmt.Printf("   Active profiles: * (default)\n")
+			}
+			if fuzzySearch != "" {
+				fmt.Printf("   Fuzzy search: %s\n", fuzzySearch)
+			}
+			fmt.Println()
+		}
+		
+		results, err := componentManager.RunPostLinkHooks(activeProfiles, fuzzySearch)
+		if err != nil {
+			return err
+		}
+		a.printResults("PostLink Hook", results)
+		return nil
 	}
 
 	// Handle uninstall

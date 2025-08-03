@@ -99,6 +99,26 @@ profiles:
 			wantErr:     true,
 			errContains: "only available on macOS",
 		},
+		{
+			name: "run postinstall hooks",
+			app: &App{
+				RunPostInstall: true,
+				DryRun:         true,
+				Verbose:        true,
+			},
+			args:    []string{},
+			wantErr: false,
+		},
+		{
+			name: "run postlink hooks",
+			app: &App{
+				RunPostLink: true,
+				DryRun:      true,
+				Verbose:     true,
+			},
+			args:    []string{},
+			wantErr: false,
+		},
 	}
 
 	for _, tt := range tests {
@@ -270,6 +290,97 @@ func TestApp_printResults(t *testing.T) {
 	app.printSummaryResults("Test", results)
 }
 
+func TestApp_HookExecution(t *testing.T) {
+	// Create a temporary directory for testing
+	tempDir := t.TempDir()
+	
+	// Create a test config file with hooks
+	configContent := `
+profiles:
+  "*":
+    component-with-postinstall:
+      link:
+        test-file: ~/.test-file
+      postinstall: "echo 'postinstall executed'"
+    component-with-postlink:
+      link:
+        test-file2: ~/.test-file2
+      postlink: "echo 'postlink executed'"
+    component-without-hooks:
+      link:
+        test-file3: ~/.test-file3
+`
+	configPath := filepath.Join(tempDir, "dot.yaml")
+	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+		t.Fatalf("Failed to create test config: %v", err)
+	}
+
+	// Change to temp directory and set clean HOME
+	oldWd, _ := os.Getwd()
+	defer os.Chdir(oldWd)
+	os.Chdir(tempDir)
+	
+	// Set HOME to temp directory to avoid using existing state
+	originalHome := os.Getenv("HOME")
+	os.Setenv("HOME", tempDir)
+	defer os.Setenv("HOME", originalHome)
+
+	tests := []struct {
+		name        string
+		app         *App
+		args        []string
+		wantErr     bool
+	}{
+		{
+			name: "run postinstall hooks",
+			app: &App{
+				RunPostInstall: true,
+				DryRun:         true,
+				Verbose:        false,
+			},
+			args:    []string{},
+			wantErr: false,
+		},
+		{
+			name: "run postlink hooks",
+			app: &App{
+				RunPostLink: true,
+				DryRun:      true,
+				Verbose:     false,
+			},
+			args:    []string{},
+			wantErr: false,
+		},
+		{
+			name: "run postinstall hooks with profile",
+			app: &App{
+				RunPostInstall: true,
+				DryRun:         true,
+				Verbose:        true,
+			},
+			args:    []string{"*"},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.app.Run(tt.args)
+			
+			if tt.wantErr {
+				if err == nil {
+					t.Errorf("App.Run() expected error but got none")
+				}
+				return
+			}
+			
+			if err != nil {
+				t.Errorf("App.Run() unexpected error = %v", err)
+			}
+		})
+	}
+}
+
 func TestFlagParsing(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -306,6 +417,20 @@ func TestFlagParsing(t *testing.T) {
 				"install":  true,
 			},
 		},
+		{
+			name: "postinstall hook flag",
+			args: []string{"--postinstall"},
+			expected: map[string]bool{
+				"postinstall": true,
+			},
+		},
+		{
+			name: "postlink hook flag",
+			args: []string{"--postlink"},
+			expected: map[string]bool{
+				"postlink": true,
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -318,6 +443,8 @@ func TestFlagParsing(t *testing.T) {
 			verboseLong := flag.Bool("verbose", false, "verbose output")
 			dryRun := flag.Bool("dry-run", false, "preview actions without making changes")
 			install := flag.Bool("install", false, "force reinstall")
+			postinstall := flag.Bool("postinstall", false, "run only postinstall hooks")
+			postlink := flag.Bool("postlink", false, "run only postlink hooks")
 			
 			// Parse test args
 			os.Args = append([]string{"dot"}, tt.args...)
@@ -339,6 +466,18 @@ func TestFlagParsing(t *testing.T) {
 			if expected, exists := tt.expected["install"]; exists {
 				if *install != expected {
 					t.Errorf("install flag = %v, want %v", *install, expected)
+				}
+			}
+			
+			if expected, exists := tt.expected["postinstall"]; exists {
+				if *postinstall != expected {
+					t.Errorf("postinstall flag = %v, want %v", *postinstall, expected)
+				}
+			}
+			
+			if expected, exists := tt.expected["postlink"]; exists {
+				if *postlink != expected {
+					t.Errorf("postlink flag = %v, want %v", *postlink, expected)
 				}
 			}
 		})

@@ -615,6 +615,220 @@ func TestManagerVerboseAndDryRun(t *testing.T) {
 	}
 }
 
+func TestRunPostInstallHooks(t *testing.T) {
+	tmpDir := t.TempDir()
+	homeDir := filepath.Join(tmpDir, "home")
+	
+	// Set HOME for state manager
+	originalHome := os.Getenv("HOME")
+	os.Setenv("HOME", homeDir)
+	t.Cleanup(func() { os.Setenv("HOME", originalHome) })
+
+	tests := []struct {
+		name            string
+		config          *config.Config
+		profiles        []string
+		fuzzySearch     string
+		expectedSuccess int
+		expectedSkipped int
+		expectedFailed  int
+	}{
+		{
+			name: "run postinstall hooks",
+			config: &config.Config{
+				Profiles: map[string]config.Profile{
+					"*": {
+						"with-hook": config.Component{
+							PostInstall: "echo 'postinstall success'",
+						},
+						"without-hook": config.Component{
+							Link: map[string]string{"test": "~/.test"},
+						},
+					},
+				},
+			},
+			profiles:        []string{"*"},
+			expectedSuccess: 1,
+			expectedSkipped: 1,
+			expectedFailed:  0,
+		},
+		{
+			name: "failing postinstall hook",
+			config: &config.Config{
+				Profiles: map[string]config.Profile{
+					"*": {
+						"failing-hook": config.Component{
+							PostInstall: "exit 1",
+						},
+					},
+				},
+			},
+			profiles:        []string{"*"},
+			expectedSuccess: 0,
+			expectedSkipped: 0,
+			expectedFailed:  1,
+		},
+		{
+			name: "no matching components",
+			config: &config.Config{
+				Profiles: map[string]config.Profile{
+					"*": {
+						"test": config.Component{
+							Link: map[string]string{"test": "~/.test"},
+						},
+					},
+				},
+			},
+			profiles:        []string{"*"},
+			expectedSuccess: 0,
+			expectedSkipped: 1,
+			expectedFailed:  0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			manager, err := NewManager(tt.config, tmpDir, false, false)
+			if err != nil {
+				t.Fatalf("Failed to create manager: %v", err)
+			}
+
+			results, err := manager.RunPostInstallHooks(tt.profiles, tt.fuzzySearch)
+			if err != nil {
+				t.Fatalf("RunPostInstallHooks() error = %v", err)
+			}
+
+			var successful, skipped, failed int
+			for _, result := range results {
+				if result.Skipped {
+					skipped++
+				} else if result.WasSuccessful() {
+					successful++
+				} else {
+					failed++
+				}
+			}
+
+			if successful != tt.expectedSuccess {
+				t.Errorf("RunPostInstallHooks() successful = %v, want %v", successful, tt.expectedSuccess)
+			}
+			if skipped != tt.expectedSkipped {
+				t.Errorf("RunPostInstallHooks() skipped = %v, want %v", skipped, tt.expectedSkipped)
+			}
+			if failed != tt.expectedFailed {
+				t.Errorf("RunPostInstallHooks() failed = %v, want %v", failed, tt.expectedFailed)
+			}
+		})
+	}
+}
+
+func TestRunPostLinkHooks(t *testing.T) {
+	tmpDir := t.TempDir()
+	homeDir := filepath.Join(tmpDir, "home")
+	
+	// Set HOME for state manager
+	originalHome := os.Getenv("HOME")
+	os.Setenv("HOME", homeDir)
+	t.Cleanup(func() { os.Setenv("HOME", originalHome) })
+
+	tests := []struct {
+		name            string
+		config          *config.Config
+		profiles        []string
+		fuzzySearch     string
+		expectedSuccess int
+		expectedSkipped int
+		expectedFailed  int
+	}{
+		{
+			name: "run postlink hooks",
+			config: &config.Config{
+				Profiles: map[string]config.Profile{
+					"*": {
+						"with-hook": config.Component{
+							PostLink: "echo 'postlink success'",
+						},
+						"without-hook": config.Component{
+							Link: map[string]string{"test": "~/.test"},
+						},
+					},
+				},
+			},
+			profiles:        []string{"*"},
+			expectedSuccess: 1,
+			expectedSkipped: 1,
+			expectedFailed:  0,
+		},
+		{
+			name: "failing postlink hook",
+			config: &config.Config{
+				Profiles: map[string]config.Profile{
+					"*": {
+						"failing-hook": config.Component{
+							PostLink: "exit 1",
+						},
+					},
+				},
+			},
+			profiles:        []string{"*"},
+			expectedSuccess: 0,
+			expectedSkipped: 0,
+			expectedFailed:  1,
+		},
+		{
+			name: "no matching components",
+			config: &config.Config{
+				Profiles: map[string]config.Profile{
+					"*": {
+						"test": config.Component{
+							Link: map[string]string{"test": "~/.test"},
+						},
+					},
+				},
+			},
+			profiles:        []string{"*"},
+			expectedSuccess: 0,
+			expectedSkipped: 1,
+			expectedFailed:  0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			manager, err := NewManager(tt.config, tmpDir, false, false)
+			if err != nil {
+				t.Fatalf("Failed to create manager: %v", err)
+			}
+
+			results, err := manager.RunPostLinkHooks(tt.profiles, tt.fuzzySearch)
+			if err != nil {
+				t.Fatalf("RunPostLinkHooks() error = %v", err)
+			}
+
+			var successful, skipped, failed int
+			for _, result := range results {
+				if result.Skipped {
+					skipped++
+				} else if result.WasSuccessful() {
+					successful++
+				} else {
+					failed++
+				}
+			}
+
+			if successful != tt.expectedSuccess {
+				t.Errorf("RunPostLinkHooks() successful = %v, want %v", successful, tt.expectedSuccess)
+			}
+			if skipped != tt.expectedSkipped {
+				t.Errorf("RunPostLinkHooks() skipped = %v, want %v", skipped, tt.expectedSkipped)
+			}
+			if failed != tt.expectedFailed {
+				t.Errorf("RunPostLinkHooks() failed = %v, want %v", failed, tt.expectedFailed)
+			}
+		})
+	}
+}
+
 // Helper function
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && (s == substr || (len(s) > len(substr) && 

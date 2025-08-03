@@ -155,6 +155,10 @@ dot git     # Installs any component matching "git"
 # Remove a profile from active set
 dot --remove-profile work
 
+# Run hooks independently
+dot --postinstall       # Run only postinstall hooks
+dot --postlink          # Run only postlink hooks
+
 # macOS defaults management
 dot --defaults-export   # Export current settings to plist files
 dot --defaults-import   # Import settings from plist files
@@ -217,6 +221,39 @@ profiles:
         echo "Installing vim plugins..."
         vim +PlugInstall +qall
 ```
+
+### Hook Types
+
+- **`postinstall`**: Runs after package installation succeeds
+- **`postlink`**: Runs after symlink creation succeeds
+
+### Running Hooks Independently
+
+You can run hooks without performing full installation:
+
+```bash
+# Run only postinstall hooks
+dot --postinstall
+
+# Run only postlink hooks
+dot --postlink
+
+# Run hooks for specific components
+dot git --postinstall    # Run postinstall for git component
+dot vim --postlink       # Run postlink for vim component
+
+# Run hooks with dry-run to see what would execute
+dot --postinstall --dry-run -v
+
+# Run hooks for specific profiles
+dot work --postinstall   # Run postinstall hooks for work profile
+```
+
+This is useful for:
+- **Testing hooks** during development
+- **Re-running configuration** after manual changes
+- **Debugging hook failures** without full reinstalls
+- **Updating configs** without reinstalling packages
 
 ## macOS Defaults
 

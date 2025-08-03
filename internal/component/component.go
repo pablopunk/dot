@@ -595,3 +595,71 @@ func (r *InstallResult) String() string {
 
 	return fmt.Sprintf("✓ %s", r.Component.FullName())
 }
+
+// RunPostInstallHooks runs only the postinstall hooks for matching components
+func (m *Manager) RunPostInstallHooks(activeProfiles []string, fuzzySearch string) ([]InstallResult, error) {
+	components, err := m.profileManager.GetActiveComponents(activeProfiles, fuzzySearch)
+	if err != nil {
+		return nil, err
+	}
+
+	var results []InstallResult
+
+	for _, comp := range components {
+		result := InstallResult{Component: comp}
+
+		// Only run postinstall hook if it exists
+		if comp.Component.PostInstall != "" {
+			if m.verbose {
+				fmt.Printf("   Running postinstall hook for %s...\n", comp.FullName())
+			}
+			
+			postInstallResult := m.execManager.ExecuteShellCommand(comp.Component.PostInstall)
+			result.PostInstallResult = &postInstallResult
+
+			if !postInstallResult.Success {
+				result.Error = fmt.Errorf("post-install hook failed: %w", postInstallResult.Error)
+			}
+		} else {
+			result.Skipped = true
+		}
+
+		results = append(results, result)
+	}
+
+	return results, nil
+}
+
+// RunPostLinkHooks runs only the postlink hooks for matching components
+func (m *Manager) RunPostLinkHooks(activeProfiles []string, fuzzySearch string) ([]InstallResult, error) {
+	components, err := m.profileManager.GetActiveComponents(activeProfiles, fuzzySearch)
+	if err != nil {
+		return nil, err
+	}
+
+	var results []InstallResult
+
+	for _, comp := range components {
+		result := InstallResult{Component: comp}
+
+		// Only run postlink hook if it exists
+		if comp.Component.PostLink != "" {
+			if m.verbose {
+				fmt.Printf("   Running postlink hook for %s...\n", comp.FullName())
+			}
+			
+			postLinkResult := m.execManager.ExecuteShellCommand(comp.Component.PostLink)
+			result.PostLinkResult = &postLinkResult
+
+			if !postLinkResult.Success {
+				result.Error = fmt.Errorf("post-link hook failed: %w", postLinkResult.Error)
+			}
+		} else {
+			result.Skipped = true
+		}
+
+		results = append(results, result)
+	}
+
+	return results, nil
+}
