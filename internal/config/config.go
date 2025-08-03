@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -11,7 +12,9 @@ type Config struct {
 	Profiles map[string]Profile `yaml:"profiles"`
 }
 
-type Profile map[string]Component
+type Profile map[string]interface{}
+
+type ComponentMap map[string]Component
 
 type Component struct {
 	Install     map[string]string `yaml:"install,omitempty"`
@@ -41,6 +44,81 @@ func Load(filename string) (*Config, error) {
 	return &config, nil
 }
 
+// GetComponents recursively extracts all components from a profile
+func (p Profile) GetComponents() ComponentMap {
+	components := make(ComponentMap)
+	for name, value := range p {
+		extractComponents(value, name, components)
+	}
+	return components
+}
+
+
+// extractComponents recursively traverses the profile structure to find components
+func extractComponents(value interface{}, path string, components ComponentMap) {
+	switch v := value.(type) {
+	case map[string]interface{}:
+		// Check if this is a component (has component properties)
+		if isComponent(v) {
+			// Convert to Component struct
+			component, err := convertToComponent(v)
+			if err == nil {
+				components[path] = component
+			}
+		} else {
+			// This is a container, recurse into it
+			for key, nestedValue := range v {
+				newPath := path + "." + key
+				extractComponents(nestedValue, newPath, components)
+			}
+		}
+	case Profile:
+		// Handle Profile type (which is map[string]interface{})
+		m := map[string]interface{}(v)
+		if isComponent(m) {
+			// Convert to Component struct
+			component, err := convertToComponent(m)
+			if err == nil {
+				components[path] = component
+			}
+		} else {
+			// This is a container, recurse into it
+			for key, nestedValue := range v {
+				newPath := path + "." + key
+				extractComponents(nestedValue, newPath, components)
+			}
+		}
+	case Component:
+		// Direct component (backward compatibility)
+		components[path] = v
+	}
+}
+
+// isComponent checks if a map contains component properties
+func isComponent(m map[string]interface{}) bool {
+	componentKeys := []string{"install", "uninstall", "link", "postinstall", "postlink", "os", "defaults"}
+	for _, key := range componentKeys {
+		if _, exists := m[key]; exists {
+			return true
+		}
+	}
+	return false
+}
+
+// convertToComponent converts a map[string]interface{} to a Component struct
+func convertToComponent(m map[string]interface{}) (Component, error) {
+	// Marshal back to YAML and unmarshal into Component struct
+	// This handles type conversion properly
+	data, err := yaml.Marshal(m)
+	if err != nil {
+		return Component{}, err
+	}
+	
+	var component Component
+	err = yaml.Unmarshal(data, &component)
+	return component, err
+}
+
 func validate(config *Config) error {
 	if config.Profiles == nil {
 		return fmt.Errorf("no profiles defined")
@@ -51,21 +129,27 @@ func validate(config *Config) error {
 			return fmt.Errorf("profile name cannot be empty")
 		}
 
-		for componentName, component := range profile {
-			if componentName == "" {
-				return fmt.Errorf("component name cannot be empty in profile %s", profileName)
+		// Extract all components from the potentially recursive profile structure
+		components := profile.GetComponents()
+		if len(components) == 0 {
+			return fmt.Errorf("profile %s contains no components", profileName)
+		}
+
+		for componentPath, component := range components {
+			if strings.Contains(componentPath, "..") || strings.HasPrefix(componentPath, ".") || strings.HasSuffix(componentPath, ".") {
+				return fmt.Errorf("invalid component path '%s' in profile %s", componentPath, profileName)
 			}
 
 			// Validate OS restrictions
 			for _, osName := range component.OS {
 				if osName != "mac" && osName != "darwin" && osName != "linux" {
-					return fmt.Errorf("invalid OS restriction '%s' in component %s.%s, must be 'mac', 'darwin', or 'linux'", osName, profileName, componentName)
+					return fmt.Errorf("invalid OS restriction '%s' in component %s.%s, must be 'mac', 'darwin', or 'linux'", osName, profileName, componentPath)
 				}
 			}
 
 			// At least one action must be defined
 			if len(component.Install) == 0 && len(component.Link) == 0 && len(component.Defaults) == 0 {
-				return fmt.Errorf("component %s.%s must define at least one action (install, link, or defaults)", profileName, componentName)
+				return fmt.Errorf("component %s.%s must define at least one action (install, link, or defaults)", profileName, componentPath)
 			}
 		}
 	}

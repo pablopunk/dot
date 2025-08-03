@@ -2,6 +2,7 @@ package profile
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/pablopunk/dot/internal/config"
@@ -31,12 +32,22 @@ func (m *Manager) GetActiveComponents(activeProfiles []string, fuzzySearch strin
 	
 	// Always include the "*" profile if it exists
 	if defaultProfile, exists := m.config.Profiles["*"]; exists {
-		for componentName, component := range defaultProfile {
+		profileComponents := defaultProfile.GetComponents()
+		
+		// Get sorted component paths to maintain consistent order
+		var paths []string
+		for componentPath := range profileComponents {
+			paths = append(paths, componentPath)
+		}
+		sort.Strings(paths)
+		
+		for _, componentPath := range paths {
+			component := profileComponents[componentPath]
 			if component.MatchesOS(m.currentOS) {
-				if fuzzySearch == "" || m.matchesFuzzySearch(componentName, fuzzySearch) {
+				if fuzzySearch == "" || m.matchesFuzzySearch(componentPath, fuzzySearch) {
 					components = append(components, ComponentInfo{
 						ProfileName:   "*",
-						ComponentName: componentName,
+						ComponentName: componentPath,
 						Component:     component,
 					})
 				}
@@ -55,12 +66,22 @@ func (m *Manager) GetActiveComponents(activeProfiles []string, fuzzySearch strin
 			return nil, fmt.Errorf("profile '%s' not found", profileName)
 		}
 		
-		for componentName, component := range profile {
+		profileComponents := profile.GetComponents()
+		
+		// Get sorted component paths to maintain consistent order
+		var paths []string
+		for componentPath := range profileComponents {
+			paths = append(paths, componentPath)
+		}
+		sort.Strings(paths)
+		
+		for _, componentPath := range paths {
+			component := profileComponents[componentPath]
 			if component.MatchesOS(m.currentOS) {
-				if fuzzySearch == "" || m.matchesFuzzySearch(componentName, fuzzySearch) {
+				if fuzzySearch == "" || m.matchesFuzzySearch(componentPath, fuzzySearch) {
 					components = append(components, ComponentInfo{
 						ProfileName:   profileName,
-						ComponentName: componentName,
+						ComponentName: componentPath,
 						Component:     component,
 					})
 				}
@@ -84,12 +105,12 @@ func (m *Manager) ProfileExists(profileName string) bool {
 	return exists
 }
 
-func (m *Manager) GetComponentsInProfile(profileName string) (map[string]config.Component, error) {
+func (m *Manager) GetComponentsInProfile(profileName string) (config.ComponentMap, error) {
 	profile, exists := m.config.Profiles[profileName]
 	if !exists {
 		return nil, fmt.Errorf("profile '%s' not found", profileName)
 	}
-	return profile, nil
+	return profile.GetComponents(), nil
 }
 
 func (m *Manager) FindComponentsByFuzzySearch(search string) []ComponentInfo {
@@ -98,11 +119,21 @@ func (m *Manager) FindComponentsByFuzzySearch(search string) []ComponentInfo {
 	search = strings.ToLower(search)
 	
 	for profileName, profile := range m.config.Profiles {
-		for componentName, component := range profile {
-			if component.MatchesOS(m.currentOS) && m.matchesFuzzySearch(componentName, search) {
+		profileComponents := profile.GetComponents()
+		
+		// Get sorted component paths to maintain consistent order
+		var paths []string
+		for componentPath := range profileComponents {
+			paths = append(paths, componentPath)
+		}
+		sort.Strings(paths)
+		
+		for _, componentPath := range paths {
+			component := profileComponents[componentPath]
+			if component.MatchesOS(m.currentOS) && m.matchesFuzzySearch(componentPath, search) {
 				matches = append(matches, ComponentInfo{
 					ProfileName:   profileName,
-					ComponentName: componentName,
+					ComponentName: componentPath,
 					Component:     component,
 				})
 			}

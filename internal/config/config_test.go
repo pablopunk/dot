@@ -52,7 +52,8 @@ profiles:
 		t.Error("Default profile '*' not found")
 	}
 	
-	bashComponent, exists := defaultProfile["bash"]
+	defaultComponents := defaultProfile.GetComponents()
+	bashComponent, exists := defaultComponents["bash"]
 	if !exists {
 		t.Error("bash component not found in default profile")
 	}
@@ -67,7 +68,8 @@ profiles:
 		t.Error("work profile not found")
 	}
 	
-	vpnComponent, exists := workProfile["vpn"]
+	workComponents := workProfile.GetComponents()
+	vpnComponent, exists := workComponents["vpn"]
 	if !exists {
 		t.Error("vpn component not found in work profile")
 	}

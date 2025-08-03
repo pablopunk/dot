@@ -60,9 +60,37 @@ profiles:
       install:
         brew: "brew install --cask spotify"
         apt: "snap install spotify"
+    
+    # Example of recursive modules - 'cli' is an organizational container
+    cli:
+      tools:
+        fzf:
+          install:
+            brew: "brew install fzf"
+            apt: "apt install -y fzf"
+          link:
+            "fzf/.fzfrc": "~/.fzfrc"
+        ripgrep:
+          install:
+            brew: "brew install ripgrep"
+            apt: "apt install -y ripgrep"
+      editors:
+        vim:
+          link:
+            "vim/.vimrc": "~/.vimrc"
+            "vim/.vim/": "~/.vim/"
+        nvim:
+          install:
+            brew: "brew install neovim"
+            apt: "apt install -y neovim"
+          link:
+            "nvim/": "~/.config/nvim/"
 ```
 
 - Each profile contains components.
+- **Recursive modules**: The structure supports arbitrary nesting levels beyond the required profile/profile-name structure. The third level and beyond can be either:
+  - A module/component with the standard properties (install, link, etc.)
+  - A plain organizational container that groups submodules (e.g., a "cli" section containing multiple tool configurations)
 - Each component can have:
   - `install`: map of package manager/tool names to install commands.
   - `uninstall`: map of package manager/tool names to uninstall commands.
