@@ -27,6 +27,7 @@ type ComponentState struct {
 	Links           map[string]string `yaml:"links,omitempty"`
 	PostInstallRan  bool              `yaml:"post_install_ran"`
 	PostLinkRan     bool              `yaml:"post_link_ran"`
+	ContentHash     string            `yaml:"content_hash,omitempty"` // Hash of component content for rename detection
 }
 
 type Manager struct {
@@ -34,7 +35,7 @@ type Manager struct {
 	lockFile     *LockFile
 }
 
-const LockFileVersion = "1.0"
+const LockFileVersion = "1.1"
 
 func NewManager() (*Manager, error) {
 	homeDir, err := os.UserHomeDir()
@@ -126,6 +127,7 @@ func (m *Manager) MarkComponentInstalled(componentInfo profile.ComponentInfo, pa
 		Links:          links,
 		PostInstallRan: false,
 		PostLinkRan:    false,
+		ContentHash:    componentInfo.Component.ContentHash(),
 	}
 }
 
@@ -167,13 +169,29 @@ func (m *Manager) GetRemovedComponents(currentComponents []profile.ComponentInfo
 	
 	// Create a set of current component keys
 	currentKeys := make(map[string]bool)
+	// Create a map of content hash to current component for rename detection
+	currentContentHashes := make(map[string]profile.ComponentInfo)
+	
 	for _, comp := range currentComponents {
 		currentKeys[comp.FullName()] = true
+		contentHash := comp.Component.ContentHash()
+		if contentHash != "" {
+			currentContentHashes[contentHash] = comp
+		}
 	}
 	
 	// Find components in lock file that are not in current components
 	for key, state := range m.lockFile.InstalledComponents {
 		if !currentKeys[key] {
+			// Component not found by name, check if it was renamed by content hash
+			if state.ContentHash != "" {
+				if renamedComponent, exists := currentContentHashes[state.ContentHash]; exists {
+					// This component was renamed! Update the state to use the new name
+					m.migrateRenamedComponent(key, renamedComponent, state)
+					continue // Don't add to removed list
+				}
+			}
+			// Component was truly removed
 			removed = append(removed, state)
 		}
 	}
@@ -240,13 +258,37 @@ func (m *Manager) HasInstallChanged(componentInfo profile.ComponentInfo, install
 }
 
 func (m *Manager) migrate() error {
-	// Future migration logic would go here
+	// Migrate from 1.0 to 1.1: no structural changes needed, 
+	// ContentHash field will be populated on next component update
 	m.lockFile.Version = LockFileVersion
 	return m.Save()
 }
 
 func (m *Manager) GetLockFilePath() string {
 	return m.lockFilePath
+}
+
+// migrateRenamedComponent moves a component from old name to new name in the state
+// This handles the case where a component was renamed/moved but has identical content
+func (m *Manager) migrateRenamedComponent(oldKey string, newComponent profile.ComponentInfo, oldState ComponentState) {
+	newKey := newComponent.FullName()
+	
+	// Create new state with updated names but preserve everything else
+	newState := ComponentState{
+		ProfileName:    newComponent.ProfileName,
+		ComponentName:  newComponent.ComponentName,
+		InstalledAt:    oldState.InstalledAt,
+		PackageManager: oldState.PackageManager,
+		InstallCommand: oldState.InstallCommand,
+		Links:          oldState.Links,
+		PostInstallRan: oldState.PostInstallRan,
+		PostLinkRan:    oldState.PostLinkRan,
+		ContentHash:    oldState.ContentHash, // Keep the same content hash
+	}
+	
+	// Remove old entry and add new one
+	delete(m.lockFile.InstalledComponents, oldKey)
+	m.lockFile.InstalledComponents[newKey] = newState
 }
 
 func (m *Manager) Reset() error {

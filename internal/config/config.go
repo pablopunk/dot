@@ -1,8 +1,10 @@
 package config
 
 import (
+	"crypto/sha256"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -180,4 +182,78 @@ func (c *Component) MatchesOS(currentOS string) bool {
 	}
 
 	return false
+}
+
+// ContentHash generates a hash of the component's actual content (install, link, etc.)
+// excluding the component name/path. This allows detecting renames/moves.
+func (c *Component) ContentHash() string {
+	h := sha256.New()
+	
+	// Sort and hash install commands
+	if len(c.Install) > 0 {
+		var installKeys []string
+		for k := range c.Install {
+			installKeys = append(installKeys, k)
+		}
+		sort.Strings(installKeys)
+		for _, k := range installKeys {
+			h.Write([]byte(fmt.Sprintf("install:%s:%s;", k, c.Install[k])))
+		}
+	}
+	
+	// Sort and hash uninstall commands
+	if len(c.Uninstall) > 0 {
+		var uninstallKeys []string
+		for k := range c.Uninstall {
+			uninstallKeys = append(uninstallKeys, k)
+		}
+		sort.Strings(uninstallKeys)
+		for _, k := range uninstallKeys {
+			h.Write([]byte(fmt.Sprintf("uninstall:%s:%s;", k, c.Uninstall[k])))
+		}
+	}
+	
+	// Sort and hash link commands
+	if len(c.Link) > 0 {
+		var linkKeys []string
+		for k := range c.Link {
+			linkKeys = append(linkKeys, k)
+		}
+		sort.Strings(linkKeys)
+		for _, k := range linkKeys {
+			h.Write([]byte(fmt.Sprintf("link:%s:%s;", k, c.Link[k])))
+		}
+	}
+	
+	// Hash post-install and post-link hooks
+	if c.PostInstall != "" {
+		h.Write([]byte(fmt.Sprintf("postinstall:%s;", c.PostInstall)))
+	}
+	if c.PostLink != "" {
+		h.Write([]byte(fmt.Sprintf("postlink:%s;", c.PostLink)))
+	}
+	
+	// Sort and hash OS restrictions
+	if len(c.OS) > 0 {
+		osSlice := make([]string, len(c.OS))
+		copy(osSlice, c.OS)
+		sort.Strings(osSlice)
+		for _, os := range osSlice {
+			h.Write([]byte(fmt.Sprintf("os:%s;", os)))
+		}
+	}
+	
+	// Sort and hash defaults
+	if len(c.Defaults) > 0 {
+		var defaultKeys []string
+		for k := range c.Defaults {
+			defaultKeys = append(defaultKeys, k)
+		}
+		sort.Strings(defaultKeys)
+		for _, k := range defaultKeys {
+			h.Write([]byte(fmt.Sprintf("defaults:%s:%s;", k, c.Defaults[k])))
+		}
+	}
+	
+	return fmt.Sprintf("%x", h.Sum(nil))
 }
