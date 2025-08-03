@@ -367,6 +367,10 @@ func TestDefaultsManager(t *testing.T) {
 }
 
 func TestDefaultsManagerCompareDefaults(t *testing.T) {
+	if !IsMacOS() {
+		t.Skip("Skipping defaults test on non-macOS platform")
+	}
+
 	tmpDir := t.TempDir()
 	manager := NewDefaultsManager(tmpDir, false, false)
 
@@ -397,6 +401,10 @@ func TestDefaultsManagerCompareDefaults(t *testing.T) {
 }
 
 func TestDefaultsManagerExportImport(t *testing.T) {
+	if !IsMacOS() {
+		t.Skip("Skipping defaults test on non-macOS platform")
+	}
+
 	tmpDir := t.TempDir()
 	manager := NewDefaultsManager(tmpDir, false, false)
 
