@@ -59,10 +59,15 @@ func DiscoverPackageManagers() map[string]PackageManager {
 }
 
 func GetFirstAvailablePackageManager(installCommands map[string]string, managers map[string]PackageManager) (string, string, bool) {
-	// Try any available manager
-	for managerName, cmd := range installCommands {
-		if manager, available := managers[managerName]; available && manager.Available {
-			return managerName, cmd, true
+	// Define priority order for package managers
+	priority := []string{"brew", "apt", "yum", "dnf", "pacman", "snap", "pip", "pip3", "npm", "cargo", "go"}
+	
+	// Try managers in priority order
+	for _, managerName := range priority {
+		if cmd, exists := installCommands[managerName]; exists {
+			if manager, available := managers[managerName]; available && manager.Available {
+				return managerName, cmd, true
+			}
 		}
 	}
 	
@@ -97,11 +102,34 @@ func GetCommandPath(command string) string {
 // NormalizeOSName converts various OS name formats to standardized names
 func NormalizeOSName(osName string) string {
 	normalized := strings.ToLower(strings.TrimSpace(osName))
-	switch normalized {
-	case "mac", "macos", "osx":
+	
+	// Handle Windows variants
+	if strings.HasPrefix(normalized, "windows") {
+		return "windows"
+	}
+	
+	// Handle macOS/Darwin variants
+	if strings.HasPrefix(normalized, "macos") || strings.HasPrefix(normalized, "darwin") {
 		return "darwin"
-	case "ubuntu", "debian", "fedora", "centos", "rhel", "arch", "manjaro":
+	}
+	
+	// Handle Linux variants
+	if strings.Contains(normalized, "ubuntu") || 
+	   strings.Contains(normalized, "debian") ||
+	   strings.Contains(normalized, "fedora") ||
+	   strings.Contains(normalized, "centos") ||
+	   strings.Contains(normalized, "rhel") ||
+	   strings.Contains(normalized, "red hat") ||
+	   strings.Contains(normalized, "arch") ||
+	   strings.Contains(normalized, "manjaro") ||
+	   strings.Contains(normalized, "linux") {
 		return "linux"
+	}
+	
+	// Exact matches for backward compatibility
+	switch normalized {
+	case "mac", "osx":
+		return "darwin"
 	default:
 		return normalized
 	}

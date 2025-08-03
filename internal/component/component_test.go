@@ -435,7 +435,7 @@ func TestInstallComponentFailures(t *testing.T) {
 					},
 				},
 			},
-			expectedError: "no available package manager",
+			expectedError: "no available command for component",
 		},
 		{
 			name: "component with invalid link source",

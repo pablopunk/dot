@@ -149,12 +149,14 @@ func (m *Manager) installComponentsWithProgress(activeProfiles []string, fuzzySe
 func (m *Manager) installComponent(comp profile.ComponentInfo, forceInstall bool) InstallResult {
 	result := InstallResult{Component: comp}
 
-	// Check if component needs install work (linking always runs)
+	// Check if component needs install work
 	needsInstall := forceInstall || !m.stateManager.IsComponentInstalled(comp) || m.stateManager.HasInstallChanged(comp, comp.Component.Install)
 	hasLinks := len(comp.Component.Link) > 0
+	needsLinking := hasLinks && (forceInstall || !m.stateManager.IsComponentInstalled(comp) || m.stateManager.HasChangedSince(comp, comp.Component.Link))
 
-	// If no install needed and no links, mark as successful (already in desired state)
-	if !needsInstall && !hasLinks {
+	// If no install needed and no linking needed, mark as skipped
+	if !needsInstall && !needsLinking {
+		result.Skipped = true
 		return result
 	}
 
@@ -189,8 +191,8 @@ func (m *Manager) installComponent(comp profile.ComponentInfo, forceInstall bool
 		}
 	}
 
-	// Create links
-	if len(comp.Component.Link) > 0 {
+	// Create links only if linking is needed
+	if needsLinking {
 		linkResults, err := m.linkManager.CreateLinks(comp.Component.Link)
 		result.LinkResults = linkResults
 
@@ -265,12 +267,14 @@ func (m *Manager) installComponentWithProgress(comp profile.ComponentInfo, force
 	// Create progress tracker for this component
 	progress := progressManager.NewComponentProgress(comp.ComponentName)
 
-	// Check if component needs install work (linking always runs)
+	// Check if component needs install work
 	needsInstall := forceInstall || !m.stateManager.IsComponentInstalled(comp) || m.stateManager.HasInstallChanged(comp, comp.Component.Install)
 	hasLinks := len(comp.Component.Link) > 0
+	needsLinking := hasLinks && (forceInstall || !m.stateManager.IsComponentInstalled(comp) || m.stateManager.HasChangedSince(comp, comp.Component.Link))
 
-	// If no install needed and no links, mark as successful (already in desired state)
-	if !needsInstall && !hasLinks {
+	// If no install needed and no linking needed, mark as skipped
+	if !needsInstall && !needsLinking {
+		result.Skipped = true
 		progress.CompleteSuccess()
 		return result
 	}
@@ -306,8 +310,8 @@ func (m *Manager) installComponentWithProgress(comp profile.ComponentInfo, force
 		}
 	}
 
-	// Create links
-	if len(comp.Component.Link) > 0 {
+	// Create links only if linking is needed
+	if needsLinking {
 		progress.StartLinking()
 		linkResults, err := m.linkManager.CreateLinks(comp.Component.Link)
 		result.LinkResults = linkResults

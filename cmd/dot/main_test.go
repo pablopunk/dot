@@ -5,6 +5,7 @@ import (
 	"flag"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -28,10 +29,15 @@ profiles:
 		t.Fatalf("Failed to create test config: %v", err)
 	}
 
-	// Change to temp directory
+	// Change to temp directory and set clean HOME
 	oldWd, _ := os.Getwd()
 	defer os.Chdir(oldWd)
 	os.Chdir(tempDir)
+	
+	// Set HOME to temp directory to avoid using existing state
+	originalHome := os.Getenv("HOME")
+	os.Setenv("HOME", tempDir)
+	defer os.Setenv("HOME", originalHome)
 
 	tests := []struct {
 		name        string
@@ -97,6 +103,11 @@ profiles:
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// Skip macOS-specific tests when running on macOS
+			if (strings.Contains(tt.name, "non-macOS") && runtime.GOOS == "darwin") {
+				t.Skip("Skipping non-macOS test on macOS platform")
+			}
+			
 			err := tt.app.Run(tt.args)
 			
 			if tt.wantErr {

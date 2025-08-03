@@ -31,18 +31,20 @@ func NewProgressManager(quiet bool) *ProgressManager {
 
 // NewSection creates a new progress section with a spinner
 func (pm *ProgressManager) NewSection(title string) *ProgressSection {
+	var section *ProgressSection
+	
 	if pm.quiet {
-		return &ProgressSection{title: title}
-	}
+		section = &ProgressSection{title: title}
+	} else {
+		s := spinner.New(spinner.CharSets[14], 100*time.Millisecond)
+		s.Suffix = fmt.Sprintf(" %s", title)
+		s.FinalMSG = fmt.Sprintf("%s\n", Success(title))
 
-	s := spinner.New(spinner.CharSets[14], 100*time.Millisecond)
-	s.Suffix = fmt.Sprintf(" %s", title)
-	s.FinalMSG = fmt.Sprintf("%s\n", Success(title))
-
-	section := &ProgressSection{
-		spinner: s,
-		title:   title,
-		active:  false,
+		section = &ProgressSection{
+			spinner: s,
+			title:   title,
+			active:  false,
+		}
 	}
 
 	pm.sections = append(pm.sections, section)

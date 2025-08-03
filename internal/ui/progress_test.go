@@ -273,7 +273,7 @@ func TestStopAllWithActiveSections(t *testing.T) {
 
 	// Create sections and start some
 	section1 := pm.NewSection("Active 1")
-	section2 := pm.NewSection("Not Started")
+	pm.NewSection("Not Started") // section2 - not started
 	section3 := pm.NewSection("Active 2")
 
 	section1.Start()
@@ -313,7 +313,6 @@ func (e testError) Error() string {
 
 func TestComponentProgressErrors(t *testing.T) {
 	pm := NewProgressManager(true) // quiet mode for predictable testing
-	cp := pm.NewComponentProgress("test-component")
 
 	// Test with different error types
 	errors := []error{
