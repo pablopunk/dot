@@ -14,7 +14,7 @@
 - Install software or tools using user-defined commands keyed by package manager/tool names (e.g., `brew`, `apt`).
 - Detect available package managers/tools by checking for their binaries (`which brew`, `which apt`), and use the first available command.
 - Support OS restrictions for components: only install components matching the current OS (`mac`/`darwin` or `linux`). If no OS is specified, install on all.
-- Link configuration files/directories using `ln -s` without prompting or backing up existing files.
+- Link configuration files/directories using `ln -s` without prompting or backing up existing files. Links are only created if they don't already exist or don't point to the correct target.
 - Run optional post-install and post-link shell commands.
 - Optionally uninstall components that were previously installed but removed from the config, using uninstall commands if provided.
 - Maintain a persistent state file (`~/.local/state/dot/lock.yaml`) to track installed components and detect changes.
@@ -107,7 +107,7 @@ profiles:
   - Skip if OS restriction does not match.
   - Check if component is already installed (based on lock file).
   - If not installed, run the first available install command.
-  - Link config files/directories using `ln -s`.
+  - Link config files/directories using `ln -s` only if symlinks don't exist or don't point to the correct target.
   - Run post-install and post-link commands.
 - On subsequent runs, detect removed components and run uninstall commands if available.
 
@@ -132,8 +132,9 @@ profiles:
   - Default output is minimal, showing only modules being processed.
 - Install/uninstall behavior:
   - By default, install only runs if files/configs differ from the last run.
+  - Linking only runs if symlinks don't exist or don't point to the correct target.
   - Uninstall runs only for components present in the lock file but removed from the repo, or if `--uninstall` is specified.
-  - `--install` forces reinstall regardless of changes.
+  - `--install` forces reinstall and relinking regardless of changes.
 
 ## 6. Hooks
 

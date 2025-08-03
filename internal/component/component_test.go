@@ -216,18 +216,14 @@ func TestInstallComponentsForceInstall(t *testing.T) {
 		t.Fatalf("Second install result count = %v, want 1", len(results2))
 	}
 
-	// The component should not be skipped because links always run (they're fast and ensure proper linking)
-	if results2[0].Skipped {
-		t.Errorf("Second install should not be skipped because links always need to run. Error: %v", results2[0].Error)
+	// The component should be skipped on second install since links already exist correctly
+	if !results2[0].Skipped {
+		t.Errorf("Second install should be skipped since links already exist correctly")
 	}
 	
-	// But it should have succeeded and run links
+	// Should not have an error
 	if results2[0].Error != nil {
-		t.Errorf("Second install should succeed but had error: %v", results2[0].Error)
-	}
-	
-	if len(results2[0].LinkResults) == 0 {
-		t.Errorf("Second install should have run links but LinkResults was empty")
+		t.Errorf("Second install should not have error: %v", results2[0].Error)
 	}
 
 	// Install again with force - should not be skipped
@@ -582,18 +578,14 @@ func TestInstallComponentWithProgress(t *testing.T) {
 		t.Errorf("Symlink should exist at %s: %v", targetPath, err)
 	}
 
-	// Test second install with progress (links should always run)
+	// Test second install with progress (should be skipped since links already exist correctly)
 	result2 := manager.installComponentWithProgress(comp, false, progressManager)
-	if result2.Skipped {
-		t.Error("Second install should not be skipped because links always run")
+	if !result2.Skipped {
+		t.Error("Second install should be skipped since links already exist correctly")
 	}
 	
 	if result2.Error != nil {
-		t.Errorf("Second install should succeed but had error: %v", result2.Error)
-	}
-	
-	if len(result2.LinkResults) == 0 {
-		t.Error("Second install should have run links but LinkResults was empty")
+		t.Errorf("Second install should not have error: %v", result2.Error)
 	}
 
 	// Test force install with progress
