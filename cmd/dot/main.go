@@ -1,7 +1,5 @@
 package main
 
-var version = "dev"
-
 import (
 	"flag"
 	"fmt"
@@ -17,6 +15,8 @@ import (
 	"github.com/pablopunk/dot/internal/system"
 	"github.com/pablopunk/dot/internal/ui"
 )
+
+var version = "dev"
 
 func main() {
 	var (
