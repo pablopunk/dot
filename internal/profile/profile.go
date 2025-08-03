@@ -27,8 +27,30 @@ func NewManager(cfg *config.Config) *Manager {
 	}
 }
 
+type SearchResult struct {
+	Components     []ComponentInfo
+	UnmatchedTerms []string
+}
+
 func (m *Manager) GetActiveComponents(activeProfiles []string, fuzzySearch string) ([]ComponentInfo, error) {
+	result, err := m.GetActiveComponentsWithSearchResult(activeProfiles, fuzzySearch)
+	if err != nil {
+		return nil, err
+	}
+	return result.Components, nil
+}
+
+func (m *Manager) GetActiveComponentsWithSearchResult(activeProfiles []string, fuzzySearch string) (*SearchResult, error) {
 	var components []ComponentInfo
+	var unmatchedTerms []string
+	
+	// If fuzzy search is provided, track which terms match
+	var searchTerms []string
+	if fuzzySearch != "" {
+		searchTerms = strings.Fields(strings.ToLower(fuzzySearch))
+		unmatchedTerms = make([]string, len(searchTerms))
+		copy(unmatchedTerms, searchTerms)
+	}
 	
 	// Always include the "*" profile if it exists
 	if defaultProfile, exists := m.config.Profiles["*"]; exists {
@@ -44,12 +66,28 @@ func (m *Manager) GetActiveComponents(activeProfiles []string, fuzzySearch strin
 		for _, componentPath := range paths {
 			component := profileComponents[componentPath]
 			if component.MatchesOS(m.currentOS) {
-				if fuzzySearch == "" || m.matchesFuzzySearch(componentPath, fuzzySearch) {
+				if fuzzySearch == "" {
 					components = append(components, ComponentInfo{
 						ProfileName:   "*",
 						ComponentName: componentPath,
 						Component:     component,
 					})
+				} else {
+					matchingTerm := m.getMatchingTerm(componentPath, searchTerms)
+					if matchingTerm != "" {
+						components = append(components, ComponentInfo{
+							ProfileName:   "*",
+							ComponentName: componentPath,
+							Component:     component,
+						})
+						// Remove this term from unmatched list
+						for i, term := range unmatchedTerms {
+							if term == matchingTerm {
+								unmatchedTerms = append(unmatchedTerms[:i], unmatchedTerms[i+1:]...)
+								break
+							}
+						}
+					}
 				}
 			}
 		}
@@ -78,18 +116,37 @@ func (m *Manager) GetActiveComponents(activeProfiles []string, fuzzySearch strin
 		for _, componentPath := range paths {
 			component := profileComponents[componentPath]
 			if component.MatchesOS(m.currentOS) {
-				if fuzzySearch == "" || m.matchesFuzzySearch(componentPath, fuzzySearch) {
+				if fuzzySearch == "" {
 					components = append(components, ComponentInfo{
 						ProfileName:   profileName,
 						ComponentName: componentPath,
 						Component:     component,
 					})
+				} else {
+					matchingTerm := m.getMatchingTerm(componentPath, searchTerms)
+					if matchingTerm != "" {
+						components = append(components, ComponentInfo{
+							ProfileName:   profileName,
+							ComponentName: componentPath,
+							Component:     component,
+						})
+						// Remove this term from unmatched list
+						for i, term := range unmatchedTerms {
+							if term == matchingTerm {
+								unmatchedTerms = append(unmatchedTerms[:i], unmatchedTerms[i+1:]...)
+								break
+							}
+						}
+					}
 				}
 			}
 		}
 	}
 	
-	return components, nil
+	return &SearchResult{
+		Components:     components,
+		UnmatchedTerms: unmatchedTerms,
+	}, nil
 }
 
 func (m *Manager) ListProfiles() []string {
@@ -115,8 +172,6 @@ func (m *Manager) GetComponentsInProfile(profileName string) (config.ComponentMa
 
 func (m *Manager) FindComponentsByFuzzySearch(search string) []ComponentInfo {
 	var matches []ComponentInfo
-	
-	search = strings.ToLower(search)
 	
 	for profileName, profile := range m.config.Profiles {
 		profileComponents := profile.GetComponents()
@@ -149,27 +204,53 @@ func (m *Manager) matchesFuzzySearch(componentName, search string) bool {
 	}
 	
 	componentLower := strings.ToLower(componentName)
-	searchLower := strings.ToLower(search)
 	
+	// Split search into multiple terms
+	searchTerms := strings.Fields(strings.ToLower(search))
+	
+	// Check if component matches any of the search terms
+	for _, term := range searchTerms {
+		if m.matchesSingleTerm(componentLower, term) {
+			return true
+		}
+	}
+	
+	return false
+}
+
+// getMatchingTerm returns the first search term that matches the component, or empty string if none match
+func (m *Manager) getMatchingTerm(componentName string, searchTerms []string) string {
+	componentLower := strings.ToLower(componentName)
+	
+	for _, term := range searchTerms {
+		if m.matchesSingleTerm(componentLower, term) {
+			return term
+		}
+	}
+	
+	return ""
+}
+
+func (m *Manager) matchesSingleTerm(componentName, searchTerm string) bool {
 	// Exact match
-	if componentLower == searchLower {
+	if componentName == searchTerm {
 		return true
 	}
 	
 	// Contains match
-	if strings.Contains(componentLower, searchLower) {
+	if strings.Contains(componentName, searchTerm) {
 		return true
 	}
 	
 	// Simple fuzzy matching - check if all characters of search appear in order
 	searchIdx := 0
-	for _, char := range componentLower {
-		if searchIdx < len(searchLower) && char == rune(searchLower[searchIdx]) {
+	for _, char := range componentName {
+		if searchIdx < len(searchTerm) && char == rune(searchTerm[searchIdx]) {
 			searchIdx++
 		}
 	}
 	
-	return searchIdx == len(searchLower)
+	return searchIdx == len(searchTerm)
 }
 
 func (m *Manager) ValidateProfiles(profileNames []string) error {

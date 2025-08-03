@@ -190,23 +190,48 @@ func (a *App) Run(args []string) error {
 	var profilesFromUser bool = false
 
 	// Parse arguments - first check if they're profile names or fuzzy search
+	var foundProfiles []string
+	var foundFuzzyTerms []string
+	
 	for _, arg := range args {
 		if profileManager.ProfileExists(arg) {
-			activeProfiles = append(activeProfiles, arg)
-			profilesFromUser = true
-			if a.Verbose {
-				fmt.Printf("🔍 Recognized '%s' as profile\n", arg)
-			}
+			foundProfiles = append(foundProfiles, arg)
 		} else {
-			// Treat as fuzzy search if not a profile name
-			if fuzzySearch == "" {
-				fuzzySearch = arg
-			} else {
-				fuzzySearch += " " + arg
-			}
-			if a.Verbose {
-				fmt.Printf("🔍 Treating '%s' as fuzzy search (profile not found)\n", arg)
-			}
+			foundFuzzyTerms = append(foundFuzzyTerms, arg)
+		}
+	}
+	
+	// Check if mixing profiles and fuzzy search terms
+	if len(foundProfiles) > 0 && len(foundFuzzyTerms) > 0 {
+		return fmt.Errorf("cannot mix profile names (%v) with fuzzy search terms (%v)", foundProfiles, foundFuzzyTerms)
+	}
+	
+	// Apply the results
+	if len(foundProfiles) > 0 {
+		activeProfiles = foundProfiles
+		profilesFromUser = true
+		if a.Verbose {
+			fmt.Printf("🔍 Recognized profiles: %v\n", foundProfiles)
+		}
+	} else if len(foundFuzzyTerms) > 0 {
+		fuzzySearch = strings.Join(foundFuzzyTerms, " ")
+		if a.Verbose {
+			fmt.Printf("🔍 Fuzzy search terms: %v\n", foundFuzzyTerms)
+		}
+	}
+	
+	// Check for unmatched fuzzy search terms and report errors
+	var unmatchedTerms []string
+	if fuzzySearch != "" {
+		result, err := profileManager.GetActiveComponentsWithSearchResult(activeProfiles, fuzzySearch)
+		if err != nil {
+			return err
+		}
+		unmatchedTerms = result.UnmatchedTerms
+		
+		// Report unmatched terms as errors
+		for _, term := range unmatchedTerms {
+			fmt.Printf("❌ No components found matching '%s'\n", term)
 		}
 	}
 
