@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/pablopunk/dot/internal/component"
+	"github.com/pablopunk/dot/internal/state"
 )
 
 func TestApp_Run(t *testing.T) {
@@ -481,5 +482,55 @@ func TestFlagParsing(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// New test: profiles are saved even if tool installation fails
+func TestProfileSavedEvenIfInstallFails(t *testing.T) {
+	// Setup temp workspace and HOME
+	tempDir := t.TempDir()
+	oldWd, _ := os.Getwd()
+	defer os.Chdir(oldWd)
+	os.Chdir(tempDir)
+
+	originalHome := os.Getenv("HOME")
+	os.Setenv("HOME", tempDir)
+	defer os.Setenv("HOME", originalHome)
+
+	// Config with a profile whose install always fails
+	configContent := `
+profiles:
+  failp:
+    broken:
+      install:
+        sh: "false"
+`
+	if err := os.WriteFile(filepath.Join(tempDir, "dot.yaml"), []byte(configContent), 0644); err != nil {
+		t.Fatalf("Failed to write config: %v", err)
+	}
+
+	// Run the app with the failing profile
+	app := &App{Verbose: false, DryRun: false}
+	if err := app.Run([]string{"failp"}); err != nil {
+		// The app should not return an error for component failures
+		t.Fatalf("App.Run returned error: %v", err)
+	}
+
+	// Verify state saved the active profile
+	stateManager, err := state.NewManager()
+	if err != nil {
+		t.Fatalf("Failed to create state manager: %v", err)
+	}
+
+	profiles := stateManager.GetActiveProfiles()
+	found := false
+	for _, p := range profiles {
+		if p == "failp" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected active profiles to include 'failp', got %v", profiles)
 	}
 }
