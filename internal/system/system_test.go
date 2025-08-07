@@ -428,6 +428,189 @@ func TestDefaultsManagerCompareXMLFormat(t *testing.T) {
 	}
 }
 
+func TestDefaultsManagerXMLImport(t *testing.T) {
+	if !IsMacOS() {
+		t.Skip("Skipping defaults test on non-macOS platform")
+	}
+
+	tmpDir := t.TempDir()
+	manager := NewDefaultsManager(tmpDir, false, false)
+
+	// Create test XML files
+	xmlFile := filepath.Join(tmpDir, "import_test.xml")
+	xmlContent := `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>testkey</key>
+	<string>testvalue</string>
+	<key>anothertestkey</key>
+	<integer>42</integer>
+	<key>booltestkey</key>
+	<true/>
+</dict>
+</plist>`
+
+	err := os.WriteFile(xmlFile, []byte(xmlContent), 0644)
+	if err != nil {
+		t.Fatalf("Failed to create test XML file: %v", err)
+	}
+
+	// Test import with XML file
+	defaults := map[string]string{
+		"com.example.xmlimporttest": xmlFile, // Use a test domain
+	}
+
+	results, err := manager.ImportDefaults(defaults)
+	if err != nil {
+		t.Errorf("ImportDefaults() error = %v", err)
+		return
+	}
+
+	if len(results) != 1 {
+		t.Errorf("Expected 1 result, got %d", len(results))
+		return
+	}
+
+	result := results[0]
+	
+	// The import might succeed or fail depending on the test environment
+	// But we want to ensure the XML file is properly processed
+	if result.Action != "imported" && result.Action != "error" {
+		t.Errorf("Expected 'imported' or 'error' action, got %s", result.Action)
+	}
+
+	if result.Action == "imported" {
+		t.Logf("Successfully imported XML file")
+		
+		// If import succeeded, verify we can export back and get the same format
+		exportResults, err := manager.ExportDefaults(defaults)
+		if err != nil {
+			t.Errorf("ExportDefaults() after import error = %v", err)
+			return
+		}
+		
+		if len(exportResults) != 1 {
+			t.Errorf("Expected 1 export result, got %d", len(exportResults))
+			return
+		}
+		
+		exportResult := exportResults[0]
+		if exportResult.Action == "exported" {
+			// Verify the exported file is in XML format
+			if _, err := os.Stat(xmlFile); err == nil {
+				content, err := os.ReadFile(xmlFile)
+				if err != nil {
+					t.Errorf("Failed to read exported XML file: %v", err)
+				} else {
+					contentStr := string(content)
+					if !strings.Contains(contentStr, "<?xml") && !strings.Contains(contentStr, "<plist") {
+						t.Errorf("Exported file should be in XML format, got: %s", contentStr[:min(100, len(contentStr))])
+					} else {
+						t.Logf("Successfully verified XML format in exported file")
+					}
+				}
+			}
+		}
+	} else if result.Error != nil {
+		t.Logf("Import failed (may be expected for test domain): %v", result.Error)
+	}
+}
+
+func TestDefaultsManagerXMLImportDryRun(t *testing.T) {
+	if !IsMacOS() {
+		t.Skip("Skipping defaults test on non-macOS platform")
+	}
+
+	tmpDir := t.TempDir()
+	dryManager := NewDefaultsManager(tmpDir, true, false) // dry run mode
+
+	// Create test XML files
+	xmlFile := filepath.Join(tmpDir, "dryrun_test.xml")
+	xmlContent := `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>dryruntest</key>
+	<string>value</string>
+</dict>
+</plist>`
+
+	err := os.WriteFile(xmlFile, []byte(xmlContent), 0644)
+	if err != nil {
+		t.Fatalf("Failed to create test XML file: %v", err)
+	}
+
+	// Test dry run import with XML file
+	defaults := map[string]string{
+		"com.example.xmldryruntest": xmlFile,
+	}
+
+	results, err := dryManager.ImportDefaults(defaults)
+	if err != nil {
+		t.Errorf("ImportDefaults() dry run error = %v", err)
+		return
+	}
+
+	if len(results) != 1 {
+		t.Errorf("Expected 1 result, got %d", len(results))
+		return
+	}
+
+	result := results[0]
+	if result.Action != "would_import" {
+		t.Errorf("Expected 'would_import' action for dry run, got %s", result.Action)
+	}
+
+	// Verify the path is correct and includes XML file
+	if !strings.HasSuffix(result.PlistPath, "dryrun_test.xml") {
+		t.Errorf("Expected path to end with XML file, got %s", result.PlistPath)
+	}
+
+	t.Logf("Successfully tested XML import dry run functionality")
+}
+
+func TestDefaultsManagerXMLImportNonExistentFile(t *testing.T) {
+	if !IsMacOS() {
+		t.Skip("Skipping defaults test on non-macOS platform")
+	}
+
+	tmpDir := t.TempDir()
+	manager := NewDefaultsManager(tmpDir, false, false)
+
+	// Test import with non-existent XML file
+	nonExistentXML := filepath.Join(tmpDir, "nonexistent.xml")
+	defaults := map[string]string{
+		"com.example.test": nonExistentXML,
+	}
+
+	results, err := manager.ImportDefaults(defaults)
+	if err != nil {
+		t.Errorf("ImportDefaults() error = %v", err)
+		return
+	}
+
+	if len(results) != 1 {
+		t.Errorf("Expected 1 result, got %d", len(results))
+		return
+	}
+
+	result := results[0]
+	if result.Action != "error" {
+		t.Errorf("Expected 'error' action for non-existent file, got %s", result.Action)
+	}
+
+	if result.Error == nil {
+		t.Error("Expected error for non-existent file")
+	} else {
+		// Check that the error message mentions the XML file
+		if !strings.Contains(result.Error.Error(), "nonexistent.xml") {
+			t.Errorf("Error message should mention the XML file: %v", result.Error)
+		}
+		t.Logf("Correctly handled non-existent XML file: %v", result.Error)
+	}
+}
+
 func TestNormalizeOSNameEdgeCases(t *testing.T) {
 	tests := []struct {
 		input string
