@@ -328,45 +328,14 @@ profiles:
       defaults:
         "com.apple.dock": "macos/dock.plist"
         "com.apple.finder": "macos/finder.xml"        # XML format for better readability
-        "com.apple.safari": "macos/safari.plist"      # Binary plist format
 ```
 
-### File Format Support
-
-- **Binary plist** (`.plist`): Standard macOS binary format, compact but not human-readable
-- **XML format** (`.xml`): Human-readable XML format, ideal for version control and manual editing
-
-The tool automatically detects the target file format based on the file extension:
-- Files ending in `.xml` (case-insensitive) are exported as XML using `plutil` conversion
-- All other files are exported as binary plist format
-
-### Commands
-
+Commands:
 - `dot --defaults-export`: Export current settings to plist/XML files
-- `dot --defaults-import`: Import settings from plist/XML files  
+- `dot --defaults-import`: Import settings from plist/XML files
 - Normal runs will warn if current settings differ from saved files
 
-### Benefits of XML Format
-
-- **Human-readable**: Easy to view and edit manually
-- **Version control friendly**: Git diffs show meaningful changes
-- **Cross-platform compatible**: Can be viewed on any system
-- **Debugging**: Easier to troubleshoot configuration issues
-
-### Example XML Output
-
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>autohide</key>
-    <true/>
-    <key>tilesize</key>
-    <integer>36</integer>
-</dict>
-</plist>
-```
+Files ending in `.xml` are exported as XML format for better readability and version control.
 
 ## State Management
 
