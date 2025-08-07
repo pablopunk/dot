@@ -335,6 +335,18 @@ func (a *App) Run(args []string) error {
 		return nil
 	}
 
+	// Persist active profiles early when provided by user (ensures they are saved even if installs fail hard)
+	if !a.DryRun && profilesFromUser {
+		stateManager, err := state.NewManager()
+		if err != nil {
+			return fmt.Errorf("failed to create state manager: %w", err)
+		}
+		stateManager.SetActiveProfiles(activeProfiles)
+		if err := stateManager.Save(); err != nil {
+			return fmt.Errorf("failed to save state: %w", err)
+		}
+	}
+
 	// Main install operation
 	if a.Verbose {
 		fmt.Printf("🚀 Starting %s operation...\n", "installation")
