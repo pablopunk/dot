@@ -234,7 +234,13 @@ func (a *App) Run(args []string) error {
 	// Check for unmatched fuzzy search terms and report errors
 	var unmatchedTerms []string
 	if fuzzySearch != "" {
-		result, err := profileManager.GetActiveComponentsWithSearchResult(activeProfiles, fuzzySearch)
+		// If doing fuzzy search and no specific profiles are requested, search across all profiles
+		searchProfiles := activeProfiles
+		if len(activeProfiles) == 0 {
+			searchProfiles = profileManager.ListProfiles()
+		}
+		
+		result, err := profileManager.GetActiveComponentsWithSearchResult(searchProfiles, fuzzySearch)
 		if err != nil {
 			return err
 		}
@@ -357,10 +363,17 @@ func (a *App) Run(args []string) error {
 		// Use regular installation for verbose mode
 		var results []component.InstallResult
 		var err error
+		
+		// If doing fuzzy search and no specific profiles are requested, search across all profiles
+		installProfiles := activeProfiles
+		if fuzzySearch != "" && len(activeProfiles) == 0 {
+			installProfiles = profileManager.ListProfiles()
+		}
+		
 		if profilesFromUser {
-			results, err = componentManager.InstallComponents(activeProfiles, fuzzySearch, a.ForceInstall)
+			results, err = componentManager.InstallComponents(installProfiles, fuzzySearch, a.ForceInstall)
 		} else {
-			results, err = componentManager.InstallComponentsWithoutSaving(activeProfiles, fuzzySearch, a.ForceInstall)
+			results, err = componentManager.InstallComponentsWithoutSaving(installProfiles, fuzzySearch, a.ForceInstall)
 		}
 		if err != nil {
 			return err
@@ -373,10 +386,17 @@ func (a *App) Run(args []string) error {
 
 		var results []component.InstallResult
 		var err error
+		
+		// If doing fuzzy search and no specific profiles are requested, search across all profiles
+		installProfiles := activeProfiles
+		if fuzzySearch != "" && len(activeProfiles) == 0 {
+			installProfiles = profileManager.ListProfiles()
+		}
+		
 		if profilesFromUser {
-			results, err = componentManager.InstallComponentsWithProgress(activeProfiles, fuzzySearch, a.ForceInstall, progressManager)
+			results, err = componentManager.InstallComponentsWithProgress(installProfiles, fuzzySearch, a.ForceInstall, progressManager)
 		} else {
-			results, err = componentManager.InstallComponentsWithProgressWithoutSaving(activeProfiles, fuzzySearch, a.ForceInstall, progressManager)
+			results, err = componentManager.InstallComponentsWithProgressWithoutSaving(installProfiles, fuzzySearch, a.ForceInstall, progressManager)
 		}
 		if err != nil {
 			return err
