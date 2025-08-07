@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 )
 
 type DefaultsManager struct {
@@ -100,8 +101,18 @@ func (dm *DefaultsManager) exportDefault(appID, plistPath string) DefaultsResult
 		}
 	}
 
-	// Export defaults using the defaults command
-	cmd := exec.Command("defaults", "export", appID, resolvedPath)
+	var cmd *exec.Cmd
+	
+	// Check if target file is XML format
+	if strings.HasSuffix(strings.ToLower(resolvedPath), ".xml") {
+		// Use XML format for better readability
+		// Command: defaults export "app" - | plutil -convert xml1 -o "target.xml" -
+		cmd = exec.Command("sh", "-c", fmt.Sprintf(`defaults export "%s" - | plutil -convert xml1 -o "%s" -`, appID, resolvedPath))
+	} else {
+		// Default to binary plist
+		cmd = exec.Command("defaults", "export", appID, resolvedPath)
+	}
+
 	output, err := cmd.CombinedOutput()
 
 	if err != nil {
@@ -183,7 +194,16 @@ func (dm *DefaultsManager) compareDefault(appID, plistPath string) DefaultsResul
 	}
 
 	// Export current defaults to a temporary file
-	tempFile, err := os.CreateTemp("", "dot-defaults-*.plist")
+	var tempFile *os.File
+	var err error
+	
+	// Create temp file with appropriate extension
+	if strings.HasSuffix(strings.ToLower(resolvedPath), ".xml") {
+		tempFile, err = os.CreateTemp("", "dot-defaults-*.xml")
+	} else {
+		tempFile, err = os.CreateTemp("", "dot-defaults-*.plist")
+	}
+	
 	if err != nil {
 		return DefaultsResult{
 			AppID:     appID,
@@ -195,8 +215,16 @@ func (dm *DefaultsManager) compareDefault(appID, plistPath string) DefaultsResul
 	defer os.Remove(tempFile.Name())
 	tempFile.Close()
 
-	// Export current defaults
-	cmd := exec.Command("defaults", "export", appID, tempFile.Name())
+	// Export current defaults using the same format as target
+	var cmd *exec.Cmd
+	if strings.HasSuffix(strings.ToLower(resolvedPath), ".xml") {
+		// Use XML format to match target file
+		cmd = exec.Command("sh", "-c", fmt.Sprintf(`defaults export "%s" - | plutil -convert xml1 -o "%s" -`, appID, tempFile.Name()))
+	} else {
+		// Default to binary plist
+		cmd = exec.Command("defaults", "export", appID, tempFile.Name())
+	}
+	
 	if err := cmd.Run(); err != nil {
 		return DefaultsResult{
 			AppID:     appID,

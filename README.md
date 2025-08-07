@@ -222,8 +222,8 @@ dot --postinstall       # Run only postinstall hooks
 dot --postlink          # Run only postlink hooks
 
 # macOS defaults management
-dot --defaults-export   # Export current settings to plist files
-dot --defaults-import   # Import settings from plist files
+dot --defaults-export   # Export current settings to plist/XML files
+dot --defaults-import   # Import settings from plist/XML files
 
 # Upgrade dot itself
 dot --upgrade
@@ -319,7 +319,7 @@ This is useful for:
 
 ## macOS Defaults
 
-Manage macOS system preferences with plist files:
+Manage macOS system preferences with plist or XML files:
 
 ```yaml
 profiles:
@@ -327,13 +327,15 @@ profiles:
     dock:
       defaults:
         "com.apple.dock": "macos/dock.plist"
-        "com.apple.finder": "macos/finder.plist"
+        "com.apple.finder": "macos/finder.xml"        # XML format for better readability
 ```
 
 Commands:
-- `dot --defaults-export`: Export current settings to plist files
-- `dot --defaults-import`: Import settings from plist files
-- Normal runs will warn if current settings differ from plist files
+- `dot --defaults-export`: Export current settings to plist/XML files
+- `dot --defaults-import`: Import settings from plist/XML files
+- Normal runs will warn if current settings differ from saved files
+
+Files ending in `.xml` are exported as XML format for better readability and version control.
 
 ## State Management
 
