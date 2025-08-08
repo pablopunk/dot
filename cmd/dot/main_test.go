@@ -431,6 +431,8 @@ func TestFlagParsing(t *testing.T) {
 			args: []string{"--postlink"},
 			expected: map[string]bool{
 				"postlink": true,
+			},
+		},
 		{
 			name: "link flag",
 			args: []string{"--link"},
@@ -438,17 +440,12 @@ func TestFlagParsing(t *testing.T) {
 				"link": true,
 			},
 		},
-
-			},
-		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Reset flag package state
 			flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
 
-			// Redefine flags for this test
 			verbose := flag.Bool("v", false, "verbose output")
 			verboseLong := flag.Bool("verbose", false, "verbose output")
 			dryRun := flag.Bool("dry-run", false, "preview actions without making changes")
@@ -457,41 +454,34 @@ func TestFlagParsing(t *testing.T) {
 			postlink := flag.Bool("postlink", false, "run only postlink hooks")
 			link := flag.Bool("link", false, "link configs only (no installs)")
 
-			// Parse test args
 			os.Args = append([]string{"dot"}, tt.args...)
 			flag.Parse()
 
-			// Check expected values
 			if expected, exists := tt.expected["verbose"]; exists {
 				if (*verbose || *verboseLong) != expected {
 					t.Errorf("verbose flag = %v, want %v", (*verbose || *verboseLong), expected)
 				}
 			}
-
 			if expected, exists := tt.expected["dry-run"]; exists {
 				if *dryRun != expected {
 					t.Errorf("dry-run flag = %v, want %v", *dryRun, expected)
 				}
 			}
-
 			if expected, exists := tt.expected["install"]; exists {
 				if *install != expected {
 					t.Errorf("install flag = %v, want %v", *install, expected)
 				}
 			}
-
 			if expected, exists := tt.expected["link"]; exists {
 				if *link != expected {
 					t.Errorf("link flag = %v, want %v", *link, expected)
 				}
 			}
-
 			if expected, exists := tt.expected["postinstall"]; exists {
 				if *postinstall != expected {
 					t.Errorf("postinstall flag = %v, want %v", *postinstall, expected)
 				}
 			}
-
 			if expected, exists := tt.expected["postlink"]; exists {
 				if *postlink != expected {
 					t.Errorf("postlink flag = %v, want %v", *postlink, expected)

@@ -1,26 +1,3 @@
-# dot
-
-Quickly bootstrap and manage your development environment using profiles and components.
-
-## Usage
-
-- Install and link as usual:
-  - dot
-  - dot work laptop
-  - dot neovim
-
-- Link-only mode (no installs, no defaults, no state persistence):
-  - dot --link
-  - dot --link work laptop
-  - dot --link neovim
-
-Link-only mode:
-- Only creates or updates symlinks defined in components (component.link)
-- Runs postlink hooks when present
-- Supports the same profile selection and fuzzy search
-- Does not run install commands or export/import defaults
-- Does not persist profiles or other state changes
-
 
 # dot - all your computers in one repo
 
@@ -235,6 +212,19 @@ dot -v work
 ```
 
 ### Advanced Usage
+
+#### Link-only mode
+- Create or update symlinks defined in components without running installs or macOS defaults
+- Runs postlink hooks when links are created or updated
+- Supports the same profile selection and fuzzy search
+- Does not persist state changes
+
+Examples:
+```bash
+dot --link
+dot --link work laptop
+dot --link neovim
+```
 
 ```bash
 # Fuzzy search for components
