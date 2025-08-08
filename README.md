@@ -88,7 +88,7 @@ profiles:
       os: ["mac"]     # OS restrictions (mac/darwin, linux)
       defaults:       # macOS system defaults (macOS only)
         "com.apple.dock": "macos/dock.plist"
-        
+
     # Recursive modules - organize yourself
     cli:
       tools:
@@ -113,6 +113,8 @@ profiles:
 
 - `"*"`: Always installed on every machine
 - Named profiles: Only installed when explicitly requested
+- You can pass multiple profiles at once (e.g., `dot work laptop`). The `*` profile is always included. You cannot mix profile names with fuzzy search terms in the same run.
+
 
 ### OS Restrictions
 

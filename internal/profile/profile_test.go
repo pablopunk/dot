@@ -128,6 +128,48 @@ func TestGetActiveComponents(t *testing.T) {
 	}
 }
 
+func TestGetActiveComponents_MultipleProfiles(t *testing.T) {
+	cfg := &config.Config{
+		Profiles: map[string]config.Profile{
+			"*": {
+				"common": config.Component{Link: map[string]string{"s": "t"}},
+			},
+			"p1": {
+				"c1": config.Component{Link: map[string]string{"s": "t"}},
+			},
+			"p2": {
+				"c2": config.Component{Link: map[string]string{"s": "t"}},
+			},
+		},
+	}
+
+	manager := NewManager(cfg)
+	components, err := manager.GetActiveComponents([]string{"p1", "p2"}, "")
+	if err != nil {
+		t.Fatalf("GetActiveComponents() error = %v", err)
+	}
+
+	if len(components) != 3 {
+		t.Fatalf("expected 3 components, got %d", len(components))
+	}
+
+	// Expect order: * then p1 then p2, each profile's components sorted by name
+	expected := []struct {
+		profile string
+		name    string
+	}{
+		{"*", "common"},
+		{"p1", "c1"},
+		{"p2", "c2"},
+	}
+
+	for i, exp := range expected {
+		if components[i].ProfileName != exp.profile || components[i].ComponentName != exp.name {
+			t.Fatalf("unexpected component at %d: got %s.%s, want %s.%s", i, components[i].ProfileName, components[i].ComponentName, exp.profile, exp.name)
+		}
+	}
+}
+
 func TestListProfiles(t *testing.T) {
 	cfg := createTestConfig()
 	manager := NewManager(cfg)
