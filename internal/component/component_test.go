@@ -255,6 +255,59 @@ func TestInstallComponentsFuzzySearch(t *testing.T) {
 	}
 }
 
+func TestLinkComponents(t *testing.T) {
+	manager, _ := createTestComponentManager(t, false)
+
+	results, err := manager.LinkComponents([]string{"work"}, "")
+	if err != nil {
+		t.Fatalf("LinkComponents() error = %v", err)
+	}
+
+	// Should have bash (from *) + git and docker (from work)
+	if len(results) != 3 {
+		t.Fatalf("LinkComponents() results count = %v, want 3", len(results))
+	}
+
+	var gitResult, dockerResult *InstallResult
+	for i := range results {
+		switch results[i].Component.ComponentName {
+		case "git":
+			gitResult = &results[i]
+		case "docker":
+			dockerResult = &results[i]
+		}
+	}
+
+	if gitResult == nil || dockerResult == nil {
+		t.Fatal("Expected git and docker results")
+	}
+
+	if gitResult.InstallResult != nil {
+		t.Error("git InstallResult should be nil in link-only mode")
+	}
+	if dockerResult.InstallResult != nil {
+		t.Error("docker InstallResult should be nil in link-only mode")
+	}
+
+	if len(gitResult.LinkResults) == 0 {
+		t.Error("git should have link results")
+	}
+	if len(dockerResult.LinkResults) == 0 {
+		t.Error("docker should have link results")
+	}
+
+	if gitResult.PostLinkResult == nil {
+		t.Error("git should have post-link result")
+	}
+	if dockerResult.PostLinkResult == nil {
+		t.Error("docker should have post-link result")
+	}
+
+	if len(manager.stateManager.GetInstalledComponents()) != 0 {
+		t.Error("state should not be modified by link-only operations")
+	}
+}
+
 func TestUninstallRemovedComponents(t *testing.T) {
 	manager, _ := createTestComponentManager(t, true)
 

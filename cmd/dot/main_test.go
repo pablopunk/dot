@@ -411,11 +411,12 @@ func TestFlagParsing(t *testing.T) {
 		},
 		{
 			name: "multiple flags",
-			args: []string{"-v", "--dry-run", "--install"},
+			args: []string{"-v", "--dry-run", "--install", "--link"},
 			expected: map[string]bool{
 				"verbose": true,
 				"dry-run": true,
 				"install": true,
+				"link":    true,
 			},
 		},
 		{
@@ -430,6 +431,14 @@ func TestFlagParsing(t *testing.T) {
 			args: []string{"--postlink"},
 			expected: map[string]bool{
 				"postlink": true,
+		{
+			name: "link flag",
+			args: []string{"--link"},
+			expected: map[string]bool{
+				"link": true,
+			},
+		},
+
 			},
 		},
 	}
@@ -446,6 +455,7 @@ func TestFlagParsing(t *testing.T) {
 			install := flag.Bool("install", false, "force reinstall")
 			postinstall := flag.Bool("postinstall", false, "run only postinstall hooks")
 			postlink := flag.Bool("postlink", false, "run only postlink hooks")
+			link := flag.Bool("link", false, "link configs only (no installs)")
 
 			// Parse test args
 			os.Args = append([]string{"dot"}, tt.args...)
@@ -467,6 +477,12 @@ func TestFlagParsing(t *testing.T) {
 			if expected, exists := tt.expected["install"]; exists {
 				if *install != expected {
 					t.Errorf("install flag = %v, want %v", *install, expected)
+				}
+			}
+
+			if expected, exists := tt.expected["link"]; exists {
+				if *link != expected {
+					t.Errorf("link flag = %v, want %v", *link, expected)
 				}
 			}
 
