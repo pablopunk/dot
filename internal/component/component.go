@@ -546,6 +546,125 @@ func (m *Manager) uninstallComponent(comp profile.ComponentInfo, componentState 
 	return result
 }
 
+func (m *Manager) LinkComponents(activeProfiles []string, fuzzySearch string) ([]InstallResult, error) {
+	components, err := m.profileManager.GetActiveComponents(activeProfiles, fuzzySearch)
+	if err != nil {
+		return nil, err
+	}
+
+	var results []InstallResult
+	for _, comp := range components {
+		result := InstallResult{Component: comp}
+
+		if len(comp.Component.Link) == 0 {
+			result.Skipped = true
+			results = append(results, result)
+			continue
+		}
+
+		if !m.linkManager.NeedsLinking(comp.Component.Link) {
+			result.Skipped = true
+			results = append(results, result)
+			continue
+		}
+
+		linkResults, err := m.linkManager.CreateLinks(comp.Component.Link)
+		result.LinkResults = linkResults
+		if err != nil {
+			result.Error = fmt.Errorf("linking failed: %w", err)
+			results = append(results, result)
+			continue
+		}
+
+		for _, lr := range linkResults {
+			if !lr.WasSuccessful() {
+				result.Error = fmt.Errorf("linking failed: %v", lr.Error)
+				break
+			}
+		}
+		if result.Error != nil {
+			results = append(results, result)
+			continue
+		}
+
+		if comp.Component.PostLink != "" && len(result.LinkResults) > 0 {
+			execResult := m.execManager.ExecuteShellCommand(comp.Component.PostLink)
+			result.PostLinkResult = &execResult
+			if !execResult.Success {
+				result.Error = fmt.Errorf("post-link hook failed: %w", execResult.Error)
+			}
+		}
+
+		results = append(results, result)
+	}
+
+	return results, nil
+}
+
+func (m *Manager) LinkComponentsWithProgress(activeProfiles []string, fuzzySearch string, progressManager *ui.ProgressManager) ([]InstallResult, error) {
+	components, err := m.profileManager.GetActiveComponents(activeProfiles, fuzzySearch)
+	if err != nil {
+		return nil, err
+	}
+
+	var results []InstallResult
+	for _, comp := range components {
+		result := InstallResult{Component: comp}
+		progress := progressManager.NewComponentProgress(comp.ComponentName)
+
+		if len(comp.Component.Link) == 0 {
+			result.Skipped = true
+			results = append(results, result)
+			continue
+		}
+
+		if !m.linkManager.NeedsLinking(comp.Component.Link) {
+			result.Skipped = true
+			results = append(results, result)
+			continue
+		}
+
+		progress.StartLinking()
+		linkResults, err := m.linkManager.CreateLinks(comp.Component.Link)
+		result.LinkResults = linkResults
+		if err != nil {
+			result.Error = fmt.Errorf("linking failed: %w", err)
+			progress.CompleteFailed(result.Error)
+			results = append(results, result)
+			continue
+		}
+
+		for _, lr := range linkResults {
+			if !lr.WasSuccessful() {
+				result.Error = fmt.Errorf("linking failed: %v", lr.Error)
+				progress.CompleteFailed(result.Error)
+				break
+			}
+		}
+		if result.Error != nil {
+			results = append(results, result)
+			continue
+		}
+
+		if comp.Component.PostLink != "" && len(result.LinkResults) > 0 {
+			progress.StartPostHooks()
+			execResult := m.execManager.ExecuteShellCommandWithProgress(comp.Component.PostLink, progress)
+			result.PostLinkResult = &execResult
+			if !execResult.Success {
+				result.Error = fmt.Errorf("post-link hook failed: %w", execResult.Error)
+				progress.CompleteFailed(result.Error)
+				results = append(results, result)
+				continue
+			}
+		}
+
+		progress.CompleteSuccess()
+		results = append(results, result)
+	}
+
+	return results, nil
+}
+
 func (m *Manager) ExportDefaults(activeProfiles []string) error {
 	components, err := m.profileManager.GetActiveComponents(activeProfiles, "")
 	if err != nil {

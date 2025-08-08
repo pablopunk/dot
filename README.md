@@ -1,3 +1,4 @@
+
 # dot - all your computers in one repo
 
 > All your tools, apps, and configs with 0 dependencies
@@ -211,6 +212,19 @@ dot -v work
 ```
 
 ### Advanced Usage
+
+#### Link-only mode
+- Create or update symlinks defined in components without running installs or macOS defaults
+- Runs postlink hooks when links are created or updated
+- Supports the same profile selection and fuzzy search
+- Does not persist state changes
+
+Examples:
+```bash
+dot --link
+dot --link work laptop
+dot --link neovim
+```
 
 ```bash
 # Fuzzy search for components
