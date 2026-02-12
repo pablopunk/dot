@@ -53,3 +53,4 @@ test-dotfiles/
 .local/
 
 .claude/
+.opencode

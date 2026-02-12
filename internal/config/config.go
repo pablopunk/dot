@@ -5,16 +5,15 @@ import (
 	"fmt"
 	"os"
 	"sort"
-	"strings"
 
 	"gopkg.in/yaml.v3"
 )
 
 type Config struct {
-	Profiles map[string]Profile `yaml:"profiles"`
+	Profiles  map[string][]interface{} `yaml:"profiles"`
+	Config    map[string]interface{}   `yaml:"config"` // Allow nested structures
+	RawConfig map[string]Component     // Flattened config for fast lookup
 }
-
-type Profile map[string]interface{}
 
 type ComponentMap map[string]Component
 
@@ -39,6 +38,12 @@ func Load(filename string) (*Config, error) {
 		return nil, fmt.Errorf("failed to parse YAML config: %w", err)
 	}
 
+	// Flatten nested config into RawConfig
+	config.RawConfig = make(map[string]Component)
+	if err := flattenConfig(config.Config, config.RawConfig); err != nil {
+		return nil, fmt.Errorf("failed to process config: %w", err)
+	}
+
 	if err := validate(&config); err != nil {
 		return nil, fmt.Errorf("config validation failed: %w", err)
 	}
@@ -46,78 +51,133 @@ func Load(filename string) (*Config, error) {
 	return &config, nil
 }
 
-// GetComponents recursively extracts all components from a profile
-func (p Profile) GetComponents() ComponentMap {
+// flattenConfig recursively flattens nested config structures into a flat map of Components
+func flattenConfig(source map[string]interface{}, target map[string]Component) error {
+	for key, value := range source {
+		if component, ok := value.(Component); ok {
+			// It's already a Component - add it directly
+			target[key] = component
+		} else if mapVal, ok := value.(map[string]interface{}); ok {
+			// It's a nested map - try to unmarshal as Component first
+			data, err := yaml.Marshal(mapVal)
+			if err != nil {
+				return fmt.Errorf("failed to marshal value for key '%s': %w", key, err)
+			}
+
+			var comp Component
+			if err := yaml.Unmarshal(data, &comp); err != nil {
+				return fmt.Errorf("failed to unmarshal value for key '%s': %w", key, err)
+			}
+
+			// Check if it has any action fields (Install, Link, Defaults, Uninstall)
+			hasActions := len(comp.Install) > 0 || len(comp.Link) > 0 || len(comp.Defaults) > 0 || len(comp.Uninstall) > 0
+			// Check if it has only metadata (OS) without any actions
+			hasOnlyMetadata := (len(comp.Install) == 0 && len(comp.Link) == 0 && len(comp.Defaults) == 0 && len(comp.Uninstall) == 0) &&
+				(len(comp.OS) > 0 || len(comp.PostInstall) > 0 || len(comp.PostLink) > 0)
+
+			if hasActions {
+				// It's a component with actions - add it directly
+				target[key] = comp
+			} else if hasOnlyMetadata {
+				// It's an invalid component (has metadata but no actions) - still add to RawConfig so validation catches it
+				target[key] = comp
+			} else {
+				// It's likely a container (no actions and no metadata) - recursively flatten
+				nestedComponents := make(map[string]Component)
+				if err := flattenConfig(mapVal, nestedComponents); err != nil {
+					return err
+				}
+				// Add nested components to target
+				for nestedKey, nestedComp := range nestedComponents {
+					target[nestedKey] = nestedComp
+				}
+			}
+		}
+	}
+	return nil
+}
+
+// GetComponentsForProfileTools resolves tools from a profile and returns their configurations
+// It expands container references and deduplicates tool names
+func (c *Config) GetComponentsForProfileTools(profileName string) (ComponentMap, error) {
+	visited := make(map[string]bool)
+	toolNames := make(map[string]bool)
+	var tools []string
+
+	if err := c.expandProfileTools(profileName, &visited, toolNames, &tools); err != nil {
+		return nil, err
+	}
+
+	// Map tool names to components from flattened config
 	components := make(ComponentMap)
-	for name, value := range p {
-		extractComponents(value, name, components)
+	for _, toolName := range tools {
+		if component, exists := c.RawConfig[toolName]; exists {
+			components[toolName] = component
+		} else {
+			return nil, fmt.Errorf("tool '%s' referenced in profile '%s' has no config defined", toolName, profileName)
+		}
 	}
-	return components
+	return components, nil
 }
 
-// extractComponents recursively traverses the profile structure to find components
-func extractComponents(value interface{}, path string, components ComponentMap) {
-	switch v := value.(type) {
-	case map[string]interface{}:
-		// Check if this is a component (has component properties)
-		if isComponent(v) {
-			// Convert to Component struct
-			component, err := convertToComponent(v)
-			if err == nil {
-				components[path] = component
+// expandProfileTools expands a profile to get all tool names
+// Profiles can reference tools in RawConfig or containers in Config
+func (c *Config) expandProfileTools(profileName string, visited *map[string]bool, toolNames map[string]bool, tools *[]string) error {
+	// Track visited profiles to ensure each is processed only once
+	if (*visited)[profileName] {
+		return nil
+	}
+	(*visited)[profileName] = true
+
+	profile, exists := c.Profiles[profileName]
+	if !exists {
+		return fmt.Errorf("profile '%s' not found", profileName)
+	}
+
+	for _, item := range profile {
+		itemStr, ok := item.(string)
+		if !ok {
+			return fmt.Errorf("profile items must be strings, got %T in profile '%s'", item, profileName)
+		}
+
+		if _, isInRawConfig := c.RawConfig[itemStr]; isInRawConfig {
+			// It's a tool in RawConfig - add to tools list if not already seen
+			if !toolNames[itemStr] {
+				toolNames[itemStr] = true
+				*tools = append(*tools, itemStr)
+			}
+		} else if configItem, isContainer := c.Config[itemStr]; isContainer {
+			// It's a container in Config - expand all tools under it
+			if err := c.expandConfigContainer(itemStr, configItem, toolNames, tools); err != nil {
+				return err
 			}
 		} else {
-			// This is a container, recurse into it
-			for key, nestedValue := range v {
-				newPath := path + "." + key
-				extractComponents(nestedValue, newPath, components)
-			}
+			return fmt.Errorf("profile item '%s' in profile '%s' not found in config or as a container", itemStr, profileName)
 		}
-	case Profile:
-		// Handle Profile type (which is map[string]interface{})
-		m := map[string]interface{}(v)
-		if isComponent(m) {
-			// Convert to Component struct
-			component, err := convertToComponent(m)
-			if err == nil {
-				components[path] = component
-			}
-		} else {
-			// This is a container, recurse into it
-			for key, nestedValue := range v {
-				newPath := path + "." + key
-				extractComponents(nestedValue, newPath, components)
-			}
-		}
-	case Component:
-		// Direct component (backward compatibility)
-		components[path] = v
 	}
+
+	return nil
 }
 
-// isComponent checks if a map contains component properties
-func isComponent(m map[string]interface{}) bool {
-	componentKeys := []string{"install", "uninstall", "link", "postinstall", "postlink", "os", "defaults"}
-	for _, key := range componentKeys {
-		if _, exists := m[key]; exists {
-			return true
+// expandConfigContainer expands all tools under a nested config container
+func (c *Config) expandConfigContainer(containerName string, containerValue interface{}, toolNames map[string]bool, tools *[]string) error {
+	// The container should be a map of tools
+	mapVal, ok := containerValue.(map[string]interface{})
+	if !ok {
+		return fmt.Errorf("container '%s' is not a map", containerName)
+	}
+
+	// For each item in the container, check if it's in RawConfig
+	for nestedToolName := range mapVal {
+		if _, exists := c.RawConfig[nestedToolName]; exists {
+			if !toolNames[nestedToolName] {
+				toolNames[nestedToolName] = true
+				*tools = append(*tools, nestedToolName)
+			}
 		}
 	}
-	return false
-}
 
-// convertToComponent converts a map[string]interface{} to a Component struct
-func convertToComponent(m map[string]interface{}) (Component, error) {
-	// Marshal back to YAML and unmarshal into Component struct
-	// This handles type conversion properly
-	data, err := yaml.Marshal(m)
-	if err != nil {
-		return Component{}, err
-	}
-
-	var component Component
-	err = yaml.Unmarshal(data, &component)
-	return component, err
+	return nil
 }
 
 func validate(config *Config) error {
@@ -125,33 +185,59 @@ func validate(config *Config) error {
 		return fmt.Errorf("no profiles defined")
 	}
 
-	for profileName, profile := range config.Profiles {
+	if config.Config == nil {
+		return fmt.Errorf("no config section defined")
+	}
+
+	// Validate profile names are not empty
+	for profileName, tools := range config.Profiles {
 		if profileName == "" {
 			return fmt.Errorf("profile name cannot be empty")
 		}
 
-		// Extract all components from the potentially recursive profile structure
-		components := profile.GetComponents()
-		if len(components) == 0 {
-			return fmt.Errorf("profile %s contains no components", profileName)
+		if len(tools) == 0 {
+			return fmt.Errorf("profile %s contains no tools", profileName)
 		}
 
-		for componentPath, component := range components {
-			if strings.Contains(componentPath, "..") || strings.HasPrefix(componentPath, ".") || strings.HasSuffix(componentPath, ".") {
-				return fmt.Errorf("invalid component path '%s' in profile %s", componentPath, profileName)
+		// Validate each tool/container reference in the profile
+		for _, item := range tools {
+			itemStr, ok := item.(string)
+			if !ok {
+				return fmt.Errorf("profile items must be strings, got %T in profile '%s'", item, profileName)
 			}
 
-			// Validate OS restrictions
-			for _, osName := range component.OS {
-				if osName != "mac" && osName != "darwin" && osName != "linux" {
-					return fmt.Errorf("invalid OS restriction '%s' in component %s.%s, must be 'mac', 'darwin', or 'linux'", osName, profileName, componentPath)
-				}
+			if itemStr == "" {
+				return fmt.Errorf("profile %s contains empty tool reference", profileName)
 			}
 
-			// At least one action must be defined
-			if len(component.Install) == 0 && len(component.Link) == 0 && len(component.Defaults) == 0 {
-				return fmt.Errorf("component %s.%s must define at least one action (install, link, or defaults)", profileName, componentPath)
+			// Check if it's a tool in RawConfig
+			if _, exists := config.RawConfig[itemStr]; exists {
+				continue
 			}
+
+			// Check if it's a container in the original Config
+			if _, isContainer := config.Config[itemStr]; isContainer {
+				// It's a container reference, which is valid
+				continue
+			}
+
+			// Not found anywhere
+			return fmt.Errorf("tool '%s' referenced in profile '%s' has no config defined", itemStr, profileName)
+		}
+	}
+
+	// Validate all tools in RawConfig have at least one action
+	for toolName, component := range config.RawConfig {
+		// Validate OS restrictions
+		for _, osName := range component.OS {
+			if osName != "mac" && osName != "darwin" && osName != "linux" {
+				return fmt.Errorf("invalid OS restriction '%s' in tool '%s', must be 'mac', 'darwin', or 'linux'", osName, toolName)
+			}
+		}
+
+		// At least one action must be defined
+		if len(component.Install) == 0 && len(component.Link) == 0 && len(component.Defaults) == 0 {
+			return fmt.Errorf("tool '%s' must define at least one action (install, link, or defaults)", toolName)
 		}
 	}
 

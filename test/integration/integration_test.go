@@ -34,9 +34,11 @@ func TestEndToEndWorkflow(t *testing.T) {
 	configContent := `
 profiles:
   "*":
-    bash:
-      link:
-        "bash/.bashrc": "` + filepath.Join(homeDir, ".bashrc") + `"
+    - bash
+config:
+  bash:
+    link:
+      "bash/.bashrc": "` + filepath.Join(homeDir, ".bashrc") + `"
 `
 
 	configPath := filepath.Join(dotfilesDir, "dot.yaml")
@@ -144,9 +146,11 @@ func TestDryRunWorkflow(t *testing.T) {
 	configContent := `
 profiles:
   "*":
-    bash:
-      link:
-        "bash/.bashrc": "` + filepath.Join(homeDir, ".bashrc") + `"
+    - bash
+config:
+  bash:
+    link:
+      "bash/.bashrc": "` + filepath.Join(homeDir, ".bashrc") + `"
 `
 
 	configPath := filepath.Join(dotfilesDir, "dot.yaml")
@@ -238,13 +242,16 @@ func TestProfileSelection(t *testing.T) {
 	configContent := `
 profiles:
   "*":
-    bash:
-      link:
-        "bash/.bashrc": "~/test_bashrc"
+    - bash
   work:
-    work_tool:
-      link:
-        "work/config": "~/work_config"
+    - work_tool
+config:
+  bash:
+    link:
+      "bash/.bashrc": "~/test_bashrc"
+  work_tool:
+    link:
+      "work/config": "~/work_config"
 `
 
 	configPath := filepath.Join(dotfilesDir, "dot.yaml")

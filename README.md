@@ -30,26 +30,35 @@ This will:
 
 ```yaml
 profiles:
-  "*":  # Always installed
-    bash:
-      link:
-        "bash/.bashrc": "~/.bashrc"
-        "bash/.bash_profile": "~/.bash_profile"
-    git:
-      link:
-        "git/.gitconfig": "~/.gitconfig"
-      install:
-        brew: "brew install git"
-        apt: "apt install -y git"
+  "*":        # Always installed on every machine
+    - bash
+    - git
+  
+  work:       # Only on your work computer
+    - vpn
+    - ssh
 
-  work:  # Only when explicitly requested
-    vpn:
-      install:
-        brew: "brew install --cask viscosity"
-        apt: "apt install -y openvpn"
-    ssh:
-      link:
-        "ssh/config": "~/.ssh/config"
+config:
+  bash:
+    link:
+      "bash/.bashrc": "~/.bashrc"
+      "bash/.bash_profile": "~/.bash_profile"
+  
+  git:
+    link:
+      "git/.gitconfig": "~/.gitconfig"
+    install:
+      brew: "brew install git"
+      apt: "apt install -y git"
+  
+  vpn:
+    install:
+      brew: "brew install --cask viscosity"
+      apt: "apt install -y openvpn"
+  
+  ssh:
+    link:
+      "ssh/config": "~/.ssh/config"
 ```
 
 2. Run dot to install the default profile:
@@ -64,123 +73,157 @@ dot
 dot work
 ```
 
+4. Install multiple profiles at once:
+
+```bash
+dot work laptop
+```
+
 ## Configuration
 
 ### Profile Structure
 
+Profiles are simple lists of tool names. Each tool is configured in the `config` section:
+
 ```yaml
 profiles:
-  profile_name:
-    component_name:
-      install:        # Installation commands (any shell command)
-        brew: "brew install package"
-        apt: "apt install -y package"
-        wget: "wget https://example.com/app.zip -O /Applications/app.zip"
-      uninstall:      # Optional uninstall commands
-        brew: "brew uninstall package"
-        apt: "apt remove -y package"
-      link:           # File/directory linking
-        "source/path": "~/target/path"
-      postinstall:    # Run after successful installation
-        "echo 'Installed successfully'"
-      postlink:       # Run after successful linking
-        "echo 'Linked successfully'"
-      os: ["mac"]     # OS restrictions (mac/darwin, linux)
-      defaults:       # macOS system defaults (macOS only)
-        "com.apple.dock": "macos/dock.plist"
+  "*":              # Always installed (special profile)
+    - git
+    - vim
+    - zsh
+  
+  work:             # Named profile (installed when requested)
+    - docker
+    - slack
+  
+  gui:
+    - apps          # Can reference nested config containers
 
-    # Recursive modules - organize yourself
-    cli:
-      tools:
-        fzf:
-          install:
-            brew: "brew install fzf"
-            apt: "apt install -y fzf"
-          link:
-            "fzf/.fzfrc": "~/.fzfrc"
-        ripgrep:
-          install:
-            brew: "brew install ripgrep"
-            apt: "apt install -y ripgrep"
-      editors:
-        vim:
-          link:
-            "vim/.vimrc": "~/.vimrc"
-            "vim/.vim/": "~/.vim/"
+config:
+  git:              # Tool configuration
+    install:        # Installation commands (any shell command)
+      brew: "brew install git"
+      apt: "apt install -y git"
+      wget: "wget https://example.com/git.zip -O /Applications/git.zip"
+    uninstall:      # Optional uninstall commands
+      brew: "brew uninstall git"
+      apt: "apt remove -y git"
+    link:           # File/directory linking
+      "source/path": "~/target/path"
+    postinstall:    # Run after successful installation
+      "echo 'Installed successfully'"
+    postlink:       # Run after successful linking
+      "echo 'Linked successfully'"
+    os: ["mac"]     # OS restrictions (mac/darwin, linux)
+    defaults:       # macOS system defaults (macOS only)
+      "com.apple.dock": "macos/dock.plist"
+  
+  vim:
+    link:
+      "vim/.vimrc": "~/.vimrc"
+      "vim/.vim/": "~/.vim/"
+  
+  zsh:
+    install:
+      brew: "brew install zsh"
+      apt: "apt install -y zsh"
+  
+  docker:
+    install:
+      brew: "brew install docker"
+      apt: "apt install -y docker.io"
+    postinstall: "sudo usermod -aG docker $USER"
+  
+  slack:
+    os: ["mac"]
+    install:
+      brew: "brew install slack"
 ```
 
 ### Special Profiles
 
 - `"*"`: Always installed on every machine
-- Named profiles: Only installed when explicitly requested
-- You can pass multiple profiles at once (e.g., `dot work laptop`). The `*` profile is always included. You cannot mix profile names with fuzzy search terms in the same run.
+- Named profiles (e.g., `work`, `laptop`, `rice`): Only installed on machines where they apply
+- You can pass multiple profiles at once (e.g., `dot work laptop`). The `*` profile is always included.
+- You can also use profiles with fuzzy search: `dot work git` (installs all tools in `*` and `work` profiles, plus any tool matching "git")
 
 
 ### OS Restrictions
 
-Restrict components to specific operating systems:
+Restrict tools to specific operating systems:
 
 ```yaml
 profiles:
   "*":
-    mac_only:
-      os: ["mac"]     # or ["darwin"]
-      install:
-        brew: "brew install --cask app"
+    - mac_only
+    - linux_only
+    - cross_platform
 
-    linux_only:
-      os: ["linux"]
-      install:
-        apt: "apt install -y package"
+config:
+  mac_only:
+    os: ["mac"]     # or ["darwin"]
+    install:
+      brew: "brew install --cask app"
 
-    cross_platform:
-      # No OS restriction - installs everywhere
-      install:
-        brew: "brew install tool"
-        apt: "apt install -y tool"
+  linux_only:
+    os: ["linux"]
+    install:
+      apt: "apt install -y package"
+
+  cross_platform:
+    # No OS restriction - installs everywhere
+    install:
+      brew: "brew install tool"
+      apt: "apt install -y tool"
 ```
 
 ### Advanced Features
 
-#### Recursive Module Organization
+#### Nested Configs
 
-Group related components using nested structures:
+Organize tools in nested structures for better readability:
 
 ```yaml
 profiles:
   "*":
-    development:
-      languages:
-        go:
-          install:
-            brew: "brew install go"
-            apt: "apt install -y golang"
-        node:
-          install:
-            brew: "brew install node"
-            apt: "apt install -y nodejs npm"
-      tools:
-        git:
-          link:
-            "git/.gitconfig": "~/.gitconfig"
-          install:
-            brew: "brew install git"
-            apt: "apt install -y git"
+    - cli      # References a nested config container
+  
+  gui:
+    - apps     # References another nested config container
+
+config:
+  cli:         # Container with shell tools
+    bash:
+      install: {...}
+    zsh:
+      install: {...}
+    git:
+      install: {...}
+  
+  apps:        # Container with GUI applications
+    slack:
+      install: {...}
+    docker:
+      install: {...}
+    chrome:
+      install: {...}
 ```
+
+When you run `dot gui`, it will install all tools from: `*` + `gui` profiles, automatically expanding `cli` and `apps` containers.
 
 #### Fuzzy Search
 
-Install specific components by name without specifying profiles:
+Install specific tools by name without specifying profiles:
 
 ```bash
-# Install any component matching "git"
+# Install any tool matching "git"
 dot git
 
-# Install components matching multiple terms
+# Install tools matching multiple terms
 dot git vim
 
-# Cannot mix profiles and fuzzy search
-dot work git  # Error: cannot mix profile names with fuzzy search terms
+# Mix profiles and fuzzy search
+dot work git    # Installs from *, work profiles, plus any tool matching "git"
 ```
 
 ## Usage
@@ -363,24 +406,29 @@ This enables:
 ```yaml
 profiles:
   "*":
-    shell:
-      link:
-        "shell/.bashrc": "~/.bashrc"
-        "shell/.zshrc": "~/.zshrc"
+    - shell
+    - git
+    - vim
 
-    git:
-      link:
-        "git/.gitconfig": "~/.gitconfig"
-      install:
-        brew: "brew install git"
-        apt: "apt install -y git"
+config:
+  shell:
+    link:
+      "shell/.bashrc": "~/.bashrc"
+      "shell/.zshrc": "~/.zshrc"
 
-    vim:
-      link:
-        "vim/.vimrc": "~/.vimrc"
-      install:
-        brew: "brew install vim"
-        apt: "apt install -y vim"
+  git:
+    link:
+      "git/.gitconfig": "~/.gitconfig"
+    install:
+      brew: "brew install git"
+      apt: "apt install -y git"
+
+  vim:
+    link:
+      "vim/.vimrc": "~/.vimrc"
+    install:
+      brew: "brew install vim"
+      apt: "apt install -y vim"
 ```
 
 ### Work Machine Profile
@@ -388,23 +436,28 @@ profiles:
 ```yaml
 profiles:
   work:
-    docker:
-      install:
-        brew: "brew install docker"
-        apt: "apt install -y docker.io"
-      postinstall: "sudo usermod -aG docker $USER"
+    - docker
+    - vpn
+    - kubectl
 
-    vpn:
-      install:
-        brew: "brew install --cask viscosity"
-        apt: "apt install -y openvpn"
-      link:
-        "work/vpn.conf": "~/.config/vpn/client.conf"
+config:
+  docker:
+    install:
+      brew: "brew install docker"
+      apt: "apt install -y docker.io"
+    postinstall: "sudo usermod -aG docker $USER"
 
-    kubectl:
-      install:
-        brew: "brew install kubectl"
-        curl: "curl -LO https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl && chmod +x kubectl && sudo mv kubectl /usr/local/bin/"
+  vpn:
+    install:
+      brew: "brew install --cask viscosity"
+      apt: "apt install -y openvpn"
+    link:
+      "work/vpn.conf": "~/.config/vpn/client.conf"
+
+  kubectl:
+    install:
+      brew: "brew install kubectl"
+      curl: "curl -LO https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl && chmod +x kubectl && sudo mv kubectl /usr/local/bin/"
 ```
 
 ### Laptop-Specific Tools
@@ -412,15 +465,19 @@ profiles:
 ```yaml
 profiles:
   laptop:
-    battery:
-      os: ["mac"]
-      install:
-        brew: "brew install --cask battery-guardian"
+    - battery
+    - wifi
 
-    wifi:
-      os: ["linux"]
-      install:
-        apt: "apt install -y network-manager"
+config:
+  battery:
+    os: ["mac"]
+    install:
+      brew: "brew install --cask battery-guardian"
+
+  wifi:
+    os: ["linux"]
+    install:
+      apt: "apt install -y network-manager"
 ```
 
 ## Building from Source

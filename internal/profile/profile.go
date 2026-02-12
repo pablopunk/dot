@@ -43,6 +43,7 @@ func (m *Manager) GetActiveComponents(activeProfiles []string, fuzzySearch strin
 func (m *Manager) GetActiveComponentsWithSearchResult(activeProfiles []string, fuzzySearch string) (*SearchResult, error) {
 	var components []ComponentInfo
 	var unmatchedTerms []string
+	seenComponents := make(map[string]bool) // Track already-added components to deduplicate
 
 	// If fuzzy search is provided, track which terms match
 	var searchTerms []string
@@ -53,43 +54,9 @@ func (m *Manager) GetActiveComponentsWithSearchResult(activeProfiles []string, f
 	}
 
 	// Always include the "*" profile if it exists
-	if defaultProfile, exists := m.config.Profiles["*"]; exists {
-		profileComponents := defaultProfile.GetComponents()
-
-		// Get sorted component paths to maintain consistent order
-		var paths []string
-		for componentPath := range profileComponents {
-			paths = append(paths, componentPath)
-		}
-		sort.Strings(paths)
-
-		for _, componentPath := range paths {
-			component := profileComponents[componentPath]
-			if component.MatchesOS(m.currentOS) {
-				if fuzzySearch == "" {
-					components = append(components, ComponentInfo{
-						ProfileName:   "*",
-						ComponentName: componentPath,
-						Component:     component,
-					})
-				} else {
-					matchingTerm := m.getMatchingTerm(componentPath, searchTerms)
-					if matchingTerm != "" {
-						components = append(components, ComponentInfo{
-							ProfileName:   "*",
-							ComponentName: componentPath,
-							Component:     component,
-						})
-						// Remove this term from unmatched list
-						for i, term := range unmatchedTerms {
-							if term == matchingTerm {
-								unmatchedTerms = append(unmatchedTerms[:i], unmatchedTerms[i+1:]...)
-								break
-							}
-						}
-					}
-				}
-			}
+	if _, exists := m.config.Profiles["*"]; exists {
+		if err := m.addProfileComponents("*", &components, &seenComponents, searchTerms, &unmatchedTerms, fuzzySearch); err != nil {
+			return nil, err
 		}
 	}
 
@@ -99,47 +66,12 @@ func (m *Manager) GetActiveComponentsWithSearchResult(activeProfiles []string, f
 			continue // Already handled above
 		}
 
-		profile, exists := m.config.Profiles[profileName]
-		if !exists {
+		if _, exists := m.config.Profiles[profileName]; !exists {
 			return nil, fmt.Errorf("profile '%s' not found", profileName)
 		}
 
-		profileComponents := profile.GetComponents()
-
-		// Get sorted component paths to maintain consistent order
-		var paths []string
-		for componentPath := range profileComponents {
-			paths = append(paths, componentPath)
-		}
-		sort.Strings(paths)
-
-		for _, componentPath := range paths {
-			component := profileComponents[componentPath]
-			if component.MatchesOS(m.currentOS) {
-				if fuzzySearch == "" {
-					components = append(components, ComponentInfo{
-						ProfileName:   profileName,
-						ComponentName: componentPath,
-						Component:     component,
-					})
-				} else {
-					matchingTerm := m.getMatchingTerm(componentPath, searchTerms)
-					if matchingTerm != "" {
-						components = append(components, ComponentInfo{
-							ProfileName:   profileName,
-							ComponentName: componentPath,
-							Component:     component,
-						})
-						// Remove this term from unmatched list
-						for i, term := range unmatchedTerms {
-							if term == matchingTerm {
-								unmatchedTerms = append(unmatchedTerms[:i], unmatchedTerms[i+1:]...)
-								break
-							}
-						}
-					}
-				}
-			}
+		if err := m.addProfileComponents(profileName, &components, &seenComponents, searchTerms, &unmatchedTerms, fuzzySearch); err != nil {
+			return nil, err
 		}
 	}
 
@@ -147,6 +79,59 @@ func (m *Manager) GetActiveComponentsWithSearchResult(activeProfiles []string, f
 		Components:     components,
 		UnmatchedTerms: unmatchedTerms,
 	}, nil
+}
+
+// addProfileComponents adds all tools from a profile to the components list
+// It expands nested config containers and deduplicates
+func (m *Manager) addProfileComponents(profileName string, components *[]ComponentInfo, seenComponents *map[string]bool, searchTerms []string, unmatchedTerms *[]string, fuzzySearch string) error {
+	profileComponents, err := m.config.GetComponentsForProfileTools(profileName)
+	if err != nil {
+		return err
+	}
+
+	// Get sorted tool names to maintain consistent order
+	var toolNames []string
+	for toolName := range profileComponents {
+		toolNames = append(toolNames, toolName)
+	}
+	sort.Strings(toolNames)
+
+	for _, toolName := range toolNames {
+		// Skip if we've already added this component
+		if (*seenComponents)[toolName] {
+			continue
+		}
+		(*seenComponents)[toolName] = true
+
+		component := profileComponents[toolName]
+		if component.MatchesOS(m.currentOS) {
+			if fuzzySearch == "" {
+				*components = append(*components, ComponentInfo{
+					ProfileName:   profileName,
+					ComponentName: toolName,
+					Component:     component,
+				})
+			} else {
+				matchingTerm := m.getMatchingTerm(toolName, searchTerms)
+				if matchingTerm != "" {
+					*components = append(*components, ComponentInfo{
+						ProfileName:   profileName,
+						ComponentName: toolName,
+						Component:     component,
+					})
+					// Remove this term from unmatched list
+					for i, term := range *unmatchedTerms {
+						if term == matchingTerm {
+							*unmatchedTerms = append((*unmatchedTerms)[:i], (*unmatchedTerms)[i+1:]...)
+							break
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return nil
 }
 
 func (m *Manager) ListProfiles() []string {
@@ -163,32 +148,43 @@ func (m *Manager) ProfileExists(profileName string) bool {
 }
 
 func (m *Manager) GetComponentsInProfile(profileName string) (config.ComponentMap, error) {
-	profile, exists := m.config.Profiles[profileName]
-	if !exists {
+	if _, exists := m.config.Profiles[profileName]; !exists {
 		return nil, fmt.Errorf("profile '%s' not found", profileName)
 	}
-	return profile.GetComponents(), nil
+	return m.config.GetComponentsForProfileTools(profileName)
 }
 
 func (m *Manager) FindComponentsByFuzzySearch(search string) []ComponentInfo {
 	var matches []ComponentInfo
+	seenComponents := make(map[string]bool)
 
-	for profileName, profile := range m.config.Profiles {
-		profileComponents := profile.GetComponents()
-
-		// Get sorted component paths to maintain consistent order
-		var paths []string
-		for componentPath := range profileComponents {
-			paths = append(paths, componentPath)
+	// Iterate through all profiles
+	for profileName := range m.config.Profiles {
+		profileComponents, err := m.config.GetComponentsForProfileTools(profileName)
+		if err != nil {
+			// Skip profiles that have errors
+			continue
 		}
-		sort.Strings(paths)
 
-		for _, componentPath := range paths {
-			component := profileComponents[componentPath]
-			if component.MatchesOS(m.currentOS) && m.matchesFuzzySearch(componentPath, search) {
+		// Get sorted tool names to maintain consistent order
+		var toolNames []string
+		for toolName := range profileComponents {
+			toolNames = append(toolNames, toolName)
+		}
+		sort.Strings(toolNames)
+
+		for _, toolName := range toolNames {
+			// Skip if we've already added this component
+			if seenComponents[toolName] {
+				continue
+			}
+			seenComponents[toolName] = true
+
+			component := profileComponents[toolName]
+			if component.MatchesOS(m.currentOS) && m.matchesFuzzySearch(toolName, search) {
 				matches = append(matches, ComponentInfo{
 					ProfileName:   profileName,
-					ComponentName: componentPath,
+					ComponentName: toolName,
 					Component:     component,
 				})
 			}

@@ -200,7 +200,7 @@ func (a *App) Run(args []string) error {
 	var fuzzySearch string
 	var profilesFromUser bool = false
 
-	// Parse arguments - first check if they're profile names or fuzzy search
+	// Parse arguments - all are either profile names or fuzzy search terms
 	var foundProfiles []string
 	var foundFuzzyTerms []string
 
@@ -212,11 +212,6 @@ func (a *App) Run(args []string) error {
 		}
 	}
 
-	// Check if mixing profiles and fuzzy search terms
-	if len(foundProfiles) > 0 && len(foundFuzzyTerms) > 0 {
-		return fmt.Errorf("cannot mix profile names (%v) with fuzzy search terms (%v)", foundProfiles, foundFuzzyTerms)
-	}
-
 	// Apply the results
 	if len(foundProfiles) > 0 {
 		activeProfiles = foundProfiles
@@ -224,7 +219,10 @@ func (a *App) Run(args []string) error {
 		if a.Verbose {
 			fmt.Printf("🔍 Recognized profiles: %v\n", foundProfiles)
 		}
-	} else if len(foundFuzzyTerms) > 0 {
+	}
+
+	// Fuzzy search can be combined with profiles now
+	if len(foundFuzzyTerms) > 0 {
 		fuzzySearch = strings.Join(foundFuzzyTerms, " ")
 		if a.Verbose {
 			fmt.Printf("🔍 Fuzzy search terms: %v\n", foundFuzzyTerms)

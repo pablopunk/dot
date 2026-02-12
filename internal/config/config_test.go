@@ -14,22 +14,28 @@ func TestLoadConfig(t *testing.T) {
 	configContent := `
 profiles:
   "*":
-    bash:
-      link:
-        "bash/.bashrc": "~/.bashrc"
-    git:
-      install:
-        brew: "brew install git"
-        apt: "apt install -y git"
+    - bash
+    - git
   work:
-    vpn:
-      install:
-        brew: "brew install --cask viscosity"
-      os: ["mac"]
-    docker:
-      install:
-        apt: "apt install -y docker.io"
-      os: ["linux"]
+    - vpn
+    - docker
+
+config:
+  bash:
+    link:
+      "bash/.bashrc": "~/.bashrc"
+  git:
+    install:
+      brew: "brew install git"
+      apt: "apt install -y git"
+  vpn:
+    install:
+      brew: "brew install --cask viscosity"
+    os: ["mac"]
+  docker:
+    install:
+      apt: "apt install -y docker.io"
+    os: ["linux"]
 `
 
 	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
@@ -47,12 +53,21 @@ profiles:
 	}
 
 	// Test default profile
-	defaultProfile, exists := cfg.Profiles["*"]
+	defaultTools, exists := cfg.Profiles["*"]
 	if !exists {
 		t.Error("Default profile '*' not found")
 	}
 
-	defaultComponents := defaultProfile.GetComponents()
+	if len(defaultTools) != 2 {
+		t.Errorf("Expected 2 tools in default profile, got %d", len(defaultTools))
+	}
+
+	// Test default profile expands to components
+	defaultComponents, err := cfg.GetComponentsForProfileTools("*")
+	if err != nil {
+		t.Fatalf("Failed to get default profile components: %v", err)
+	}
+
 	bashComponent, exists := defaultComponents["bash"]
 	if !exists {
 		t.Error("bash component not found in default profile")
@@ -63,12 +78,20 @@ profiles:
 	}
 
 	// Test work profile
-	workProfile, exists := cfg.Profiles["work"]
+	workTools, exists := cfg.Profiles["work"]
 	if !exists {
 		t.Error("work profile not found")
 	}
 
-	workComponents := workProfile.GetComponents()
+	if len(workTools) != 2 {
+		t.Errorf("Expected 2 tools in work profile, got %d", len(workTools))
+	}
+
+	workComponents, err := cfg.GetComponentsForProfileTools("work")
+	if err != nil {
+		t.Fatalf("Failed to get work profile components: %v", err)
+	}
+
 	vpnComponent, exists := workComponents["vpn"]
 	if !exists {
 		t.Error("vpn component not found in work profile")
@@ -90,16 +113,30 @@ func TestConfigValidation(t *testing.T) {
 			config: `
 profiles:
   "*":
-    bash:
-      link:
-        "bash/.bashrc": "~/.bashrc"
+    - bash
+config:
+  bash:
+    link:
+      "bash/.bashrc": "~/.bashrc"
 `,
 			wantError: false,
 		},
 		{
 			name: "no profiles",
 			config: `
-other_field: value
+config:
+  bash:
+    link:
+      "bash/.bashrc": "~/.bashrc"
+`,
+			wantError: true,
+		},
+		{
+			name: "no config",
+			config: `
+profiles:
+  "*":
+    - bash
 `,
 			wantError: true,
 		},
@@ -108,20 +145,51 @@ other_field: value
 			config: `
 profiles:
   "*":
-    bash:
-      install:
-        brew: "brew install bash"
-      os: ["windows"]
+    - bash
+config:
+  bash:
+    install:
+      brew: "brew install bash"
+    os: ["windows"]
 `,
 			wantError: true,
 		},
 		{
-			name: "component with no actions",
+			name: "tool with no actions (invalid)",
 			config: `
 profiles:
   "*":
-    empty:
-      os: ["mac"]
+    - invalid-tool
+config:
+  invalid-tool:
+    os: ["mac"]
+`,
+			wantError: true,
+		},
+		{
+			name: "nested config container (valid)",
+			config: `
+profiles:
+  "*":
+    - apps
+config:
+  apps:
+    1password:
+      install:
+        brew: "brew install 1password"
+`,
+			wantError: false,
+		},
+		{
+			name: "tool referenced but not in config",
+			config: `
+profiles:
+  "*":
+    - missing
+config:
+  bash:
+    install:
+      brew: "brew install bash"
 `,
 			wantError: true,
 		},
@@ -195,5 +263,91 @@ func TestComponentMatchesOS(t *testing.T) {
 				t.Errorf("Component.MatchesOS() = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestNestedConfigContainerExpansion(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "dot.yaml")
+
+	configContent := `
+profiles:
+  "*":
+    - cli
+  gui:
+    - apps
+
+config:
+  cli:
+    bash:
+      link:
+        "bash/.bashrc": "~/.bashrc"
+    git:
+      install:
+        brew: "brew install git"
+
+  apps:
+    1password:
+      install:
+        brew: "brew install 1password"
+    slack:
+      install:
+        brew: "brew install --cask slack"
+    chrome:
+      install:
+        brew: "brew install --cask google-chrome"
+`
+
+	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+		t.Fatalf("Failed to write test config: %v", err)
+	}
+
+	cfg, err := Load(configPath)
+	if err != nil {
+		t.Fatalf("Failed to load config: %v", err)
+	}
+
+	// Test default profile expands cli container to bash and git
+	defaultComponents, err := cfg.GetComponentsForProfileTools("*")
+	if err != nil {
+		t.Fatalf("Failed to get default profile components: %v", err)
+	}
+
+	expectedDefault := map[string]bool{"bash": true, "git": true}
+	if len(defaultComponents) != len(expectedDefault) {
+		t.Errorf("Expected %d tools in default profile, got %d", len(expectedDefault), len(defaultComponents))
+	}
+
+	for toolName := range defaultComponents {
+		if !expectedDefault[toolName] {
+			t.Errorf("Unexpected tool '%s' in default profile", toolName)
+		}
+		delete(expectedDefault, toolName)
+	}
+
+	for toolName := range expectedDefault {
+		t.Errorf("Missing expected tool '%s' in default profile", toolName)
+	}
+
+	// Test gui profile expands apps container to 1password, slack, chrome
+	guiComponents, err := cfg.GetComponentsForProfileTools("gui")
+	if err != nil {
+		t.Fatalf("Failed to get gui profile components: %v", err)
+	}
+
+	expectedGUI := map[string]bool{"1password": true, "slack": true, "chrome": true}
+	if len(guiComponents) != len(expectedGUI) {
+		t.Errorf("Expected %d tools in gui profile, got %d", len(expectedGUI), len(guiComponents))
+	}
+
+	for toolName := range guiComponents {
+		if !expectedGUI[toolName] {
+			t.Errorf("Unexpected tool '%s' in gui profile", toolName)
+		}
+		delete(expectedGUI, toolName)
+	}
+
+	for toolName := range expectedGUI {
+		t.Errorf("Missing expected tool '%s' in gui profile", toolName)
 	}
 }

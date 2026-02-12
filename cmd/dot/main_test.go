@@ -20,10 +20,12 @@ func TestApp_Run(t *testing.T) {
 	// Create a test config file
 	configContent := `
 profiles:
-  default:
-    test-component:
-      link:
-        test-file: ~/.test-file
+  "*":
+    - test-component
+config:
+  test-component:
+    link:
+      test-file: ~/.test-file
 `
 	configPath := filepath.Join(tempDir, "dot.yaml")
 	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
@@ -227,14 +229,17 @@ func TestListProfilesCommand(t *testing.T) {
 	tempDir := t.TempDir()
 	configContent := `
 profiles:
-  default:
-    test-component:
-      link:
-        test-file: ~/.test-file
+  "*":
+    - test-component
   work:
-    work-component:
-      link:
-        work-file: ~/.work-file
+    - work-component
+config:
+  test-component:
+    link:
+      test-file: ~/.test-file
+  work-component:
+    link:
+      work-file: ~/.work-file
 `
 	configPath := filepath.Join(tempDir, "dot.yaml")
 	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
@@ -267,7 +272,7 @@ profiles:
 		t.Errorf("listProfilesCommand() output should contain 'Available profiles:', got: %s", output)
 	}
 
-	if !strings.Contains(output, "default") || !strings.Contains(output, "work") {
+	if !strings.Contains(output, "*") || !strings.Contains(output, "work") {
 		t.Errorf("listProfilesCommand() output should contain profile names, got: %s", output)
 	}
 }
@@ -299,17 +304,26 @@ func TestApp_HookExecution(t *testing.T) {
 	configContent := `
 profiles:
   "*":
-    component-with-postinstall:
-      link:
-        test-file: ~/.test-file
-      postinstall: "echo 'postinstall executed'"
-    component-with-postlink:
-      link:
-        test-file2: ~/.test-file2
-      postlink: "echo 'postlink executed'"
-    component-without-hooks:
-      link:
-        test-file3: ~/.test-file3
+    - component-with-postinstall
+    - component-with-postlink
+    - component-without-hooks
+  work:
+    - work-component
+config:
+  component-with-postinstall:
+    link:
+      test-file: ~/.test-file
+    postinstall: "echo 'postinstall executed'"
+  component-with-postlink:
+    link:
+      test-file2: ~/.test-file2
+    postlink: "echo 'postlink executed'"
+  component-without-hooks:
+    link:
+      test-file3: ~/.test-file3
+  work-component:
+    link:
+      work-file: ~/.work-file
 `
 	configPath := filepath.Join(tempDir, "dot.yaml")
 	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
@@ -500,10 +514,17 @@ func TestProfileSavedEvenIfInstallFails(t *testing.T) {
 	// Config with a profile whose install always fails
 	configContent := `
 profiles:
+  "*":
+    - working
   failp:
-    broken:
-      install:
-        sh: "false"
+    - broken
+config:
+  working:
+    link:
+      test: ~/.test
+  broken:
+    install:
+      sh: "false"
 `
 	if err := os.WriteFile(filepath.Join(tempDir, "dot.yaml"), []byte(configContent), 0644); err != nil {
 		t.Fatalf("Failed to write config: %v", err)

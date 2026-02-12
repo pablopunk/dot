@@ -1,73 +1,102 @@
-# Example dot configuration for testing
+# Example dot configuration for testing with simplified profiles
+
 profiles:
   "*":
-    bash:
-      link:
-        "bash/.bashrc": "~/.bashrc"
-        "bash/.bash_profile": "~/.bash_profile"
-      postlink: "echo 'Bash configuration linked'"
-    
-    git:
-      link:
-        "git/.gitconfig": "~/.gitconfig"
-      install:
-        brew: "brew install git"
-        apt: "apt install -y git"
-      postinstall: "git config --global init.defaultBranch main"
-    
-    vim:
-      link:
-        "vim/.vimrc": "~/.vimrc"
-        "vim/.vim": "~/.vim"
-      install:
-        brew: "brew install vim"
-        apt: "apt install -y vim"
+    - bash
+    - git
+    - vim
 
   work:
-    ssh:
-      link:
-        "ssh/config": "~/.ssh/config"
-        "ssh/keys": "~/.ssh/keys"
-      postlink: "chmod 600 ~/.ssh/config"
-    
-    vpn:
-      install:
-        brew: "brew install --cask viscosity"
-        apt: "apt install -y openvpn"
-      os: ["mac", "linux"]
-    
-    docker:
-      install:
-        brew: "brew install docker"
-        apt: "apt install -y docker.io"
-      postinstall: |
-        sudo usermod -aG docker $USER
-        echo 'Please log out and back in for docker group to take effect'
-      os: ["linux"]
+    - ssh
+    - vpn
+    - docker
 
   laptop:
-    battery:
-      install:
-        brew: "brew install --cask battery-guardian"
-      os: ["mac"]
-    
-    wifi:
-      install:
-        apt: "apt install -y network-manager"
-      os: ["linux"]
-    
-    bluetooth:
-      install:
-        brew: "brew install blueutil"
-        apt: "apt install -y bluez bluez-tools"
+    - battery
+    - wifi
+    - bluetooth
 
   mac:
-    dock:
-      defaults:
-        "com.apple.dock": "macos/dock.plist"
-      os: ["mac"]
-    
-    finder:
-      defaults:
-        "com.apple.finder": "macos/finder.plist"
-      os: ["mac"]
+    - dock
+    - finder
+
+  shells:
+    - bash
+    - zsh
+
+config:
+  bash:
+    link:
+      "bash/.bashrc": "~/.bashrc"
+      "bash/.bash_profile": "~/.bash_profile"
+    postlink: "echo 'Bash configuration linked'"
+
+  zsh:
+    link:
+      "zsh/.zshrc": "~/.zshrc"
+    install:
+      brew: "brew install zsh"
+      apt: "apt install -y zsh"
+    postinstall: "chsh -s /bin/zsh"
+
+  git:
+    link:
+      "git/.gitconfig": "~/.gitconfig"
+    install:
+      brew: "brew install git"
+      apt: "apt install -y git"
+    postinstall: "git config --global init.defaultBranch main"
+
+  vim:
+    link:
+      "vim/.vimrc": "~/.vimrc"
+      "vim/.vim": "~/.vim"
+    install:
+      brew: "brew install vim"
+      apt: "apt install -y vim"
+
+  ssh:
+    link:
+      "ssh/config": "~/.ssh/config"
+      "ssh/keys": "~/.ssh/keys"
+    postlink: "chmod 600 ~/.ssh/config"
+
+  vpn:
+    install:
+      brew: "brew install --cask viscosity"
+      apt: "apt install -y openvpn"
+    os: ["mac", "linux"]
+
+  docker:
+    install:
+      brew: "brew install docker"
+      apt: "apt install -y docker.io"
+    postinstall: |
+      sudo usermod -aG docker $USER
+      echo 'Please log out and back in for docker group to take effect'
+    os: ["linux"]
+
+  battery:
+    install:
+      brew: "brew install --cask battery-guardian"
+    os: ["mac"]
+
+  wifi:
+    install:
+      apt: "apt install -y network-manager"
+    os: ["linux"]
+
+  bluetooth:
+    install:
+      brew: "brew install blueutil"
+      apt: "apt install -y bluez bluez-tools"
+
+  dock:
+    defaults:
+      "com.apple.dock": "macos/dock.plist"
+    os: ["mac"]
+
+  finder:
+    defaults:
+      "com.apple.finder": "macos/finder.plist"
+    os: ["mac"]

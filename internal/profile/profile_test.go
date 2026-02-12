@@ -7,44 +7,59 @@ import (
 )
 
 func createTestConfig() *config.Config {
-	return &config.Config{
-		Profiles: map[string]config.Profile{
-			"*": {
-				"bash": config.Component{
-					Link: map[string]string{
-						"bash/.bashrc": "~/.bashrc",
-					},
-				},
-				"git": config.Component{
-					Install: map[string]string{
-						"brew": "brew install git",
-						"apt":  "apt install -y git",
-					},
-				},
-			},
-			"work": {
-				"vpn": config.Component{
-					Install: map[string]string{
-						"brew": "brew install --cask viscosity",
-					},
-					OS: []string{"mac"},
-				},
-				"docker": config.Component{
-					Install: map[string]string{
-						"apt": "apt install -y docker.io",
-					},
-					OS: []string{"linux"},
-				},
-			},
-			"laptop": {
-				"battery": config.Component{
-					Install: map[string]string{
-						"brew": "brew install --cask battery-guardian",
-					},
-					OS: []string{"mac"},
-				},
+	rawConfig := map[string]config.Component{
+		"bash": {
+			Link: map[string]string{
+				"bash/.bashrc": "~/.bashrc",
 			},
 		},
+		"git": {
+			Install: map[string]string{
+				"brew": "brew install git",
+				"apt":  "apt install -y git",
+			},
+		},
+		"vpn": {
+			Install: map[string]string{
+				"brew": "brew install --cask viscosity",
+			},
+			OS: []string{"mac"},
+		},
+		"docker": {
+			Install: map[string]string{
+				"apt": "apt install -y docker.io",
+			},
+			OS: []string{"linux"},
+		},
+		"battery": {
+			Install: map[string]string{
+				"brew": "brew install --cask battery-guardian",
+			},
+			OS: []string{"mac"},
+		},
+	}
+
+	configMap := make(map[string]interface{})
+	for k, v := range rawConfig {
+		configMap[k] = v
+	}
+
+	return &config.Config{
+		Profiles: map[string][]interface{}{
+			"*": {
+				"bash",
+				"git",
+			},
+			"work": {
+				"vpn",
+				"docker",
+			},
+			"laptop": {
+				"battery",
+			},
+		},
+		Config:    configMap,
+		RawConfig: rawConfig,
 	}
 }
 
@@ -129,18 +144,31 @@ func TestGetActiveComponents(t *testing.T) {
 }
 
 func TestGetActiveComponents_MultipleProfiles(t *testing.T) {
+	rawConfig := map[string]config.Component{
+		"common": {Link: map[string]string{"s": "t"}},
+		"c1":     {Link: map[string]string{"s": "t"}},
+		"c2":     {Link: map[string]string{"s": "t"}},
+	}
+
+	configMap := make(map[string]interface{})
+	for k, v := range rawConfig {
+		configMap[k] = v
+	}
+
 	cfg := &config.Config{
-		Profiles: map[string]config.Profile{
+		Profiles: map[string][]interface{}{
 			"*": {
-				"common": config.Component{Link: map[string]string{"s": "t"}},
+				"common",
 			},
 			"p1": {
-				"c1": config.Component{Link: map[string]string{"s": "t"}},
+				"c1",
 			},
 			"p2": {
-				"c2": config.Component{Link: map[string]string{"s": "t"}},
+				"c2",
 			},
 		},
+		Config:    configMap,
+		RawConfig: rawConfig,
 	}
 
 	manager := NewManager(cfg)
