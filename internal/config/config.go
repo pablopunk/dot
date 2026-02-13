@@ -17,10 +17,60 @@ type Config struct {
 
 type ComponentMap map[string]Component
 
+// LinkMap is a custom type that supports both single string and array of strings as values
+// This allows backward compatibility with the old format while supporting multiple destinations per source
+type LinkMap map[string][]string
+
+// UnmarshalYAML implements custom YAML unmarshaling for LinkMap
+// Supports both formats:
+//
+//	Old (single): "source": "dest"
+//	New (multiple): "source": ["dest1", "dest2"]
+func (lm *LinkMap) UnmarshalYAML(node *yaml.Node) error {
+	if node.Kind != yaml.MappingNode {
+		return fmt.Errorf("link must be a mapping, got %s", node.Tag)
+	}
+
+	*lm = make(LinkMap)
+
+	for i := 0; i < len(node.Content); i += 2 {
+		keyNode := node.Content[i]
+		valueNode := node.Content[i+1]
+
+		var key string
+		if err := keyNode.Decode(&key); err != nil {
+			return fmt.Errorf("failed to decode link key: %w", err)
+		}
+
+		var destinations []string
+
+		switch valueNode.Kind {
+		case yaml.ScalarNode:
+			// Old format: single string value
+			var dest string
+			if err := valueNode.Decode(&dest); err != nil {
+				return fmt.Errorf("failed to decode link destination for %s: %w", key, err)
+			}
+			destinations = []string{dest}
+		case yaml.SequenceNode:
+			// New format: array of destinations
+			if err := valueNode.Decode(&destinations); err != nil {
+				return fmt.Errorf("failed to decode link destinations for %s: %w", key, err)
+			}
+		default:
+			return fmt.Errorf("link value for %s must be a string or array, got %s", key, valueNode.Tag)
+		}
+
+		(*lm)[key] = destinations
+	}
+
+	return nil
+}
+
 type Component struct {
 	Install     map[string]string `yaml:"install,omitempty"`
 	Uninstall   map[string]string `yaml:"uninstall,omitempty"`
-	Link        map[string]string `yaml:"link,omitempty"`
+	Link        LinkMap           `yaml:"link,omitempty"`
 	PostInstall string            `yaml:"postinstall,omitempty"`
 	PostLink    string            `yaml:"postlink,omitempty"`
 	OS          []string          `yaml:"os,omitempty"`

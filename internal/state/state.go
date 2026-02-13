@@ -8,6 +8,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
+	"github.com/pablopunk/dot/internal/config"
 	"github.com/pablopunk/dot/internal/profile"
 )
 
@@ -25,7 +26,7 @@ type ComponentState struct {
 	PackageManager    string            `yaml:"package_manager,omitempty"`
 	InstallCommand    string            `yaml:"install_command,omitempty"`
 	UninstallCommands map[string]string `yaml:"uninstall_commands,omitempty"` // Store uninstall commands for when component is removed
-	Links             map[string]string `yaml:"links,omitempty"`
+	Links             config.LinkMap    `yaml:"links,omitempty"`
 	PostInstallRan    bool              `yaml:"post_install_ran"`
 	PostLinkRan       bool              `yaml:"post_link_ran"`
 	ContentHash       string            `yaml:"content_hash,omitempty"` // Hash of component content for rename detection
@@ -117,7 +118,7 @@ func (m *Manager) IsComponentInstalled(componentInfo profile.ComponentInfo) bool
 	return exists
 }
 
-func (m *Manager) MarkComponentInstalled(componentInfo profile.ComponentInfo, packageManager, installCommand string, links map[string]string) {
+func (m *Manager) MarkComponentInstalled(componentInfo profile.ComponentInfo, packageManager, installCommand string, links config.LinkMap) {
 	key := componentInfo.FullName()
 	m.lockFile.InstalledComponents[key] = ComponentState{
 		ProfileName:       componentInfo.ProfileName,
@@ -207,7 +208,7 @@ func (m *Manager) GetComponentState(componentInfo profile.ComponentInfo) (Compon
 	return state, exists
 }
 
-func (m *Manager) HasChangedSince(componentInfo profile.ComponentInfo, links map[string]string) bool {
+func (m *Manager) HasChangedSince(componentInfo profile.ComponentInfo, links config.LinkMap) bool {
 	state, exists := m.GetComponentState(componentInfo)
 	if !exists {
 		return true // Not installed, so it's a change
@@ -218,9 +219,19 @@ func (m *Manager) HasChangedSince(componentInfo profile.ComponentInfo, links map
 		return true
 	}
 
-	for source, target := range links {
-		if stateTarget, exists := state.Links[source]; !exists || stateTarget != target {
+	for source, targets := range links {
+		stateTargets, exists := state.Links[source]
+		if !exists {
 			return true
+		}
+		if len(stateTargets) != len(targets) {
+			return true
+		}
+		// Check each target matches
+		for i, target := range targets {
+			if stateTargets[i] != target {
+				return true
+			}
 		}
 	}
 
@@ -285,7 +296,7 @@ func (m *Manager) migrateRenamedComponent(oldKey string, newComponent profile.Co
 		PackageManager:    oldState.PackageManager,
 		InstallCommand:    oldState.InstallCommand,
 		UninstallCommands: newComponent.Component.Uninstall, // Update uninstall commands to new component's
-		Links:             map[string]string{},              // Reset links so they get re-created
+		Links:             config.LinkMap{},                 // Reset links so they get re-created
 		PostInstallRan:    oldState.PostInstallRan,
 		PostLinkRan:       false, // Reset post-link state since links will be re-created
 		ContentHash:       newComponent.Component.ContentHash(),

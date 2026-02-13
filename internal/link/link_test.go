@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/pablopunk/dot/internal/config"
 )
 
 func TestNewManager(t *testing.T) {
@@ -46,8 +48,8 @@ func TestCreateLinks(t *testing.T) {
 
 	manager := NewManager(baseDir, false, false)
 
-	linkMap := map[string]string{
-		"bash/.bashrc": filepath.Join(homeDir, ".bashrc"),
+	linkMap := config.LinkMap{
+		"bash/.bashrc": []string{filepath.Join(homeDir, ".bashrc")},
 	}
 
 	results, err := manager.CreateLinks(linkMap)
@@ -118,8 +120,8 @@ func TestCreateLinksExistingCorrectLink(t *testing.T) {
 
 	manager := NewManager(baseDir, false, false)
 
-	linkMap := map[string]string{
-		"bash/.bashrc": targetFile,
+	linkMap := config.LinkMap{
+		"bash/.bashrc": []string{targetFile},
 	}
 
 	results, err := manager.CreateLinks(linkMap)
@@ -159,8 +161,8 @@ func TestCreateLinksDryRun(t *testing.T) {
 
 	manager := NewManager(baseDir, true, false) // dry run enabled
 
-	linkMap := map[string]string{
-		"bash/.bashrc": filepath.Join(homeDir, ".bashrc"),
+	linkMap := config.LinkMap{
+		"bash/.bashrc": []string{filepath.Join(homeDir, ".bashrc")},
 	}
 
 	results, err := manager.CreateLinks(linkMap)
@@ -211,8 +213,8 @@ func TestRemoveLinks(t *testing.T) {
 
 	manager := NewManager(baseDir, false, false)
 
-	linkMap := map[string]string{
-		"bash/.bashrc": targetFile,
+	linkMap := config.LinkMap{
+		"bash/.bashrc": []string{targetFile},
 	}
 
 	results, err := manager.RemoveLinks(linkMap)

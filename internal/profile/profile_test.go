@@ -9,8 +9,8 @@ import (
 func createTestConfig() *config.Config {
 	rawConfig := map[string]config.Component{
 		"bash": {
-			Link: map[string]string{
-				"bash/.bashrc": "~/.bashrc",
+			Link: config.LinkMap{
+				"bash/.bashrc": []string{"~/.bashrc"},
 			},
 		},
 		"git": {
@@ -145,9 +145,9 @@ func TestGetActiveComponents(t *testing.T) {
 
 func TestGetActiveComponents_MultipleProfiles(t *testing.T) {
 	rawConfig := map[string]config.Component{
-		"common": {Link: map[string]string{"s": "t"}},
-		"c1":     {Link: map[string]string{"s": "t"}},
-		"c2":     {Link: map[string]string{"s": "t"}},
+		"common": {Link: config.LinkMap{"s": []string{"t"}}},
+		"c1":     {Link: config.LinkMap{"s": []string{"t"}}},
+		"c2":     {Link: config.LinkMap{"s": []string{"t"}}},
 	}
 
 	configMap := make(map[string]interface{})

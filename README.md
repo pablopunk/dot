@@ -177,6 +177,27 @@ config:
       apt: "apt install -y tool"
 ```
 
+### Multiple Link Destinations
+
+Link the same source file to multiple destinations (useful for monorepos or shared configs):
+
+```yaml
+config:
+  shared-configs:
+    os: ["mac"]
+    link:
+      # Old format still works (single destination)
+      "./config/shared/settings.json": "~/.config/settings.json"
+      
+      # New format for multiple destinations
+      "./config/shared/.eslintrc":
+        - "~/project-a/.eslintrc"
+        - "~/project-b/.eslintrc"
+        - "~/project-c/.eslintrc"
+```
+
+Both formats can be mixed in the same component. The old format (`source: dest`) is automatically converted to a single-item array for backward compatibility.
+
 ### Advanced Features
 
 #### Nested Configs

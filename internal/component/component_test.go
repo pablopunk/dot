@@ -34,19 +34,19 @@ func createTestComponentManager(t *testing.T, dryRun bool) (*Manager, string) {
 
 	rawConfig := map[string]config.Component{
 		"bash": {
-			Link: map[string]string{
-				"bash/.bashrc": filepath.Join(homeDir, ".bashrc"),
+			Link: config.LinkMap{
+				"bash/.bashrc": []string{filepath.Join(homeDir, ".bashrc")},
 			},
 		},
 		"git": {
-			Link: map[string]string{
-				"bash/.bashrc": filepath.Join(homeDir, ".gitconfig"),
+			Link: config.LinkMap{
+				"bash/.bashrc": []string{filepath.Join(homeDir, ".gitconfig")},
 			},
 			PostLink: "echo 'git post-link'",
 		},
 		"docker": {
-			Link: map[string]string{
-				"bash/.bashrc": filepath.Join(homeDir, ".dockerrc"),
+			Link: config.LinkMap{
+				"bash/.bashrc": []string{filepath.Join(homeDir, ".dockerrc")},
 			},
 			PostLink: "echo 'docker post-link'",
 		},
@@ -83,7 +83,7 @@ func createTestComponentManager(t *testing.T, dryRun bool) (*Manager, string) {
 func TestNewManager(t *testing.T) {
 	rawConfig := map[string]config.Component{
 		"test": {
-			Link: map[string]string{"test": "~/.test"},
+			Link: config.LinkMap{"test": []string{"~/.test"}},
 		},
 	}
 

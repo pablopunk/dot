@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pablopunk/dot/internal/config"
 	"github.com/pablopunk/dot/internal/profile"
 )
 
@@ -92,7 +93,7 @@ func TestComponentTracking(t *testing.T) {
 	}
 
 	// Mark as installed
-	links := map[string]string{"git/.gitconfig": "~/.gitconfig"}
+	links := config.LinkMap{"git/.gitconfig": []string{"~/.gitconfig"}}
 	manager.MarkComponentInstalled(component, "brew", "brew install git", links)
 
 	// Should now be installed
@@ -193,7 +194,7 @@ func TestHasChangedSince(t *testing.T) {
 	}
 
 	// Not installed - should be changed
-	links := map[string]string{"git/.gitconfig": "~/.gitconfig"}
+	links := config.LinkMap{"git/.gitconfig": []string{"~/.gitconfig"}}
 	if !manager.HasChangedSince(component, links) {
 		t.Error("HasChangedSince should return true for uninstalled component")
 	}
@@ -204,10 +205,9 @@ func TestHasChangedSince(t *testing.T) {
 		t.Error("HasChangedSince should return false for unchanged component")
 	}
 
-	// Change links
-	newLinks := map[string]string{
-		"git/.gitconfig": "~/.gitconfig",
-		"git/.gitignore": "~/.gitignore",
+	// Change links - add another destination to same source
+	newLinks := config.LinkMap{
+		"git/.gitconfig": []string{"~/.gitconfig", "~/.config/git/config"},
 	}
 	if !manager.HasChangedSince(component, newLinks) {
 		t.Error("HasChangedSince should return true for changed links")

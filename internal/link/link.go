@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/pablopunk/dot/internal/config"
 )
 
 type Manager struct {
@@ -28,12 +30,14 @@ type LinkResult struct {
 	Error  error
 }
 
-func (m *Manager) CreateLinks(linkMap map[string]string) ([]LinkResult, error) {
+func (m *Manager) CreateLinks(linkMap config.LinkMap) ([]LinkResult, error) {
 	var results []LinkResult
 
-	for source, target := range linkMap {
-		result := m.createLink(source, target)
-		results = append(results, result)
+	for source, targets := range linkMap {
+		for _, target := range targets {
+			result := m.createLink(source, target)
+			results = append(results, result)
+		}
 	}
 
 	return results, nil
@@ -41,10 +45,12 @@ func (m *Manager) CreateLinks(linkMap map[string]string) ([]LinkResult, error) {
 
 // NeedsLinking checks if any of the links in linkMap need to be created or updated
 // Returns true if at least one link needs work, false if all links already exist correctly
-func (m *Manager) NeedsLinking(linkMap map[string]string) bool {
-	for source, target := range linkMap {
-		if m.needsLinking(source, target) {
-			return true
+func (m *Manager) NeedsLinking(linkMap config.LinkMap) bool {
+	for source, targets := range linkMap {
+		for _, target := range targets {
+			if m.needsLinking(source, target) {
+				return true
+			}
 		}
 	}
 	return false
@@ -187,12 +193,14 @@ func (m *Manager) createLink(source, target string) LinkResult {
 	}
 }
 
-func (m *Manager) RemoveLinks(linkMap map[string]string) ([]LinkResult, error) {
+func (m *Manager) RemoveLinks(linkMap config.LinkMap) ([]LinkResult, error) {
 	var results []LinkResult
 
-	for source, target := range linkMap {
-		result := m.removeLink(source, target)
-		results = append(results, result)
+	for source, targets := range linkMap {
+		for _, target := range targets {
+			result := m.removeLink(source, target)
+			results = append(results, result)
+		}
 	}
 
 	return results, nil
