@@ -229,23 +229,8 @@ func (a *App) Run(args []string) error {
 		}
 	}
 
-	// Check for unmatched fuzzy search terms and report errors
-	var unmatchedTerms []string
-	if fuzzySearch != "" {
-		result, err := profileManager.GetActiveComponentsWithSearchResult(activeProfiles, fuzzySearch)
-		if err != nil {
-			return err
-		}
-		unmatchedTerms = result.UnmatchedTerms
-
-		// Report unmatched terms as errors
-		for _, term := range unmatchedTerms {
-			fmt.Printf("❌ No components found matching '%s'\n", term)
-		}
-	}
-
 	// If no profiles specified, load from state or default to empty (which means just "*")
-	if len(activeProfiles) == 0 && fuzzySearch == "" {
+	if len(activeProfiles) == 0 {
 		stateManager, err := state.NewManager()
 		if err != nil {
 			return fmt.Errorf("failed to create state manager: %w", err)
@@ -260,6 +245,21 @@ func (a *App) Run(args []string) error {
 			} else {
 				fmt.Printf("🔄 No saved profiles found in state\n")
 			}
+		}
+	}
+
+	// Check for unmatched fuzzy search terms and report errors
+	var unmatchedTerms []string
+	if fuzzySearch != "" {
+		result, err := profileManager.GetActiveComponentsWithSearchResult(activeProfiles, fuzzySearch)
+		if err != nil {
+			return err
+		}
+		unmatchedTerms = result.UnmatchedTerms
+
+		// Report unmatched terms as errors
+		for _, term := range unmatchedTerms {
+			fmt.Printf("❌ No components found matching '%s'\n", term)
 		}
 	}
 
