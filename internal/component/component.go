@@ -251,7 +251,7 @@ func (m *Manager) installComponent(comp profile.ComponentInfo, forceInstall bool
 
 	// Run post-install hook
 	if comp.Component.PostInstall != "" && result.InstallResult != nil && result.InstallResult.Success {
-		postInstallResult := m.execManager.ExecuteShellCommand(comp.Component.PostInstall)
+		postInstallResult := m.execManager.ExecuteHookCommand(comp.Component.PostInstall, nil)
 		result.PostInstallResult = &postInstallResult
 
 		if !postInstallResult.Success {
@@ -266,7 +266,7 @@ func (m *Manager) installComponent(comp profile.ComponentInfo, forceInstall bool
 
 	// Run post-link hook
 	if comp.Component.PostLink != "" && len(result.LinkResults) > 0 {
-		postLinkResult := m.execManager.ExecuteShellCommand(comp.Component.PostLink)
+		postLinkResult := m.execManager.ExecuteHookCommand(comp.Component.PostLink, nil)
 		result.PostLinkResult = &postLinkResult
 
 		if !postLinkResult.Success {
@@ -396,7 +396,7 @@ func (m *Manager) installComponentWithProgress(comp profile.ComponentInfo, force
 	// Run post-install hook
 	if comp.Component.PostInstall != "" && result.InstallResult != nil && result.InstallResult.Success {
 		progress.StartPostHooks()
-		postInstallResult := m.execManager.ExecuteShellCommandWithProgress(comp.Component.PostInstall, progress)
+		postInstallResult := m.execManager.ExecuteHookCommand(comp.Component.PostInstall, progress)
 		result.PostInstallResult = &postInstallResult
 
 		if !postInstallResult.Success {
@@ -415,7 +415,7 @@ func (m *Manager) installComponentWithProgress(comp profile.ComponentInfo, force
 		if comp.Component.PostInstall == "" {
 			progress.StartPostHooks()
 		}
-		postLinkResult := m.execManager.ExecuteShellCommandWithProgress(comp.Component.PostLink, progress)
+		postLinkResult := m.execManager.ExecuteHookCommand(comp.Component.PostLink, progress)
 		result.PostLinkResult = &postLinkResult
 
 		if !postLinkResult.Success {
@@ -628,7 +628,7 @@ func (m *Manager) RunPostInstallHooks(activeProfiles []string, fuzzySearch strin
 				fmt.Printf("   Running postinstall hook for %s...\n", comp.FullName())
 			}
 
-			postInstallResult := m.execManager.ExecuteShellCommand(comp.Component.PostInstall)
+			postInstallResult := m.execManager.ExecuteHookCommand(comp.Component.PostInstall, nil)
 			result.PostInstallResult = &postInstallResult
 
 			if !postInstallResult.Success {
@@ -662,7 +662,7 @@ func (m *Manager) RunPostLinkHooks(activeProfiles []string, fuzzySearch string) 
 				fmt.Printf("   Running postlink hook for %s...\n", comp.FullName())
 			}
 
-			postLinkResult := m.execManager.ExecuteShellCommand(comp.Component.PostLink)
+			postLinkResult := m.execManager.ExecuteHookCommand(comp.Component.PostLink, nil)
 			result.PostLinkResult = &postLinkResult
 
 			if !postLinkResult.Success {

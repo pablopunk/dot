@@ -72,6 +72,51 @@ func (m *Manager) ExecuteShellCommand(command string) ExecResult {
 	return m.ExecuteShellCommandWithProgress(command, nil)
 }
 
+// ExecuteHookCommand runs a command connected directly to the terminal for interactive support
+// This is used for postinstall/postlink hooks that may need user interaction
+func (m *Manager) ExecuteHookCommand(command string, progress ProgressCallback) ExecResult {
+	if m.dryRun {
+		return ExecResult{
+			Command: command,
+			Success: true,
+			Output:  fmt.Sprintf("[DRY RUN] Would execute hook: %s", command),
+		}
+	}
+
+	// Use shell to execute command
+	var cmd *exec.Cmd
+	if isWindows() {
+		cmd = exec.Command("cmd", "/C", command)
+	} else {
+		cmd = exec.Command("sh", "-c", command)
+	}
+
+	cmd.Env = os.Environ()
+
+	// Pause progress indicator
+	if progress != nil {
+		progress.PauseForInteraction("running interactive hook")
+	}
+
+	// Always connect to terminal for hooks
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	err := cmd.Run()
+
+	// Resume progress indicator
+	if progress != nil {
+		progress.ResumeAfterInteraction()
+	}
+
+	return ExecResult{
+		Command: command,
+		Success: err == nil,
+		Output:  "",
+		Error:   err,
+	}
+}
+
 func (m *Manager) ExecuteShellCommandWithProgress(command string, progress ProgressCallback) ExecResult {
 
 	if m.dryRun {
