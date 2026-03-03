@@ -73,11 +73,15 @@ dot
 dot work
 ```
 
+**Note:** Profiles are additive. Running `dot work` adds the `work` profile to your active profiles (it doesn't replace existing ones). All active profiles are applied on every run.
+
 4. Install multiple profiles at once:
 
 ```bash
 dot work laptop
 ```
+
+Both `work` and `laptop` profiles will be active and merged with the default `*` profile.
 
 ## Configuration
 
@@ -144,8 +148,10 @@ config:
 
 - `"*"`: Always installed on every machine
 - Named profiles (e.g., `work`, `laptop`, `rice`): Only installed on machines where they apply
+- **Profiles are additive**: Running `dot work` adds `work` to your active profiles. Existing profiles remain active.
 - You can pass multiple profiles at once (e.g., `dot work laptop`). The `*` profile is always included.
 - You can also use profiles with fuzzy search: `dot work git` (installs all tools in `*` and `work` profiles, plus any tool matching "git")
+- Use `--rm <profile>` or `--remove-profile <profile>` to remove a profile from the active set
 
 
 ### OS Restrictions
@@ -281,6 +287,8 @@ dot -v work
 dot git     # Installs any component matching "git"
 
 # Remove a profile from active set
+dot --rm work
+# or
 dot --remove-profile work
 
 # Run hooks independently
@@ -416,9 +424,11 @@ dot maintains a state file at `~/.local/state/dot/lock.yaml` to track:
 This enables:
 - **Incremental updates**: Only install/link what's changed
 - **Automatic cleanup**: Remove components deleted from config
-- **State persistence**: Remember active profiles across runs
+- **State persistence**: Remember active profiles across runs (profiles are additive)
 - **Efficient linking**: Skip symlinks that already exist and point correctly
 - **Smart uninstalls**: Run uninstall commands for components removed from config
+
+Profiles accumulate over time. To see active profiles, run `dot --profiles`. To remove a profile, use `dot --rm <profile>`.
 
 ## Examples
 
