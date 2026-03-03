@@ -20,10 +20,11 @@ var version = "dev"
 
 func main() {
 	var (
-		listProfiles        = flag.Bool("profiles", false, "list available profiles")
+		listProfiles        = flag.Bool("profiles", false, "list available and active profiles")
 		upgrade             = flag.Bool("upgrade", false, "upgrade the tool")
 		version             = flag.Bool("version", false, "show version information")
 		removeProfile       = flag.String("remove-profile", "", "remove a profile from the active set")
+		removeProfileShort  = flag.String("rm", "", "remove a profile from the active set (shorthand)")
 		verbose             = flag.Bool("v", false, "verbose output")
 		verboseLong         = flag.Bool("verbose", false, "verbose output")
 		dryRun              = flag.Bool("dry-run", false, "preview actions without making changes")
@@ -43,6 +44,24 @@ func main() {
 	// Set os.Args to contain only the program name and flags for flag.Parse()
 	originalArgs := os.Args
 	os.Args = append([]string{os.Args[0]}, flags...)
+
+	// Set custom usage message
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "Usage: dot [options] [profile1 profile2 ...]\n\n")
+		fmt.Fprintf(os.Stderr, "Dot is a dotfiles management tool that applies configurations\n")
+		fmt.Fprintf(os.Stderr, "based on profiles defined in dot.yaml.\n\n")
+		fmt.Fprintf(os.Stderr, "Profile Management:\n")
+		fmt.Fprintf(os.Stderr, "  Profiles are additive - running 'dot work' keeps existing profiles\n")
+		fmt.Fprintf(os.Stderr, "  and adds 'work' to the active set. Use --rm to remove profiles.\n\n")
+		fmt.Fprintf(os.Stderr, "Examples:\n")
+		fmt.Fprintf(os.Stderr, "  dot                  Apply currently active profiles\n")
+		fmt.Fprintf(os.Stderr, "  dot work laptop      Add work and laptop profiles\n")
+		fmt.Fprintf(os.Stderr, "  dot work             Reinstall work (keeps other active profiles)\n")
+		fmt.Fprintf(os.Stderr, "  dot --rm laptop      Remove laptop profile\n")
+		fmt.Fprintf(os.Stderr, "  dot --profiles       List available and active profiles\n\n")
+		fmt.Fprintf(os.Stderr, "Options:\n")
+		flag.PrintDefaults()
+	}
 
 	flag.Parse()
 
@@ -81,15 +100,16 @@ func main() {
 	}
 
 	app := &App{
-		Verbose:        isVerbose,
-		DryRun:         *dryRun,
-		ForceInstall:   *forceInstall,
-		ForceUninstall: *forceUninstall,
-		ExportDefaults: shouldExportDefaults,
-		ImportDefaults: shouldImportDefaults,
-		RemoveProfile:  *removeProfile,
-		RunPostInstall: *runPostInstall,
-		RunPostLink:    *runPostLink,
+		Verbose:            isVerbose,
+		DryRun:             *dryRun,
+		ForceInstall:       *forceInstall,
+		ForceUninstall:     *forceUninstall,
+		ExportDefaults:     shouldExportDefaults,
+		ImportDefaults:     shouldImportDefaults,
+		RemoveProfile:      *removeProfile,
+		RemoveProfileShort: *removeProfileShort,
+		RunPostInstall:     *runPostInstall,
+		RunPostLink:        *runPostLink,
 	}
 
 	// Use the preprocessed positional arguments instead of flag.Args()
@@ -142,15 +162,16 @@ func preprocessArgs(args []string) (flags []string, positional []string) {
 }
 
 type App struct {
-	Verbose        bool
-	DryRun         bool
-	ForceInstall   bool
-	ForceUninstall bool
-	ExportDefaults bool
-	ImportDefaults bool
-	RemoveProfile  string
-	RunPostInstall bool
-	RunPostLink    bool
+	Verbose            bool
+	DryRun             bool
+	ForceInstall       bool
+	ForceUninstall     bool
+	ExportDefaults     bool
+	ImportDefaults     bool
+	RemoveProfile      string
+	RemoveProfileShort string
+	RunPostInstall     bool
+	RunPostLink        bool
 }
 
 func (a *App) Run(args []string) error {
@@ -191,8 +212,12 @@ func (a *App) Run(args []string) error {
 	profileManager := profile.NewManager(cfg)
 
 	// Handle special commands
-	if a.RemoveProfile != "" {
-		return a.removeProfileCommand(a.RemoveProfile)
+	profileToRemove := a.RemoveProfile
+	if profileToRemove == "" {
+		profileToRemove = a.RemoveProfileShort
+	}
+	if profileToRemove != "" {
+		return a.removeProfileCommand(profileToRemove)
 	}
 
 	// Determine active profiles and fuzzy search
@@ -334,12 +359,15 @@ func (a *App) Run(args []string) error {
 	}
 
 	// Persist active profiles early when provided by user (ensures they are saved even if installs fail hard)
+	// Profiles are additive - new profiles are merged with existing ones
 	if !a.DryRun && profilesFromUser {
 		stateManager, err := state.NewManager()
 		if err != nil {
 			return fmt.Errorf("failed to create state manager: %w", err)
 		}
-		stateManager.SetActiveProfiles(activeProfiles)
+		existingProfiles := stateManager.GetActiveProfiles()
+		mergedProfiles := mergeProfiles(existingProfiles, activeProfiles)
+		stateManager.SetActiveProfiles(mergedProfiles)
 		if err := stateManager.Save(); err != nil {
 			return fmt.Errorf("failed to save state: %w", err)
 		}
@@ -704,4 +732,29 @@ func listProfilesCommand() error {
 	}
 
 	return nil
+}
+
+// mergeProfiles combines two profile slices, keeping unique values
+// Existing profiles are preserved, new profiles are added
+func mergeProfiles(existing, new []string) []string {
+	seen := make(map[string]bool)
+	result := make([]string, 0, len(existing)+len(new))
+
+	// Add all existing profiles first
+	for _, profile := range existing {
+		if !seen[profile] {
+			seen[profile] = true
+			result = append(result, profile)
+		}
+	}
+
+	// Add new profiles (skip duplicates)
+	for _, profile := range new {
+		if !seen[profile] {
+			seen[profile] = true
+			result = append(result, profile)
+		}
+	}
+
+	return result
 }

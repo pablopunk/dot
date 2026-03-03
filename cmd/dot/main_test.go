@@ -5,6 +5,7 @@ import (
 	"flag"
 	"os"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"strings"
 	"testing"
@@ -553,5 +554,61 @@ config:
 	}
 	if !found {
 		t.Fatalf("expected active profiles to include 'failp', got %v", profiles)
+	}
+}
+
+func TestMergeProfiles(t *testing.T) {
+	tests := []struct {
+		name     string
+		existing []string
+		new      []string
+		expected []string
+	}{
+		{
+			name:     "add new profiles to empty",
+			existing: []string{},
+			new:      []string{"work", "laptop"},
+			expected: []string{"work", "laptop"},
+		},
+		{
+			name:     "add new profiles to existing",
+			existing: []string{"work"},
+			new:      []string{"laptop"},
+			expected: []string{"work", "laptop"},
+		},
+		{
+			name:     "duplicate profiles are ignored",
+			existing: []string{"work", "laptop"},
+			new:      []string{"work"},
+			expected: []string{"work", "laptop"},
+		},
+		{
+			name:     "multiple duplicates handled",
+			existing: []string{"work", "laptop", "server"},
+			new:      []string{"work", "server", "desktop"},
+			expected: []string{"work", "laptop", "server", "desktop"},
+		},
+		{
+			name:     "empty new profiles",
+			existing: []string{"work", "laptop"},
+			new:      []string{},
+			expected: []string{"work", "laptop"},
+		},
+		{
+			name:     "additive behavior - running same profile is no-op",
+			existing: []string{"work", "laptop"},
+			new:      []string{"work"},
+			expected: []string{"work", "laptop"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := mergeProfiles(tt.existing, tt.new)
+			if !reflect.DeepEqual(result, tt.expected) {
+				t.Errorf("mergeProfiles(%v, %v) = %v, want %v",
+					tt.existing, tt.new, result, tt.expected)
+			}
+		})
 	}
 }
