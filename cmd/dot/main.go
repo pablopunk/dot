@@ -372,6 +372,24 @@ func (a *App) Run(args []string) error {
 			return fmt.Errorf("failed to save state: %w", err)
 		}
 	}
+	if !a.DryRun && profilesFromUser {
+		stateManager, err := state.NewManager()
+		if err != nil {
+			return fmt.Errorf("failed to create state manager: %w", err)
+		}
+		existingProfiles := stateManager.GetActiveProfiles()
+		mergedProfiles := mergeProfiles(existingProfiles, activeProfiles)
+		if a.Verbose {
+			fmt.Printf("DEBUG: existing=%v, active=%v, merged=%v\n", existingProfiles, activeProfiles, mergedProfiles)
+		}
+		stateManager.SetActiveProfiles(mergedProfiles)
+		if err := stateManager.Save(); err != nil {
+			return fmt.Errorf("failed to save state: %w", err)
+		}
+		if a.Verbose {
+			fmt.Printf("DEBUG: Saved profiles to state\n")
+		}
+	}
 
 	// Main install operation
 	if a.Verbose {
@@ -393,13 +411,8 @@ func (a *App) Run(args []string) error {
 		fmt.Println()
 
 		// Use regular installation for verbose mode
-		var results []component.InstallResult
-		var err error
-		if profilesFromUser {
-			results, err = componentManager.InstallComponents(activeProfiles, fuzzySearch, a.ForceInstall)
-		} else {
-			results, err = componentManager.InstallComponentsWithoutSaving(activeProfiles, fuzzySearch, a.ForceInstall)
-		}
+		// Profiles already merged and saved above, so use WithoutSaving
+		results, err := componentManager.InstallComponentsWithoutSaving(activeProfiles, fuzzySearch, a.ForceInstall)
 		if err != nil {
 			return err
 		}
@@ -409,13 +422,8 @@ func (a *App) Run(args []string) error {
 		progressManager := ui.NewProgressManager(false)
 		defer progressManager.StopAll()
 
-		var results []component.InstallResult
-		var err error
-		if profilesFromUser {
-			results, err = componentManager.InstallComponentsWithProgress(activeProfiles, fuzzySearch, a.ForceInstall, progressManager)
-		} else {
-			results, err = componentManager.InstallComponentsWithProgressWithoutSaving(activeProfiles, fuzzySearch, a.ForceInstall, progressManager)
-		}
+		// Profiles already merged and saved above, so use WithoutSaving
+		results, err := componentManager.InstallComponentsWithProgressWithoutSaving(activeProfiles, fuzzySearch, a.ForceInstall, progressManager)
 		if err != nil {
 			return err
 		}

@@ -89,13 +89,15 @@ func (m *Manager) installComponents(activeProfiles []string, fuzzySearch string,
 		results = append(results, result)
 	}
 
-	// Save state after installation
-	if !m.dryRun {
-		if saveProfiles {
-			m.stateManager.SetActiveProfiles(activeProfiles)
-			if m.verbose && len(activeProfiles) > 0 {
-				fmt.Printf("💾 Saving profiles to state: %s\n", strings.Join(activeProfiles, ", "))
-			}
+	// Save state after installation (only if saveProfiles is true)
+	if !m.dryRun && saveProfiles {
+		// Reload state to get any changes made by other managers (e.g., main.go)
+		if err := m.stateManager.Load(); err != nil {
+			return results, fmt.Errorf("failed to reload state: %w", err)
+		}
+		m.stateManager.SetActiveProfiles(activeProfiles)
+		if m.verbose && len(activeProfiles) > 0 {
+			fmt.Printf("💾 Saving profiles to state: %s\n", strings.Join(activeProfiles, ", "))
 		}
 		if err := m.stateManager.Save(); err != nil {
 			return results, fmt.Errorf("failed to save state: %w", err)
@@ -128,13 +130,15 @@ func (m *Manager) installComponentsWithProgress(activeProfiles []string, fuzzySe
 		results = append(results, result)
 	}
 
-	// Save state after installation
-	if !m.dryRun {
-		if saveProfiles {
-			m.stateManager.SetActiveProfiles(activeProfiles)
-			if m.verbose && len(activeProfiles) > 0 {
-				fmt.Printf("💾 Saving profiles to state: %s\n", strings.Join(activeProfiles, ", "))
-			}
+	// Save state after installation (only if saveProfiles is true)
+	if !m.dryRun && saveProfiles {
+		// Reload state to get any changes made by other managers (e.g., main.go)
+		if err := m.stateManager.Load(); err != nil {
+			return results, fmt.Errorf("failed to reload state: %w", err)
+		}
+		m.stateManager.SetActiveProfiles(activeProfiles)
+		if m.verbose && len(activeProfiles) > 0 {
+			fmt.Printf("💾 Saving profiles to state: %s\n", strings.Join(activeProfiles, ", "))
 		}
 		if err := m.stateManager.Save(); err != nil {
 			return results, fmt.Errorf("failed to save state: %w", err)
@@ -464,6 +468,10 @@ func (m *Manager) UninstallRemovedComponents() ([]InstallResult, error) {
 
 	// Save state after uninstallation
 	if !m.dryRun {
+		// Reload state to get any changes made by other managers (e.g., main.go)
+		if err := m.stateManager.Load(); err != nil {
+			return results, fmt.Errorf("failed to reload state: %w", err)
+		}
 		if err := m.stateManager.Save(); err != nil {
 			return results, fmt.Errorf("failed to save state: %w", err)
 		}
