@@ -112,6 +112,28 @@ func (m *Manager) Save() error {
 	return nil
 }
 
+func (m *Manager) SyncActiveProfilesFromDisk() error {
+	if _, err := os.Stat(m.lockFilePath); os.IsNotExist(err) {
+		return nil
+	} else if err != nil {
+		return fmt.Errorf("failed to stat lock file: %w", err)
+	}
+
+	data, err := os.ReadFile(m.lockFilePath)
+	if err != nil {
+		return fmt.Errorf("failed to read lock file: %w", err)
+	}
+
+	var lockFile LockFile
+	if err := yaml.Unmarshal(data, &lockFile); err != nil {
+		return fmt.Errorf("failed to parse lock file: %w", err)
+	}
+
+	m.lockFile.ActiveProfiles = lockFile.ActiveProfiles
+
+	return nil
+}
+
 func (m *Manager) IsComponentInstalled(componentInfo profile.ComponentInfo) bool {
 	key := componentInfo.FullName()
 	_, exists := m.lockFile.InstalledComponents[key]

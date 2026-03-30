@@ -32,6 +32,51 @@ type SearchResult struct {
 	UnmatchedTerms []string
 }
 
+// GetAllComponents returns all components from all profiles in the config.
+// Used to determine if a component was truly removed from dot.yaml vs just
+// no longer in the active profile set.
+func (m *Manager) GetAllComponents() []ComponentInfo {
+	var components []ComponentInfo
+	seenComponents := make(map[string]bool)
+
+	// Get sorted profile names for consistent order
+	var profileNames []string
+	for name := range m.config.Profiles {
+		profileNames = append(profileNames, name)
+	}
+	sort.Strings(profileNames)
+
+	for _, profileName := range profileNames {
+		profileComponents, err := m.config.GetComponentsForProfileTools(profileName)
+		if err != nil {
+			continue
+		}
+
+		var toolNames []string
+		for toolName := range profileComponents {
+			toolNames = append(toolNames, toolName)
+		}
+		sort.Strings(toolNames)
+
+		for _, toolName := range toolNames {
+			key := profileName + "." + toolName
+			if seenComponents[key] {
+				continue
+			}
+			seenComponents[key] = true
+
+			component := profileComponents[toolName]
+			components = append(components, ComponentInfo{
+				ProfileName:   profileName,
+				ComponentName: toolName,
+				Component:     component,
+			})
+		}
+	}
+
+	return components
+}
+
 func (m *Manager) GetActiveComponents(activeProfiles []string, fuzzySearch string) ([]ComponentInfo, error) {
 	result, err := m.GetActiveComponentsWithSearchResult(activeProfiles, fuzzySearch)
 	if err != nil {

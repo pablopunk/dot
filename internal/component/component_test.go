@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	"github.com/pablopunk/dot/internal/config"
+	"github.com/pablopunk/dot/internal/profile"
+	"github.com/pablopunk/dot/internal/state"
 )
 
 func createTestComponentManager(t *testing.T, dryRun bool) (*Manager, string) {
@@ -184,5 +186,38 @@ func TestDryRun(t *testing.T) {
 	bashrcLink := filepath.Join(homeDir, ".bashrc")
 	if _, err := os.Stat(bashrcLink); err == nil {
 		t.Errorf("Expected .bashrc symlink NOT to be created in dry-run mode at %s", bashrcLink)
+	}
+}
+
+func TestUninstallRemovedComponentsPersistsRemoval(t *testing.T) {
+	manager, _ := createTestComponentManager(t, false)
+
+	removedComponent := profile.ComponentInfo{
+		ProfileName:   "*",
+		ComponentName: "pi",
+	}
+
+	manager.stateManager.SetActiveProfiles([]string{"work"})
+	manager.stateManager.MarkComponentInstalled(removedComponent, "bun", "bun i -g @mariozechner/pi-coding-agent", nil)
+	if err := manager.stateManager.Save(); err != nil {
+		t.Fatalf("Save() error = %v", err)
+	}
+
+	if _, err := manager.UninstallRemovedComponents(""); err != nil {
+		t.Fatalf("UninstallRemovedComponents() error = %v", err)
+	}
+
+	reloadedState, err := state.NewManager()
+	if err != nil {
+		t.Fatalf("NewManager() error = %v", err)
+	}
+
+	if reloadedState.IsComponentInstalled(removedComponent) {
+		t.Fatal("removed component should not still be in state after uninstall")
+	}
+
+	activeProfiles := reloadedState.GetActiveProfiles()
+	if len(activeProfiles) != 1 || activeProfiles[0] != "work" {
+		t.Fatalf("active profiles = %v, want [work]", activeProfiles)
 	}
 }

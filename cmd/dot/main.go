@@ -350,7 +350,7 @@ func (a *App) Run(args []string) error {
 
 	// Handle uninstall
 	if a.ForceUninstall {
-		results, err := componentManager.UninstallRemovedComponents()
+		results, err := componentManager.UninstallRemovedComponents(fuzzySearch)
 		if err != nil {
 			return err
 		}
@@ -360,18 +360,6 @@ func (a *App) Run(args []string) error {
 
 	// Persist active profiles early when provided by user (ensures they are saved even if installs fail hard)
 	// Profiles are additive - new profiles are merged with existing ones
-	if !a.DryRun && profilesFromUser {
-		stateManager, err := state.NewManager()
-		if err != nil {
-			return fmt.Errorf("failed to create state manager: %w", err)
-		}
-		existingProfiles := stateManager.GetActiveProfiles()
-		mergedProfiles := mergeProfiles(existingProfiles, activeProfiles)
-		stateManager.SetActiveProfiles(mergedProfiles)
-		if err := stateManager.Save(); err != nil {
-			return fmt.Errorf("failed to save state: %w", err)
-		}
-	}
 	if !a.DryRun && profilesFromUser {
 		stateManager, err := state.NewManager()
 		if err != nil {
@@ -428,37 +416,6 @@ func (a *App) Run(args []string) error {
 			return err
 		}
 		a.printSummaryResults("Install", results)
-	}
-
-	// Also handle automatic uninstall of removed components
-	if !a.DryRun {
-		if a.Verbose {
-			fmt.Printf("🔍 Checking for removed components to uninstall...\n")
-		}
-		uninstallResults, err := componentManager.UninstallRemovedComponents()
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Warning: failed to uninstall removed components: %v\n", err)
-		} else if len(uninstallResults) > 0 {
-			// Only show "Uninstalled removed components" if actual uninstall commands were executed
-			var actualUninstalls []component.InstallResult
-			for _, result := range uninstallResults {
-				if result.InstallResult != nil {
-					actualUninstalls = append(actualUninstalls, result)
-				}
-			}
-
-			if len(actualUninstalls) > 0 {
-				if a.Verbose {
-					fmt.Printf("📦 Found %d removed components with uninstall commands\n", len(actualUninstalls))
-				}
-				fmt.Println("\nUninstalled removed components:")
-				a.printResults("Uninstall", actualUninstalls)
-			} else if a.Verbose {
-				fmt.Printf("✓ Cleaned up %d removed components (links only)\n", len(uninstallResults))
-			}
-		} else if a.Verbose {
-			fmt.Printf("✓ No removed components found\n")
-		}
 	}
 
 	return nil

@@ -89,15 +89,18 @@ func (m *Manager) installComponents(activeProfiles []string, fuzzySearch string,
 		results = append(results, result)
 	}
 
-	// Save state after installation (only if saveProfiles is true)
-	if !m.dryRun && saveProfiles {
-		// Reload state to get any changes made by other managers (e.g., main.go)
-		if err := m.stateManager.Load(); err != nil {
-			return results, fmt.Errorf("failed to reload state: %w", err)
+	// Always save component state after installation
+	if !m.dryRun {
+		// Sync profiles from disk to pick up changes made by main.go
+		// without discarding in-memory component state
+		if err := m.stateManager.SyncActiveProfilesFromDisk(); err != nil {
+			return results, fmt.Errorf("failed to sync profiles from disk: %w", err)
 		}
-		m.stateManager.SetActiveProfiles(activeProfiles)
-		if m.verbose && len(activeProfiles) > 0 {
-			fmt.Printf("💾 Saving profiles to state: %s\n", strings.Join(activeProfiles, ", "))
+		if saveProfiles {
+			m.stateManager.SetActiveProfiles(activeProfiles)
+			if m.verbose && len(activeProfiles) > 0 {
+				fmt.Printf("💾 Saving profiles to state: %s\n", strings.Join(activeProfiles, ", "))
+			}
 		}
 		if err := m.stateManager.Save(); err != nil {
 			return results, fmt.Errorf("failed to save state: %w", err)
@@ -130,15 +133,18 @@ func (m *Manager) installComponentsWithProgress(activeProfiles []string, fuzzySe
 		results = append(results, result)
 	}
 
-	// Save state after installation (only if saveProfiles is true)
-	if !m.dryRun && saveProfiles {
-		// Reload state to get any changes made by other managers (e.g., main.go)
-		if err := m.stateManager.Load(); err != nil {
-			return results, fmt.Errorf("failed to reload state: %w", err)
+	// Always save component state after installation
+	if !m.dryRun {
+		// Sync profiles from disk to pick up changes made by main.go
+		// without discarding in-memory component state
+		if err := m.stateManager.SyncActiveProfilesFromDisk(); err != nil {
+			return results, fmt.Errorf("failed to sync profiles from disk: %w", err)
 		}
-		m.stateManager.SetActiveProfiles(activeProfiles)
-		if m.verbose && len(activeProfiles) > 0 {
-			fmt.Printf("💾 Saving profiles to state: %s\n", strings.Join(activeProfiles, ", "))
+		if saveProfiles {
+			m.stateManager.SetActiveProfiles(activeProfiles)
+			if m.verbose && len(activeProfiles) > 0 {
+				fmt.Printf("💾 Saving profiles to state: %s\n", strings.Join(activeProfiles, ", "))
+			}
 		}
 		if err := m.stateManager.Save(); err != nil {
 			return results, fmt.Errorf("failed to save state: %w", err)
@@ -446,14 +452,29 @@ func getCommandNames(installCommands map[string]string) []string {
 	return names
 }
 
-func (m *Manager) UninstallRemovedComponents() ([]InstallResult, error) {
-	activeProfiles := m.stateManager.GetActiveProfiles()
-	currentComponents, err := m.profileManager.GetActiveComponents(activeProfiles, "")
-	if err != nil {
-		return nil, err
+func (m *Manager) UninstallRemovedComponents(fuzzySearch string) ([]InstallResult, error) {
+	// Compare against ALL components in the config, not just active profiles.
+	// A component should only be considered "removed" if it's completely gone
+	// from dot.yaml, not just because a profile was deactivated.
+	allComponents := m.profileManager.GetAllComponents()
+	removedComponents := m.stateManager.GetRemovedComponents(allComponents)
+
+	// Apply fuzzy search filter if provided
+	if fuzzySearch != "" {
+		searchTerms := strings.Fields(strings.ToLower(fuzzySearch))
+		var filtered []state.ComponentState
+		for _, comp := range removedComponents {
+			compName := strings.ToLower(comp.ComponentName)
+			for _, term := range searchTerms {
+				if strings.Contains(compName, term) {
+					filtered = append(filtered, comp)
+					break
+				}
+			}
+		}
+		removedComponents = filtered
 	}
 
-	removedComponents := m.stateManager.GetRemovedComponents(currentComponents)
 	var results []InstallResult
 
 	for _, removedState := range removedComponents {
@@ -468,9 +489,9 @@ func (m *Manager) UninstallRemovedComponents() ([]InstallResult, error) {
 
 	// Save state after uninstallation
 	if !m.dryRun {
-		// Reload state to get any changes made by other managers (e.g., main.go)
-		if err := m.stateManager.Load(); err != nil {
-			return results, fmt.Errorf("failed to reload state: %w", err)
+		// Keep in-memory component changes, but refresh active profiles saved by other managers.
+		if err := m.stateManager.SyncActiveProfilesFromDisk(); err != nil {
+			return results, fmt.Errorf("failed to sync active profiles from state: %w", err)
 		}
 		if err := m.stateManager.Save(); err != nil {
 			return results, fmt.Errorf("failed to save state: %w", err)
