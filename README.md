@@ -295,6 +295,9 @@ dot --remove-profile work
 dot --postinstall       # Run only postinstall hooks
 dot --postlink          # Run only postlink hooks
 
+# Link config files only (skip installs/defaults/hooks)
+dot --link
+
 # macOS defaults management
 dot --defaults-export   # Export current settings to plist/XML files
 dot --defaults-import   # Import settings from plist/XML files
@@ -362,6 +365,7 @@ profiles:
 
 - **`postinstall`**: Runs only if package installation was executed and succeeded in the current run
 - **`postlink`**: Runs only if symlink creation was performed and succeeded in the current run
+- **`--link` CLI mode**: Creates/updates symlinks only, skipping package installs, defaults checks/imports, and hooks
 
 ### Running Hooks Independently
 

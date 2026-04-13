@@ -189,6 +189,35 @@ func TestDryRun(t *testing.T) {
 	}
 }
 
+func TestLinkComponents(t *testing.T) {
+	manager, homeDir := createTestComponentManager(t, false)
+
+	results, err := manager.LinkComponents([]string{"work"}, "", false)
+	if err != nil {
+		t.Fatalf("LinkComponents() error = %v", err)
+	}
+
+	if len(results) != 3 {
+		t.Fatalf("Expected 3 results (default + work), got %d", len(results))
+	}
+
+	for _, target := range []string{".bashrc", ".gitconfig", ".dockerrc"} {
+		path := filepath.Join(homeDir, target)
+		if _, err := os.Lstat(path); os.IsNotExist(err) {
+			t.Fatalf("Expected symlink to exist at %s", path)
+		}
+	}
+
+	for _, result := range results {
+		if result.InstallResult != nil {
+			t.Fatalf("expected no install step in link-only mode for %s", result.Component.ComponentName)
+		}
+		if result.PostLinkResult != nil {
+			t.Fatalf("expected no postlink hook in link-only mode for %s", result.Component.ComponentName)
+		}
+	}
+}
+
 func TestUninstallRemovedComponentsPersistsRemoval(t *testing.T) {
 	manager, _ := createTestComponentManager(t, false)
 

@@ -61,6 +61,30 @@ func (m *Manager) InstallComponentsWithoutSaving(activeProfiles []string, fuzzyS
 	return m.installComponents(activeProfiles, fuzzySearch, forceInstall, false)
 }
 
+func (m *Manager) LinkComponents(activeProfiles []string, fuzzySearch string, forceLink bool) ([]InstallResult, error) {
+	components, err := m.profileManager.GetActiveComponents(activeProfiles, fuzzySearch)
+	if err != nil {
+		return nil, err
+	}
+
+	var results []InstallResult
+	for _, comp := range components {
+		result := m.linkComponent(comp, forceLink)
+		results = append(results, result)
+	}
+
+	if !m.dryRun {
+		if err := m.stateManager.SyncActiveProfilesFromDisk(); err != nil {
+			return results, fmt.Errorf("failed to sync profiles from disk: %w", err)
+		}
+		if err := m.stateManager.Save(); err != nil {
+			return results, fmt.Errorf("failed to save state: %w", err)
+		}
+	}
+
+	return results, nil
+}
+
 func (m *Manager) installComponents(activeProfiles []string, fuzzySearch string, forceInstall bool, saveProfiles bool) ([]InstallResult, error) {
 	components, err := m.profileManager.GetActiveComponents(activeProfiles, fuzzySearch)
 	if err != nil {
@@ -499,6 +523,44 @@ func (m *Manager) UninstallRemovedComponents(fuzzySearch string) ([]InstallResul
 	}
 
 	return results, nil
+}
+
+func (m *Manager) linkComponent(comp profile.ComponentInfo, forceLink bool) InstallResult {
+	result := InstallResult{Component: comp}
+
+	hasLinks := len(comp.Component.Link) > 0
+	needsLinking := hasLinks && (forceLink || m.linkManager.NeedsLinking(comp.Component.Link))
+
+	if !hasLinks || !needsLinking {
+		result.Skipped = true
+		return result
+	}
+
+	linkResults, err := m.linkManager.CreateLinks(comp.Component.Link)
+	result.LinkResults = linkResults
+	if err != nil {
+		result.Error = fmt.Errorf("linking failed: %w", err)
+		return result
+	}
+
+	for _, linkResult := range linkResults {
+		if !linkResult.WasSuccessful() {
+			result.Error = fmt.Errorf("linking failed: %v", linkResult.Error)
+			return result
+		}
+	}
+
+	if !m.dryRun {
+		packageManager := ""
+		installCommand := ""
+		if existingState, exists := m.stateManager.GetComponentState(comp); exists {
+			packageManager = existingState.PackageManager
+			installCommand = existingState.InstallCommand
+		}
+		m.stateManager.MarkComponentInstalled(comp, packageManager, installCommand, comp.Component.Link)
+	}
+
+	return result
 }
 
 func (m *Manager) uninstallComponent(comp profile.ComponentInfo, componentState state.ComponentState) InstallResult {

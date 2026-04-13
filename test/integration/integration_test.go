@@ -214,6 +214,79 @@ config:
 	}
 }
 
+func TestLinkOnlyWorkflow(t *testing.T) {
+	// Create temporary directory structure
+	tmpDir := t.TempDir()
+	dotfilesDir := filepath.Join(tmpDir, "dotfiles")
+	homeDir := filepath.Join(tmpDir, "home")
+
+	if err := os.MkdirAll(filepath.Join(dotfilesDir, "bash"), 0755); err != nil {
+		t.Fatalf("Failed to create bash dir: %v", err)
+	}
+	if err := os.MkdirAll(homeDir, 0755); err != nil {
+		t.Fatalf("Failed to create home dir: %v", err)
+	}
+
+	bashrcPath := filepath.Join(dotfilesDir, "bash", ".bashrc")
+	if err := os.WriteFile(bashrcPath, []byte("test content"), 0644); err != nil {
+		t.Fatalf("Failed to create .bashrc: %v", err)
+	}
+
+	configContent := `
+profiles:
+  "*":
+    - bash
+config:
+  bash:
+    install:
+      sh: "echo installing > /tmp/dot-should-not-run"
+    link:
+      "bash/.bashrc": "` + filepath.Join(homeDir, ".bashrc") + `"
+`
+
+	configPath := filepath.Join(dotfilesDir, "dot.yaml")
+	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+		t.Fatalf("Failed to create config: %v", err)
+	}
+
+	originalDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Failed to get current dir: %v", err)
+	}
+	defer os.Chdir(originalDir)
+
+	if err := os.Chdir(dotfilesDir); err != nil {
+		t.Fatalf("Failed to change to dotfiles dir: %v", err)
+	}
+
+	cfg, err := config.Load("dot.yaml")
+	if err != nil {
+		t.Fatalf("Failed to load config: %v", err)
+	}
+
+	componentManager, err := component.NewManager(cfg, dotfilesDir, false, false)
+	if err != nil {
+		t.Fatalf("Failed to create component manager: %v", err)
+	}
+
+	results, err := componentManager.LinkComponents([]string{}, "", false)
+	if err != nil {
+		t.Fatalf("Failed to link components: %v", err)
+	}
+
+	if len(results) != 1 {
+		t.Fatalf("Expected 1 result, got %d", len(results))
+	}
+	if results[0].InstallResult != nil {
+		t.Fatalf("expected no install result in link-only workflow")
+	}
+
+	targetPath := filepath.Join(homeDir, ".bashrc")
+	if _, err := os.Lstat(targetPath); err != nil {
+		t.Fatalf("Failed to stat target file: %v", err)
+	}
+}
+
 func TestProfileSelection(t *testing.T) {
 	// Create temporary directory structure
 	tmpDir := t.TempDir()

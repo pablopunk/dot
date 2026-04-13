@@ -123,6 +123,16 @@ config:
 			args:    []string{},
 			wantErr: false,
 		},
+		{
+			name: "link only mode",
+			app: &App{
+				LinkOnly: true,
+				DryRun:   true,
+				Verbose:  true,
+			},
+			args:    []string{},
+			wantErr: false,
+		},
 	}
 
 	for _, tt := range tests {
@@ -447,6 +457,13 @@ func TestFlagParsing(t *testing.T) {
 				"postlink": true,
 			},
 		},
+		{
+			name: "link only flag",
+			args: []string{"--link"},
+			expected: map[string]bool{
+				"link": true,
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -461,6 +478,7 @@ func TestFlagParsing(t *testing.T) {
 			install := flag.Bool("install", false, "force reinstall")
 			postinstall := flag.Bool("postinstall", false, "run only postinstall hooks")
 			postlink := flag.Bool("postlink", false, "run only postlink hooks")
+			linkOnly := flag.Bool("link", false, "run only linking for matching components")
 
 			// Parse test args
 			os.Args = append([]string{"dot"}, tt.args...)
@@ -494,6 +512,12 @@ func TestFlagParsing(t *testing.T) {
 			if expected, exists := tt.expected["postlink"]; exists {
 				if *postlink != expected {
 					t.Errorf("postlink flag = %v, want %v", *postlink, expected)
+				}
+			}
+
+			if expected, exists := tt.expected["link"]; exists {
+				if *linkOnly != expected {
+					t.Errorf("link flag = %v, want %v", *linkOnly, expected)
 				}
 			}
 		})

@@ -36,6 +36,7 @@ func main() {
 		defaultsImportShort = flag.Bool("i", false, "import macOS defaults from plist files")
 		runPostInstall      = flag.Bool("postinstall", false, "run only postinstall hooks")
 		runPostLink         = flag.Bool("postlink", false, "run only postlink hooks")
+		linkOnly            = flag.Bool("link", false, "run only linking for matching components")
 	)
 
 	// Preprocess arguments to allow flexible flag/argument ordering
@@ -110,6 +111,7 @@ func main() {
 		RemoveProfileShort: *removeProfileShort,
 		RunPostInstall:     *runPostInstall,
 		RunPostLink:        *runPostLink,
+		LinkOnly:           *linkOnly,
 	}
 
 	// Use the preprocessed positional arguments instead of flag.Args()
@@ -172,6 +174,7 @@ type App struct {
 	RemoveProfileShort string
 	RunPostInstall     bool
 	RunPostLink        bool
+	LinkOnly           bool
 }
 
 func (a *App) Run(args []string) error {
@@ -355,6 +358,32 @@ func (a *App) Run(args []string) error {
 			return err
 		}
 		a.printResults("Uninstall", results)
+		return nil
+	}
+
+	// Handle link-only operations
+	if a.LinkOnly {
+		if a.Verbose {
+			fmt.Printf("🔗 Running link-only operation...\n")
+			if len(activeProfiles) > 0 {
+				fmt.Printf("   Active profiles: %s\n", strings.Join(activeProfiles, ", "))
+			} else {
+				fmt.Printf("   Active profiles: * (default)\n")
+			}
+			if fuzzySearch != "" {
+				fmt.Printf("   Fuzzy search: %s\n", fuzzySearch)
+			}
+			if a.DryRun {
+				fmt.Printf("   Dry run: enabled\n")
+			}
+			fmt.Println()
+		}
+
+		results, err := componentManager.LinkComponents(activeProfiles, fuzzySearch, a.ForceInstall)
+		if err != nil {
+			return err
+		}
+		a.printResults("Link", results)
 		return nil
 	}
 
