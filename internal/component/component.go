@@ -223,7 +223,8 @@ func (m *Manager) installComponent(comp profile.ComponentInfo, forceInstall bool
 
 		commandName, command, available := system.GetFirstAvailableCommand(comp.Component.Install)
 		if !available {
-			result.Error = fmt.Errorf("no available command for component %s (tried: %v)", comp.FullName(), getCommandNames(comp.Component.Install))
+			// No package manager available - skip this component rather than failing
+			result.Skipped = true
 			return result
 		}
 
@@ -363,8 +364,9 @@ func (m *Manager) installComponentWithProgress(comp profile.ComponentInfo, force
 	if len(comp.Component.Install) > 0 && needsInstall {
 		commandName, command, available := system.GetFirstAvailableCommand(comp.Component.Install)
 		if !available {
-			result.Error = fmt.Errorf("no available command for component %s (tried: %v)", comp.FullName(), getCommandNames(comp.Component.Install))
-			progress.CompleteFailed(result.Error)
+			// No package manager available - skip this component rather than failing
+			result.Skipped = true
+			progress.CompleteSkipped()
 			return result
 		}
 
