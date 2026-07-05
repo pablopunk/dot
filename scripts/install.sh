@@ -46,13 +46,10 @@ detect_os_arch() {
     
     case $ARCH in
         x86_64)
-            ARCH="amd64"
+            ARCH="x64"
             ;;
         arm64|aarch64)
             ARCH="arm64"
-            ;;
-        armv7l)
-            ARCH="arm"
             ;;
         *)
             print_error "Unsupported architecture: $ARCH"
@@ -87,9 +84,6 @@ get_latest_version() {
 # Download the binary
 download_binary() {
     BINARY_NAME="dot-${OS}-${ARCH}"
-    if [ "$OS" = "darwin" ]; then
-        BINARY_NAME="dot-${OS}-${ARCH}"
-    fi
     
     DOWNLOAD_URL="https://github.com/pablopunk/dot/releases/download/${VERSION}/${BINARY_NAME}"
     
@@ -238,7 +232,7 @@ main() {
     print_success "dot installation completed successfully!"
     print_info "You can now use 'dot' command (restart your shell first if needed)"
     print_info "For help, run: dot --help"
-    print_info "To get started, create a dot.yaml file in your dotfiles directory"
+    print_info "To get started, create a dot.toml file in your dotfiles directory"
 }
 
 # Handle command line arguments

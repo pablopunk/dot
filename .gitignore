@@ -54,3 +54,4 @@ test-dotfiles/
 
 .claude/
 .opencode
+node_modules/
