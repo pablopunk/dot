@@ -83,7 +83,7 @@ export function createLinks(
       }
 
       if (!existsSync(absSrc)) {
-        if (options.verbose || true) {
+        if (options.verbose) {
           process.stdout.write(`  ${color("[warn]", "yellow")} ${component}: source not found: ${absSrc}\n`);
         }
         results.push({ ...base, failed: true, reason: `source not found: ${absSrc}` });

@@ -95,7 +95,8 @@ export async function main(): Promise<void> {
     process.exit(0);
   }
 
-  const options = { dryRun: args.dryRun, verbose: args.verbose, interactive: process.stdin.isTTY ?? false };
+  const isTty = process.stdin.isTTY ?? false;
+  const options = { dryRun: args.dryRun, verbose: args.verbose, interactive: isTty && args.mode === "direct" };
 
   if (args.mode === "interactive") {
     const selected = await runInteractive(resolved);

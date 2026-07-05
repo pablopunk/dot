@@ -214,7 +214,7 @@ link."config/xremap/config.yml" = "~/.config/xremap/config.yml"
 
 ```bash
 git clone https://github.com/pablopunk/dot.git
-cd dot/v4
+cd dot
 bun test        # run tests
 make build      # compile binary
 sudo make install

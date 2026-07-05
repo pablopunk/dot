@@ -55,7 +55,7 @@ export async function runInteractive(components: ResolvedComponent[]): Promise<C
         : "";
       let prefix = "◯  ";
       if (item.unavailable) prefix = "⚠  ";
-      else if (item.allLinksDone || item.isInstalled) prefix = "✓  ";
+      else if (item.allLinksDone || item.isInstalled) prefix = `${color("✓", "green")}  `;
       return {
         title: `${prefix}${item.name}`,
         value: item.name,

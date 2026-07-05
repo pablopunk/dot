@@ -20,7 +20,7 @@ jobs:
         with:
           bun-version: latest
       - run: mkdir -p dist
-        working-directory: v4
+        
       - run: |
           bun install
           EXT=""
@@ -30,7 +30,7 @@ jobs:
             --target=${{ matrix.target.bun }} \
             src/index.ts \
             --outfile dist/dot-${{ matrix.target.name }}${EXT}
-        working-directory: v4
+        
       - uses: actions/upload-artifact@v4
         with:
           name: dot-${{ matrix.target.name }}

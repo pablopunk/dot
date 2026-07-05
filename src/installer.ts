@@ -45,9 +45,9 @@ export async function installComponent(
       result = await Bun.$`${{ raw: command }} < /dev/null`.nothrow().quiet();
     }
     if (result.exitCode !== 0) {
-      const stderr = result.stderr.toString();
-      if (stderr) {
-        process.stderr.write(`  ${color("[error]", "red")} ${name}: ${stderr.trim()}\n`);
+      if (options.verbose) {
+        const stderr = result.stderr.toString().trim();
+        if (stderr) process.stderr.write(`  ${color("[error]", "red")} ${name}: ${stderr}\n`);
       }
       return { ...base, failed: true };
     }
