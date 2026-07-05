@@ -53,8 +53,7 @@ function Show-Help {
 
 function Assert-Windows {
     if ($env:OS -ne "Windows_NT") {
-        Write-ErrorMessage "This installer is for Windows only. Use scripts/install.sh on macOS or Linux."
-        exit 1
+        throw "This installer is for Windows only. Use scripts/install.sh on macOS or Linux."
     }
 }
 
@@ -66,8 +65,7 @@ function Get-DotArchitecture {
     }
 
     if (-not $arch) {
-        Write-ErrorMessage "Could not detect Windows architecture"
-        exit 1
+        throw "Could not detect Windows architecture"
     }
 
     switch ($arch.ToLowerInvariant()) {
@@ -75,13 +73,11 @@ function Get-DotArchitecture {
         "x86_64" { return "x64" }
         "x64" { return "x64" }
         "arm64" {
-            Write-ErrorMessage "Unsupported architecture: arm64"
-            Write-WarningMessage "The release workflow currently publishes dot-windows-x64.exe only."
-            exit 1
+            Write-WarningMessage "Detected Windows ARM64; installing the x64 binary under Windows emulation."
+            return "x64"
         }
         default {
-            Write-ErrorMessage "Unsupported architecture: $arch"
-            exit 1
+            throw "Unsupported architecture: $arch"
         }
     }
 }
@@ -99,8 +95,7 @@ function Get-LatestRelease {
         -Headers $headers
 
     if (-not $release.tag_name) {
-        Write-ErrorMessage "Failed to fetch latest version"
-        exit 1
+        throw "Failed to fetch latest version"
     }
 
     Write-Info "Latest version: $($release.tag_name)"
@@ -117,8 +112,7 @@ function Save-DotBinary {
     $asset = $Release.assets | Where-Object { $_.name -eq $binaryName } | Select-Object -First 1
 
     if (-not $asset) {
-        Write-ErrorMessage "No release asset found for $binaryName"
-        exit 1
+        throw "No release asset found for $binaryName"
     }
 
     $tempDir = Join-Path ([System.IO.Path]::GetTempPath()) ("dot-install-" + [System.Guid]::NewGuid().ToString())
@@ -133,8 +127,7 @@ function Save-DotBinary {
         -UseBasicParsing
 
     if (-not (Test-Path $tempFile)) {
-        Write-ErrorMessage "Failed to download binary"
-        exit 1
+        throw "Failed to download binary"
     }
 
     Write-Success "Binary downloaded successfully"
@@ -170,55 +163,73 @@ function Install-DotBinary {
 function Add-ToUserPath {
     param([string]$InstallDir)
 
-    $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
-    $pathParts = @()
-    if ($userPath) {
-        $pathParts = $userPath -split ";" | Where-Object { $_ }
+    $environmentKey = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey("Environment", $true)
+    if (-not $environmentKey) {
+        throw "Could not open HKCU\Environment for PATH update"
     }
 
-    $normalizedInstallDir = $InstallDir.TrimEnd("\")
-    $isInPath = $false
+    try {
+        $userPath = [string]$environmentKey.GetValue(
+            "Path",
+            "",
+            [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames
+        )
 
-    foreach ($pathPart in $pathParts) {
-        if ($pathPart.TrimEnd("\") -ieq $normalizedInstallDir) {
-            $isInPath = $true
-            break
+        $pathParts = @()
+        if ($userPath) {
+            $pathParts = $userPath -split ";" | Where-Object { $_ }
         }
+
+        $normalizedInstallDir = $InstallDir.TrimEnd("\")
+        $isInPath = $false
+
+        foreach ($pathPart in $pathParts) {
+            $expandedPathPart = [Environment]::ExpandEnvironmentVariables($pathPart)
+            if ($pathPart.TrimEnd("\") -ieq $normalizedInstallDir -or $expandedPathPart.TrimEnd("\") -ieq $normalizedInstallDir) {
+                $isInPath = $true
+                break
+            }
+        }
+
+        if ($isInPath) {
+            Write-Info "$InstallDir is already in user PATH"
+            return
+        }
+
+        Write-Info "Adding $InstallDir to user PATH"
+
+        if ($userPath) {
+            $newPath = "$userPath;$InstallDir"
+        } else {
+            $newPath = $InstallDir
+        }
+
+        $environmentKey.SetValue("Path", $newPath, [Microsoft.Win32.RegistryValueKind]::ExpandString)
+        $env:Path = "$env:Path;$InstallDir"
+
+        Write-Success "Updated user PATH"
+        Write-WarningMessage "Restart your terminal to use dot from new sessions"
+    } finally {
+        $environmentKey.Close()
     }
-
-    if ($isInPath) {
-        Write-Info "$InstallDir is already in user PATH"
-        return
-    }
-
-    Write-Info "Adding $InstallDir to user PATH"
-
-    if ($userPath) {
-        $newPath = "$userPath;$InstallDir"
-    } else {
-        $newPath = $InstallDir
-    }
-
-    [Environment]::SetEnvironmentVariable("Path", $newPath, "User")
-    $env:Path = "$env:Path;$InstallDir"
-
-    Write-Success "Updated user PATH"
-    Write-WarningMessage "Restart your terminal to use dot from new sessions"
 }
 
 function Test-Installation {
     param([string]$DotPath)
 
     if (-not (Test-Path $DotPath)) {
-        Write-ErrorMessage "Installation failed: $DotPath does not exist"
-        exit 1
+        throw "Installation failed: $DotPath does not exist"
     }
 
     Write-Success "Installation verified: $DotPath exists"
 
     try {
         & $DotPath --help *> $null
-        Write-Success "Binary runs successfully"
+        if ($LASTEXITCODE -eq 0) {
+            Write-Success "Binary runs successfully"
+        } else {
+            Write-WarningMessage "Binary exists but may not run correctly"
+        }
     } catch {
         Write-WarningMessage "Binary exists but may not run correctly"
     }
@@ -263,6 +274,9 @@ function Main {
         Write-Info "You can now use 'dot' command (restart your terminal first if needed)"
         Write-Info "For help, run: dot --help"
         Write-Info "To get started, create a dot.toml file in your dotfiles directory"
+    } catch {
+        Write-ErrorMessage $_.Exception.Message
+        return
     } finally {
         Remove-TempDir -TempDir $tempDir
     }
