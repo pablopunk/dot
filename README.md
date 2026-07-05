@@ -2,6 +2,9 @@
 
 > Single binary, zero dependencies, one config file
 
+<img width="751" height="486" alt="image" src="https://github.com/user-attachments/assets/9ae4f98e-5f3d-4389-985c-016a3cd0c08e" />
+
+
 ## Highlights
 
 - **Zero dependencies** — compiled binary, nothing else to install
