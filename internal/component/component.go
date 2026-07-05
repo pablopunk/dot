@@ -223,22 +223,22 @@ func (m *Manager) installComponent(comp profile.ComponentInfo, forceInstall bool
 
 		commandName, command, available := system.GetFirstAvailableCommand(comp.Component.Install)
 		if !available {
-			// No package manager available - skip this component rather than failing
-			result.Skipped = true
-			return result
-		}
+			if m.verbose {
+				fmt.Printf("   No package manager available for %s, skipping package install\n", comp.FullName())
+			}
+		} else {
+			installResult := m.execManager.ExecuteShellCommand(command)
+			result.InstallResult = &installResult
 
-		installResult := m.execManager.ExecuteShellCommand(command)
-		result.InstallResult = &installResult
+			if !installResult.Success {
+				result.Error = fmt.Errorf("install failed: %w", installResult.Error)
+				return result
+			}
 
-		if !installResult.Success {
-			result.Error = fmt.Errorf("install failed: %w", installResult.Error)
-			return result
-		}
-
-		// Mark as installed in state
-		if !m.dryRun {
-			m.stateManager.MarkComponentInstalled(comp, commandName, command, comp.Component.Link)
+			// Mark as installed in state
+			if !m.dryRun {
+				m.stateManager.MarkComponentInstalled(comp, commandName, command, comp.Component.Link)
+			}
 		}
 	} else if len(comp.Component.Install) > 0 && !needsInstall {
 		// Packages already installed and unchanged, skip install step
@@ -364,24 +364,23 @@ func (m *Manager) installComponentWithProgress(comp profile.ComponentInfo, force
 	if len(comp.Component.Install) > 0 && needsInstall {
 		commandName, command, available := system.GetFirstAvailableCommand(comp.Component.Install)
 		if !available {
-			// No package manager available - skip this component rather than failing
-			result.Skipped = true
-			progress.CompleteSkipped()
-			return result
-		}
+			if m.verbose {
+				fmt.Printf("   No package manager available for %s, skipping package install\n", comp.FullName())
+			}
+		} else {
+			installResult := m.execManager.ExecuteShellCommandWithProgress(command, progress)
+			result.InstallResult = &installResult
 
-		installResult := m.execManager.ExecuteShellCommandWithProgress(command, progress)
-		result.InstallResult = &installResult
+			if !installResult.Success {
+				result.Error = fmt.Errorf("install failed: %w", installResult.Error)
+				progress.CompleteFailed(result.Error)
+				return result
+			}
 
-		if !installResult.Success {
-			result.Error = fmt.Errorf("install failed: %w", installResult.Error)
-			progress.CompleteFailed(result.Error)
-			return result
-		}
-
-		// Mark as installed in state
-		if !m.dryRun {
-			m.stateManager.MarkComponentInstalled(comp, commandName, command, comp.Component.Link)
+			// Mark as installed in state
+			if !m.dryRun {
+				m.stateManager.MarkComponentInstalled(comp, commandName, command, comp.Component.Link)
+			}
 		}
 	} else if len(comp.Component.Install) > 0 && !needsInstall {
 		// Packages already installed and unchanged, skip to linking
