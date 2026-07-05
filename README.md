@@ -4,7 +4,7 @@
 
 ## Highlights
 
-- **Zero dependencies** — compiled binary, nothing to install
+- **Zero dependencies** — compiled binary, nothing else to install
 - **Cross-platform** — macOS, Linux, Windows
 - **Interactive** — run `dot` and pick what you want from a checklist
 - **Scriptable** — `dot -i git -l zsh -v` for automation and LLMs
