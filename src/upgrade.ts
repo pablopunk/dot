@@ -29,8 +29,14 @@ export async function selfUpgrade(): Promise<void> {
     process.stderr.write(`${color("[error]", "red")} Failed to fetch release: ${apiResponse.status}\n`);
     process.exit(1);
   }
-
   const release = await apiResponse.json();
+
+  const currentVersion = process.env.DOT_VERSION || "dev";
+  if (release.tag_name === currentVersion) {
+    process.stdout.write(`${color("[upgrade]", "green")} Already up to date (${currentVersion})\n`);
+    return;
+  }
+
   const asset = release.assets.find((a: any) => a.name === assetName);
 
   if (!asset) {
