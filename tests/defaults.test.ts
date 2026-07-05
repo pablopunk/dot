@@ -82,7 +82,7 @@ describe("importDefaults", () => {
     const file = join(tmp, "nonexistent.plist");
     const result = await importDefaults({ "com.apple.dock": file }, tmp, { dryRun: false, verbose: false, interactive: false });
     expect(result[0].success).toBe(false);
-    expect(result[0].reason).toContain("not found");
+    expect(result[0].reason).toContain("exit");
   });
 
   test("handles empty defaults", async () => {

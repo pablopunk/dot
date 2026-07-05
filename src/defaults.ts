@@ -123,7 +123,14 @@ export async function importDefaults(
     }
 
     try {
-      Bun.spawnSync(["defaults", "import", domain, absFile]);
+      const proc = Bun.spawnSync(["defaults", "import", domain, absFile]);
+      if (proc.exitCode !== 0) {
+        if (options.verbose) {
+          process.stdout.write(`  ${color("[error]", "red")} ${domain}: defaults import failed (exit ${proc.exitCode})\n`);
+        }
+        results.push({ ...base, failed: true, reason: `defaults import exited with code ${proc.exitCode}` });
+        continue;
+      }
       if (options.verbose) {
         process.stdout.write(`  ${color("[import]", "green")} ${file} → ${domain}\n`);
       }

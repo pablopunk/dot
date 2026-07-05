@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
-import { parseConfig, resolveComponents } from "../src/config";
+import { parseConfig, resolveComponents, isCheckInstalled } from "../src/config";
 import { tmpdir } from "node:os";
 import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
@@ -177,6 +177,26 @@ install.any = "curl example.com/install.sh | bash"
       any: "curl example.com/install.sh | bash",
     });
   });
+
+  test("parses check field", async () => {
+    writeToml(`
+[zsh]
+install.brew = "brew install zsh"
+check = "zsh"
+`);
+    const config = await parseConfig(join(tmp, "dot.toml"));
+    expect(config.components[0].check).toBe("zsh");
+  });
+
+  test("parses check field with shell command", async () => {
+    writeToml(`
+[zed]
+install.brew = "brew install zed"
+check = "test -d /Applications/Zed.app"
+`);
+    const config = await parseConfig(join(tmp, "dot.toml"));
+    expect(config.components[0].check).toBe("test -d /Applications/Zed.app");
+  });
 });
 
 describe("resolveComponents", () => {
@@ -205,6 +225,7 @@ describe("resolveComponents", () => {
         }
       }
       if (c.postinstall) toml += `postinstall = "${c.postinstall}"\n`;
+      if (c.check) toml += `check = "${c.check}"\n`;
       if (c.postlink) toml += `postlink = "${c.postlink}"\n`;
       if (c.defaults) {
         for (const [domain, file] of Object.entries(c.defaults)) {
@@ -332,5 +353,82 @@ describe("resolveComponents", () => {
     const config = await parseConfig(join(tmp, "dot.toml"));
     const resolved = resolveComponents(config, "linux");
     expect(resolved[0].hasInstall).toBe(false);
+  });
+
+  test("check with binary name sets isInstalled", async () => {
+    await makeConfig([{
+      name: "zsh",
+      install: { brew: "brew install zsh" },
+      check: "sh",
+    }]);
+    const config = await parseConfig(join(tmp, "dot.toml"));
+    const resolved = resolveComponents(config, "linux");
+    expect(resolved[0].isInstalled).toBe(true);
+  });
+
+  test("check with nonexistent binary sets isInstalled false", async () => {
+    await makeConfig([{
+      name: "custom",
+      install: { brew: "brew install custom" },
+      check: "nonexistentkjahsdkjhaksjdh",
+    }]);
+    const config = await parseConfig(join(tmp, "dot.toml"));
+    const resolved = resolveComponents(config, "linux");
+    expect(resolved[0].isInstalled).toBe(false);
+  });
+
+  test("check with shell command sets isInstalled", async () => {
+    await makeConfig([{
+      name: "custom",
+      install: { brew: "brew install custom" },
+      check: "test -d /",
+    }]);
+    const config = await parseConfig(join(tmp, "dot.toml"));
+    const resolved = resolveComponents(config, "linux");
+    expect(resolved[0].isInstalled).toBe(true);
+  });
+
+  test("check with failing shell command sets isInstalled false", async () => {
+    await makeConfig([{
+      name: "custom",
+      install: { brew: "brew install custom" },
+      check: "exit 1",
+    }]);
+    const config = await parseConfig(join(tmp, "dot.toml"));
+    const resolved = resolveComponents(config, "linux");
+    expect(resolved[0].isInstalled).toBe(false);
+  });
+
+  test("no check defaults isInstalled to false", async () => {
+    await makeConfig([{ name: "zsh", install: { brew: "brew install zsh" } }]);
+    const config = await parseConfig(join(tmp, "dot.toml"));
+    const resolved = resolveComponents(config, "linux");
+    expect(resolved[0].isInstalled).toBe(false);
+  });
+});
+
+describe("isCheckInstalled", () => {
+  test("binary name: found", () => {
+    expect(isCheckInstalled("sh")).toBe(true);
+  });
+
+  test("binary name: not found", () => {
+    expect(isCheckInstalled("nonexistentkjahsdkjhaksjdh")).toBe(false);
+  });
+
+  test("shell command: success (exit 0)", () => {
+    expect(isCheckInstalled("echo ok")).toBe(true);
+  });
+
+  test("shell command: failure (exit 1)", () => {
+    expect(isCheckInstalled("exit 1")).toBe(false);
+  });
+
+  test("shell command: with file test ", () => {
+    expect(isCheckInstalled("test -d /")).toBe(true);
+  });
+
+  test("shell command: test nonexistent path", () => {
+    expect(isCheckInstalled("test -d /nonexistentkdjfhakjshd")).toBe(false);
   });
 });

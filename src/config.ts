@@ -126,9 +126,9 @@ function linksAllCorrect(component: Component): boolean {
   return true;
 }
 
-function isCheckInstalled(check: string): boolean {
+export function isCheckInstalled(check: string): boolean {
   if (check.includes(" ")) {
-    const result = Bun.spawnSync(["sh", "-c", check], { stdout: "null", stderr: "null" });
+    const result = Bun.spawnSync(["sh", "-c", check], { stdout: null, stderr: null });
     return result.exitCode === 0;
   }
   return Bun.which(check) !== null;
