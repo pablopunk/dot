@@ -53,11 +53,11 @@ export async function runInteractive(components: ResolvedComponent[]): Promise<C
           ? item.installCommand.slice(0, 42) + "..."
           : item.installCommand
         : "";
-      let prefix = "◯  ";
-      if (item.unavailable) prefix = "⚠  ";
-      else if (item.allLinksDone || item.isInstalled) prefix = `${color("✓", "green")}  `;
+      let marker = "";
+      if (item.unavailable) marker = " ⚠";
+      else if (item.allLinksDone || item.isInstalled) marker = ` ${color("✓", "green")}`;
       return {
-        title: `${prefix}${item.name}`,
+        title: `${item.name}${marker}`,
         value: item.name,
         description: item.unavailable ? "no install method" : `${mgr}  ${cmd}`,
         selected: false,
