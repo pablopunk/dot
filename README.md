@@ -17,11 +17,21 @@
 
 ## Installation
 
+### macOS / Linux
+
 ```bash
 curl -fsSL https://raw.githubusercontent.com/pablopunk/dot/main/scripts/install.sh | bash
 ```
 
 Downloads the latest binary to `~/.local/bin/dot`.
+
+### Windows PowerShell
+
+```powershell
+irm https://raw.githubusercontent.com/pablopunk/dot/main/scripts/install.ps1 | iex
+```
+
+Downloads the latest binary to `%LOCALAPPDATA%\Programs\dot\dot.exe` and adds it to your user `PATH`.
 
 ## Quick Start
 
