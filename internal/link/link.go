@@ -146,8 +146,8 @@ func (m *Manager) createLink(source, target string) LinkResult {
 			}
 		}
 
-		// Remove existing file/link
-		if err := os.Remove(expandedTarget); err != nil {
+		// Remove existing file/link/directory
+		if err := os.RemoveAll(expandedTarget); err != nil {
 			return LinkResult{
 				Source: source,
 				Target: expandedTarget,
