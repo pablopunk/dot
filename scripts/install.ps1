@@ -59,9 +59,20 @@ function Assert-Windows {
 }
 
 function Get-DotArchitecture {
-    $arch = [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString().ToLowerInvariant()
+    $arch = $env:PROCESSOR_ARCHITECTURE
 
-    switch ($arch) {
+    if (-not $arch -and $env:PROCESSOR_ARCHITEW6432) {
+        $arch = $env:PROCESSOR_ARCHITEW6432
+    }
+
+    if (-not $arch) {
+        Write-ErrorMessage "Could not detect Windows architecture"
+        exit 1
+    }
+
+    switch ($arch.ToLowerInvariant()) {
+        "amd64" { return "x64" }
+        "x86_64" { return "x64" }
         "x64" { return "x64" }
         "arm64" {
             Write-ErrorMessage "Unsupported architecture: arm64"
