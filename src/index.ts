@@ -99,6 +99,10 @@ export async function main(): Promise<void> {
   const options = { dryRun: args.dryRun, verbose: args.verbose, interactive: isTty && args.mode === "direct" };
 
   if (args.mode === "interactive") {
+    if (!isTty) {
+      process.stderr.write(`${color("[error]", "red")} Interactive mode requires a terminal. Use --install, --link, or --dry-run flags for non-interactive use.\n`);
+      process.exit(1);
+    }
     const selected = await runInteractive(resolved);
     if (selected.length === 0) {
       process.exit(0);
