@@ -66,7 +66,7 @@ export async function runInteractive(components: ResolvedComponent[]): Promise<C
     }),
     hint: "✓=done  ⚠=no install method  (type to filter, space to select, enter to confirm)",
     instructions: false,
-    maxItems: 20,
+    optionsPerPage: process.stdout.rows ? process.stdout.rows - 10 : 30,
     suggest: (input: string, choices: any[]) =>
       Promise.resolve(
         choices
