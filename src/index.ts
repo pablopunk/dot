@@ -66,6 +66,37 @@ function printList(resolved: ReturnType<typeof resolveComponents>): void {
   process.stdout.write(`\n`);
 }
 
+export function printResultStatus(
+  name: string,
+  result: { success: boolean; failed: boolean; dryRun: boolean; skipped?: boolean }
+): void {
+  if (result.dryRun) {
+    process.stdout.write(`  ${color("~", "yellow")} ${name}\n`);
+  } else if (result.failed) {
+    process.stdout.write(`  ${color("✗", "red")} ${name}\n`);
+  } else if (result.skipped) {
+    process.stdout.write(`  ${color("-", "dim")} ${name}\n`);
+  } else {
+    process.stdout.write(`  ${color("✓", "green")} ${name}\n`);
+  }
+}
+
+export function printLinkStatus(name: string, results: Array<{ success: boolean; failed: boolean; dryRun: boolean; skipped?: boolean }>): void {
+  if (results.length === 0) return;
+  const anyFailed = results.some((r) => r.failed);
+  const allDryRun = results.every((r) => r.dryRun);
+  const allSkipped = results.every((r) => r.skipped || r.dryRun);
+  if (allDryRun) {
+    process.stdout.write(`  ${color("~", "yellow")} ${name}\n`);
+  } else if (anyFailed) {
+    process.stdout.write(`  ${color("✗", "red")} ${name}\n`);
+  } else if (allSkipped) {
+    process.stdout.write(`  ${color("-", "dim")} ${name}\n`);
+  } else {
+    process.stdout.write(`  ${color("✓", "green")} ${name}\n`);
+  }
+}
+
 export async function main(): Promise<void> {
   const args = parseArgs(process.argv);
 
@@ -96,7 +127,7 @@ export async function main(): Promise<void> {
   }
 
   const isTty = process.stdin.isTTY ?? false;
-  const options = { dryRun: args.dryRun, verbose: args.verbose, interactive: isTty && args.mode === "direct" };
+  const options = { dryRun: args.dryRun, verbose: args.verbose, interactive: isTty };
 
   if (args.mode === "interactive") {
     if (!isTty) {
@@ -109,6 +140,7 @@ export async function main(): Promise<void> {
     }
 
     const action = args.interactiveAction;
+    const failures: string[] = [];
 
     for (const item of selected) {
       if (item.unavailable) continue;
@@ -118,33 +150,51 @@ export async function main(): Promise<void> {
       if (!action || action === "install") {
         if (comp.installCommand) {
           const result = await installComponent(comp.name, comp.installCommand, options, comp.availableManager || undefined);
-          if (result.failed) {
-            process.stderr.write(`  ${color("[error]", "red")} ${comp.name}: install failed\n`);
-          }
+          if (result.failed && !result.dryRun) failures.push(comp.name);
+          printResultStatus(comp.name, result);
+        } else {
+          printResultStatus(comp.name, { success: false, failed: false, dryRun: false, skipped: true });
         }
       }
 
       if (!action || action === "install") {
         if (comp.hasDefaults && os === "mac") {
-          await importDefaults(comp.defaults, process.cwd(), options);
+          const results = await importDefaults(comp.defaults, process.cwd(), options);
+          for (const r of results) {
+            if (r.failed && !r.dryRun) failures.push(r.domain);
+            printResultStatus(r.domain, r);
+          }
         }
       }
 
       if (!action || action === "link") {
         if (comp.hasLinks) {
-          createLinks(comp.name, comp.link, process.cwd(), options);
+          const results = createLinks(comp.name, comp.link, process.cwd(), options);
+          const anyFailed = results.some((r) => r.failed && !r.dryRun);
+          if (anyFailed) failures.push(comp.name);
+          printLinkStatus(comp.name, results);
+        } else {
+          printResultStatus(comp.name, { success: false, failed: false, dryRun: false, skipped: true });
         }
       }
 
       if (!action || action === "postinstall") {
         if (comp.postinstall) {
-          await runPostInstall(comp.name, comp.postinstall, options);
+          const result = await runPostInstall(comp.name, comp.postinstall, options);
+          if (result.failed && !result.dryRun) failures.push(comp.name);
+          printResultStatus(comp.name, result);
+        } else {
+          printResultStatus(comp.name, { success: false, failed: false, dryRun: false, skipped: true });
         }
       }
 
       if (!action || action === "postlink") {
         if (comp.postlink) {
-          await runPostLink(comp.name, comp.postlink, options);
+          const result = await runPostLink(comp.name, comp.postlink, options);
+          if (result.failed && !result.dryRun) failures.push(comp.name);
+          printResultStatus(comp.name, result);
+        } else {
+          printResultStatus(comp.name, { success: false, failed: false, dryRun: false, skipped: true });
         }
       }
 
@@ -152,11 +202,19 @@ export async function main(): Promise<void> {
         const uninstallCmd = Object.entries(comp.uninstall)[0];
         if (uninstallCmd) {
           const [, cmd] = uninstallCmd;
-          await uninstallComponent(comp.name, cmd, options);
+          const result = await uninstallComponent(comp.name, cmd, options);
+          if (result.failed && !result.dryRun) failures.push(comp.name);
+          printResultStatus(comp.name, result);
+        } else {
+          printResultStatus(comp.name, { success: false, failed: false, dryRun: false, skipped: true });
         }
       }
     }
 
+    if (failures.length > 0) {
+      process.stderr.write(`\n${color(`  ${failures.length} failure(s)`, "red")}\n`);
+    }
+    process.stdout.write(`\n${color("  Done.", "green")}\n`);
     return;
   }
 
@@ -197,11 +255,13 @@ export async function main(): Promise<void> {
         const uninstallCmd = Object.entries(comp.uninstall)[0];
         if (!uninstallCmd) {
           process.stdout.write(`  ${color("[skip]", "dim")} ${name}: no uninstall command\n`);
+          printResultStatus(name, { success: false, failed: false, dryRun: false, skipped: true });
           continue;
         }
         const [, cmd] = uninstallCmd;
         const result = await uninstallComponent(name, cmd, options);
         if (result.failed && !result.dryRun) failures.push(name);
+        printResultStatus(name, result);
       }
     }
 
@@ -216,6 +276,9 @@ export async function main(): Promise<void> {
         if (comp.installCommand) {
           const result = await installComponent(name, comp.installCommand, options, comp.availableManager || undefined);
           if (result.failed && !result.dryRun) failures.push(name);
+          printResultStatus(name, result);
+        } else {
+          printResultStatus(name, { success: false, failed: false, dryRun: false, skipped: true });
         }
       }
     }
@@ -230,6 +293,7 @@ export async function main(): Promise<void> {
       const results = await importDefaults(allDefaults, process.cwd(), options);
       for (const r of results) {
         if (r.failed && !r.dryRun) failures.push(r.domain);
+        printResultStatus(r.domain, r);
       }
     }
 
@@ -243,6 +307,7 @@ export async function main(): Promise<void> {
       const results = await exportDefaults(allDefaults, process.cwd(), options);
       for (const r of results) {
         if (r.failed && !r.dryRun) failures.push(r.domain);
+        printResultStatus(r.domain, r);
       }
     }
 
@@ -259,6 +324,9 @@ export async function main(): Promise<void> {
           for (const r of results) {
             if (r.failed && !r.dryRun) failures.push(name);
           }
+          printLinkStatus(name, results);
+        } else {
+          printResultStatus(name, { success: false, failed: false, dryRun: false, skipped: true });
         }
       }
     }
@@ -274,6 +342,9 @@ export async function main(): Promise<void> {
         if (comp.postinstall) {
           const result = await runPostInstall(name, comp.postinstall, options);
           if (result.failed && !result.dryRun) failures.push(name);
+          printResultStatus(name, result);
+        } else {
+          printResultStatus(name, { success: false, failed: false, dryRun: false, skipped: true });
         }
       }
     }
@@ -289,6 +360,9 @@ export async function main(): Promise<void> {
         if (comp.postlink) {
           const result = await runPostLink(name, comp.postlink, options);
           if (result.failed && !result.dryRun) failures.push(name);
+          printResultStatus(name, result);
+        } else {
+          printResultStatus(name, { success: false, failed: false, dryRun: false, skipped: true });
         }
       }
     }
@@ -298,9 +372,7 @@ export async function main(): Promise<void> {
       process.exit(1);
     }
 
-    if (options.verbose) {
-      process.stdout.write(`\n${color("  Done.", "green")}\n`);
-    }
+    process.stdout.write(`\n${color("  Done.", "green")}\n`);
   }
 }
 
