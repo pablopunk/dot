@@ -10,6 +10,7 @@ import { selfUpgrade } from "./upgrade";
 import { detectOS } from "./utils";
 import { color } from "./ui";
 import { showCursor, clearScreen } from "./renderer";
+import { openTerminalInput } from "./terminal";
 
 const VERSION = process.env.DOT_VERSION || "dev";
 
@@ -96,19 +97,28 @@ export async function main(): Promise<void> {
   }
 
   const isTty = process.stdin.isTTY ?? false;
-  const options = { dryRun: args.dryRun, verbose: args.verbose, interactive: isTty && args.mode === "direct" };
 
   if (args.mode === "interactive") {
+    const terminalInput = isTty ? null : openTerminalInput();
     if (!isTty) {
-      process.stderr.write(`${color("[error]", "red")} Interactive mode requires a terminal. Use --install, --link, or --dry-run flags for non-interactive use.\n`);
-      process.exit(1);
+      if (!terminalInput) {
+        process.stderr.write(`${color("[error]", "red")} Interactive mode requires a terminal. Use --install, --link, or --dry-run flags for non-interactive use.\n`);
+        process.exit(1);
+      }
     }
-    const selected = await runInteractive(resolved);
+
+    let selected;
+    try {
+      selected = await runInteractive(resolved, terminalInput || process.stdin);
+    } finally {
+      terminalInput?.destroy();
+    }
     if (selected.length === 0) {
       process.exit(0);
     }
 
     const action = args.interactiveAction;
+    const options = { dryRun: args.dryRun, verbose: args.verbose, interactive: true };
 
     for (const item of selected) {
       if (item.unavailable) continue;
@@ -161,6 +171,7 @@ export async function main(): Promise<void> {
   }
 
   if (args.mode === "direct") {
+    const options = { dryRun: args.dryRun, verbose: args.verbose, interactive: isTty };
     const names = resolved.map((c: { name: string }) => c.name);
 
     if (args.list) {
