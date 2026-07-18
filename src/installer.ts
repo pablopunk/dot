@@ -14,6 +14,23 @@ export interface RunResult {
   manager?: string;
 }
 
+async function runNonInteractive(command: string): Promise<{ exitCode: number; stderr: Buffer }> {
+  const shellCommand = process.platform === "win32"
+    ? [process.env.ComSpec || "cmd.exe", "/d", "/s", "/c", command]
+    : [Bun.which("bash") || "/bin/sh", "-c", command];
+  const child = Bun.spawn(shellCommand, {
+    stdin: "ignore",
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  const [exitCode, stderr] = await Promise.all([
+    child.exited,
+    new Response(child.stderr).arrayBuffer(),
+    new Response(child.stdout).arrayBuffer(),
+  ]);
+  return { exitCode, stderr: Buffer.from(stderr) };
+}
+
 export async function installComponent(
   name: string,
   command: string | null,
@@ -42,7 +59,7 @@ export async function installComponent(
     if (options.interactive) {
       result = await Bun.$`${{ raw: command }}`.nothrow().quiet();
     } else {
-      result = await Bun.$`${{ raw: command }} < /dev/null`.nothrow().quiet();
+      result = await runNonInteractive(command);
     }
     if (result.exitCode !== 0) {
       if (options.verbose) {
@@ -92,7 +109,7 @@ export async function uninstallComponent(
     if (options.interactive) {
       result = await Bun.$`${{ raw: command }}`.nothrow().quiet();
     } else {
-      result = await Bun.$`${{ raw: command }} < /dev/null`.nothrow().quiet();
+      result = await runNonInteractive(command);
     }
     if (result.exitCode !== 0) {
       return { ...base, failed: true };

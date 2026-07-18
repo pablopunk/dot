@@ -1,5 +1,18 @@
-import { describe, test, expect } from "bun:test";
+import { describe, test, expect, beforeEach, afterEach } from "bun:test";
 import { installComponent, uninstallComponent } from "../src/installer";
+import { mkdtempSync, rmSync, existsSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+let tmp: string;
+
+beforeEach(() => {
+  tmp = mkdtempSync(join(tmpdir(), "dot-installer-"));
+});
+
+afterEach(() => {
+  rmSync(tmp, { recursive: true, force: true });
+});
 
 describe("installComponent", () => {
   test("returns success for echo command", async () => {
@@ -33,6 +46,18 @@ describe("installComponent", () => {
   test("null command returns failure", async () => {
     const result = await installComponent("custom", null as any, { dryRun: false, verbose: false, interactive: false });
     expect(result.failed).toBe(true);
+  });
+
+  test("non-interactive commands preserve pipeline input", async () => {
+    const marker = join(tmp, "mise-installed");
+    const result = await installComponent(
+      "mise",
+      `printf 'touch ${marker}' | sh`,
+      { dryRun: false, verbose: false, interactive: false }
+    );
+
+    expect(result.success).toBe(true);
+    expect(existsSync(marker)).toBe(true);
   });
 });
 

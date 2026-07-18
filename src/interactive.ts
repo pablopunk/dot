@@ -39,7 +39,10 @@ export function buildChecklist(components: ResolvedComponent[]): CheckboxItem[] 
   return items;
 }
 
-export async function runInteractive(components: ResolvedComponent[]): Promise<CheckboxItem[]> {
+export async function runInteractive(
+  components: ResolvedComponent[],
+  stdin: NodeJS.ReadStream = process.stdin
+): Promise<CheckboxItem[]> {
   const items = buildChecklist(components);
 
   const response = await prompts({
@@ -66,6 +69,7 @@ export async function runInteractive(components: ResolvedComponent[]): Promise<C
     }),
     hint: "✓=done  ⚠=no install method  (type to filter, space to select, enter to confirm)",
     instructions: false,
+    stdin,
     optionsPerPage: process.stdout.rows ? process.stdout.rows - 10 : 30,
     suggest: (input: string, choices: any[]) =>
       Promise.resolve(

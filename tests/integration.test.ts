@@ -2,9 +2,11 @@ import { describe, test, expect, beforeEach, afterEach } from "bun:test";
 import { tmpdir } from "node:os";
 import { mkdtempSync, writeFileSync, rmSync, existsSync, readlinkSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
+import prompts from "prompts";
 import { parseConfig, resolveComponents } from "../src/config";
 import { resolveComponentNames } from "../src/fuzzy";
 import { createLinks } from "../src/linker";
+import { main } from "../src/index";
 
 function makeTempDir(): string {
   return mkdtempSync(join(tmpdir(), "dot-integration-"));
@@ -59,6 +61,37 @@ postinstall = "echo 'git configured'"
     expect(gitLinks[0].success).toBe(true);
     expect(existsSync(join(homeDir, ".gitconfig"))).toBe(true);
     expect(existsSync(join(homeDir, ".config", "git", "config"))).toBe(true);
+  });
+
+  test("interactive installs preserve pipeline input", async () => {
+    const marker = join(repoDir, "mise-installed");
+    writeFileSync(join(repoDir, "dot.toml"), `
+[mise]
+install.any = "printf 'touch ${marker}' | sh"
+`);
+
+    const originalArgv = process.argv;
+    const originalCwd = process.cwd();
+    const originalIsTty = Object.getOwnPropertyDescriptor(process.stdin, "isTTY");
+
+    try {
+      process.argv = ["dot"];
+      process.chdir(repoDir);
+      Object.defineProperty(process.stdin, "isTTY", { value: true, configurable: true });
+      prompts.inject([["mise"]]);
+
+      await main();
+
+      expect(existsSync(marker)).toBe(true);
+    } finally {
+      process.argv = originalArgv;
+      process.chdir(originalCwd);
+      if (originalIsTty) {
+        Object.defineProperty(process.stdin, "isTTY", originalIsTty);
+      } else {
+        delete (process.stdin as any).isTTY;
+      }
+    }
   });
 
   test("dry run does not create links", async () => {
