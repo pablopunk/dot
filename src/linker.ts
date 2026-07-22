@@ -7,6 +7,7 @@ export interface RunOptions {
   dryRun: boolean;
   verbose: boolean;
   interactive: boolean;
+  report?: boolean;
 }
 
 export interface LinkResult {
@@ -75,9 +76,7 @@ export function createLinks(
       };
 
       if (options.dryRun) {
-        if (options.verbose) {
-          process.stdout.write(`  ${color("[dry-run]", "yellow")} would link ${src} → ${dest}\n`);
-        }
+        if (options.report) process.stdout.write(`  ${color("[dry-run]", "yellow")} would link ${src} → ${dest}\n`);
         results.push({ ...base, success: true, dryRun: true });
         continue;
       }
@@ -94,9 +93,7 @@ export function createLinks(
         if (isSymlink(dest)) {
           const existingTarget = readlinkSync(dest);
           if (existingTarget === absSrc) {
-            if (options.verbose) {
-              process.stdout.write(`  ${color("[skip]", "dim")} ${component}: already linked ${dest}\n`);
-            }
+            if (options.report) process.stdout.write(`    ${color("✓", "green")} linked ${dest}\n`);
             results.push({ ...base, success: true, skipped: true, reason: "symlink exists and points correctly" });
             continue;
           }
@@ -124,9 +121,7 @@ export function createLinks(
 
       try {
         symlinkSync(absSrc, dest);
-        if (options.verbose) {
-          process.stdout.write(`  ${color("[link]", "green")} ${src} → ${dest}\n`);
-        }
+        if (options.report) process.stdout.write(`    ${color("✓", "green")} linked ${dest}\n`);
         results.push({ ...base, success: true });
       } catch (e: any) {
         if (options.verbose) {
@@ -163,9 +158,7 @@ export function removeLinks(
       };
 
       if (options.dryRun) {
-        if (options.verbose) {
-          process.stdout.write(`  ${color("[dry-run]", "yellow")} would unlink ${dest}\n`);
-        }
+        if (options.report) process.stdout.write(`  ${color("[dry-run]", "yellow")} would unlink ${dest}\n`);
         results.push({ ...base, success: true, dryRun: true });
         continue;
       }
@@ -188,9 +181,7 @@ export function removeLinks(
 
       try {
         unlinkSync(dest);
-        if (options.verbose) {
-          process.stdout.write(`  ${color("[unlink]", "green")} removed ${dest}\n`);
-        }
+        if (options.report) process.stdout.write(`    ${color("✓", "green")} unlinked ${dest}\n`);
         results.push({ ...base, success: true });
       } catch (e: any) {
         if (options.verbose) {

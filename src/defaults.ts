@@ -5,6 +5,7 @@ export interface RunOptions {
   dryRun: boolean;
   verbose: boolean;
   interactive: boolean;
+  report?: boolean;
 }
 
 export interface DefaultsResult {
@@ -65,6 +66,7 @@ export async function exportDefaults(
       if (options.verbose) {
         process.stdout.write(`  ${color("[export]", "green")} ${domain} → ${file}\n`);
       }
+      if (options.report) process.stdout.write(`  ${color("✓", "green")} exported ${domain}\n`);
       results.push({ ...base, success: true });
     } catch (e: any) {
       if (options.verbose) {
@@ -134,6 +136,7 @@ export async function importDefaults(
       if (options.verbose) {
         process.stdout.write(`  ${color("[import]", "green")} ${file} → ${domain}\n`);
       }
+      if (options.report) process.stdout.write(`  ${color("✓", "green")} imported ${domain}\n`);
       results.push({ ...base, success: true });
     } catch (e: any) {
       if (options.verbose) {

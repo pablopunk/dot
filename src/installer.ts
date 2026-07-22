@@ -4,6 +4,7 @@ export interface RunOptions {
   dryRun: boolean;
   verbose: boolean;
   interactive: boolean;
+  report?: boolean;
 }
 
 export interface RunResult {
@@ -44,9 +45,7 @@ export async function installComponent(
   }
 
   if (options.dryRun) {
-    if (options.verbose) {
-      process.stdout.write(`  ${color("[dry-run]", "yellow")} would run: ${command}\n`);
-    }
+    if (options.report) process.stdout.write(`  ${color("[dry-run]", "yellow")} ${name}: ${command}\n`);
     return { ...base, success: true, dryRun: true };
   }
 
@@ -75,9 +74,7 @@ export async function installComponent(
     throw e;
   }
 
-  if (options.verbose) {
-    process.stdout.write(`  ${color("[ok]", "green")} ${name}\n`);
-  }
+  if (options.report) process.stdout.write(`    ${color("✓", "green")} installed\n`);
 
   return { ...base, success: true };
 }
@@ -94,9 +91,7 @@ export async function uninstallComponent(
   }
 
   if (options.dryRun) {
-    if (options.verbose) {
-      process.stdout.write(`  ${color("[dry-run]", "yellow")} would run: ${command}\n`);
-    }
+    if (options.report) process.stdout.write(`  ${color("[dry-run]", "yellow")} ${name}: ${command}\n`);
     return { ...base, success: true, dryRun: true };
   }
 
@@ -121,9 +116,7 @@ export async function uninstallComponent(
     throw e;
   }
 
-  if (options.verbose) {
-    process.stdout.write(`  ${color("[ok]", "green")} ${name} uninstalled\n`);
-  }
+  if (options.report) process.stdout.write(`    ${color("✓", "green")} uninstalled\n`);
 
   return { ...base, success: true };
 }

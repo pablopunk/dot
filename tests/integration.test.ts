@@ -126,6 +126,36 @@ postlink = "touch ${postLinkMarker}"
     }
   });
 
+  test("direct commands show completed lifecycle steps", async () => {
+    const installMarker = join(repoDir, "installed");
+    writeFileSync(join(repoDir, "dot.toml"), `
+[mise]
+install.any = "touch ${installMarker}"
+link."config/mise.toml" = "~/.config/mise/config.toml"
+postinstall = "true"
+postlink = "true"
+`);
+    mkdirSync(join(repoDir, "config"));
+    writeFileSync(join(repoDir, "config/mise.toml"), "# mise config");
+
+    const child = Bun.spawn([process.execPath, join(import.meta.dir, "../src/index.ts"), "-i", "mise"], {
+      cwd: repoDir,
+      env: { ...process.env, HOME: homeDir },
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    const output = await new Response(child.stdout).text();
+    const plainOutput = output.replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, "");
+
+    expect(await child.exited).toBe(0);
+    expect(plainOutput).toContain("mise");
+    expect(plainOutput).toContain("✓ installed");
+    expect(plainOutput).toContain("✓ linked");
+    expect(plainOutput).toContain("✓ postinstall");
+    expect(plainOutput).toContain("✓ postlink");
+    expect(plainOutput).toContain("✓ Done.");
+  });
+
   test("dry run does not create links", async () => {
     const configToml = `
 [zsh]

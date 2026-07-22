@@ -67,6 +67,10 @@ function printList(resolved: ReturnType<typeof resolveComponents>): void {
   process.stdout.write(`\n`);
 }
 
+function printComponentStart(name: string): void {
+  process.stdout.write(`\n  ${color(name, "bold")}\n`);
+}
+
 export async function main(): Promise<void> {
   const args = parseArgs(process.argv);
 
@@ -118,7 +122,7 @@ export async function main(): Promise<void> {
     }
 
     const action = args.interactiveAction;
-    const options = { dryRun: args.dryRun, verbose: args.verbose, interactive: true };
+    const options = { dryRun: args.dryRun, verbose: args.verbose, interactive: true, report: true };
 
     for (const item of selected) {
       if (item.unavailable) continue;
@@ -171,7 +175,7 @@ export async function main(): Promise<void> {
   }
 
   if (args.mode === "direct") {
-    const options = { dryRun: args.dryRun, verbose: args.verbose, interactive: isTty };
+    const options = { dryRun: args.dryRun, verbose: args.verbose, interactive: isTty, report: true };
     const names = resolved.map((c: { name: string }) => c.name);
 
     if (args.list) {
@@ -198,12 +202,12 @@ export async function main(): Promise<void> {
     const failures: string[] = [];
 
     if (args.uninstall.length > 0) {
-      if (args.verbose) process.stdout.write(`\n${color("Uninstall", "bold")}\n`);
       const { found, missing } = resolveComponentNames(args.uninstall, names);
       for (const m of missing) {
         process.stdout.write(`  ${color("[warn]", "yellow")} component not found: ${m}\n`);
       }
       for (const name of found) {
+        printComponentStart(name);
         const comp = resolved.find((c: { name: string }) => c.name === name)!;
         const uninstallCmd = Object.entries(comp.uninstall)[0];
         if (!uninstallCmd) {
@@ -217,12 +221,12 @@ export async function main(): Promise<void> {
     }
 
     if (args.install.length > 0) {
-      if (args.verbose) process.stdout.write(`\n${color("Install", "bold")}\n`);
       const { found, missing } = resolveComponentNames(args.install, names);
       for (const m of missing) {
         process.stdout.write(`  ${color("[warn]", "yellow")} component not found: ${m}\n`);
       }
       for (const name of found) {
+        printComponentStart(name);
         const comp = resolved.find((c: { name: string }) => c.name === name)!;
         if (comp.installCommand) {
           const result = await installComponent(name, comp.installCommand, options, comp.availableManager || undefined);
@@ -262,7 +266,6 @@ export async function main(): Promise<void> {
     }
 
     if (args.importDefaults) {
-      if (args.verbose) process.stdout.write(`\n${color("Defaults", "bold")}\n`);
       const allDefaults = Object.fromEntries(
         resolved
           .filter((c: { hasDefaults: boolean }) => c.hasDefaults)
@@ -275,7 +278,6 @@ export async function main(): Promise<void> {
     }
 
     if (args.exportDefaults) {
-      if (args.verbose) process.stdout.write(`\n${color("Defaults Export", "bold")}\n`);
       const allDefaults = Object.fromEntries(
         resolved
           .filter((c: { hasDefaults: boolean }) => c.hasDefaults)
@@ -288,12 +290,12 @@ export async function main(): Promise<void> {
     }
 
     if (args.link.length > 0) {
-      if (args.verbose) process.stdout.write(`\n${color("Link", "bold")}\n`);
       const { found, missing } = resolveComponentNames(args.link, names);
       for (const m of missing) {
         process.stdout.write(`  ${color("[warn]", "yellow")} component not found: ${m}\n`);
       }
       for (const name of found) {
+        printComponentStart(name);
         const comp = resolved.find((c: { name: string }) => c.name === name)!;
         if (comp.hasLinks) {
           const results = createLinks(name, comp.link, process.cwd(), options);
@@ -305,12 +307,12 @@ export async function main(): Promise<void> {
     }
 
     if (args.postinstall.length > 0) {
-      if (args.verbose) process.stdout.write(`\n${color("Post-install", "bold")}\n`);
       const { found, missing } = resolveComponentNames(args.postinstall, names);
       for (const m of missing) {
         process.stdout.write(`  ${color("[warn]", "yellow")} component not found: ${m}\n`);
       }
       for (const name of found) {
+        printComponentStart(name);
         const comp = resolved.find((c: { name: string }) => c.name === name)!;
         if (comp.postinstall) {
           const result = await runPostInstall(name, comp.postinstall, options);
@@ -320,12 +322,12 @@ export async function main(): Promise<void> {
     }
 
     if (args.postlink.length > 0) {
-      if (args.verbose) process.stdout.write(`\n${color("Post-link", "bold")}\n`);
       const { found, missing } = resolveComponentNames(args.postlink, names);
       for (const m of missing) {
         process.stdout.write(`  ${color("[warn]", "yellow")} component not found: ${m}\n`);
       }
       for (const name of found) {
+        printComponentStart(name);
         const comp = resolved.find((c: { name: string }) => c.name === name)!;
         if (comp.postlink) {
           const result = await runPostLink(name, comp.postlink, options);
@@ -339,9 +341,7 @@ export async function main(): Promise<void> {
       process.exit(1);
     }
 
-    if (options.verbose) {
-      process.stdout.write(`\n${color("  Done.", "green")}\n`);
-    }
+    process.stdout.write(`\n  ${color("✓", "green")} Done.\n`);
   }
 }
 

@@ -4,6 +4,7 @@ export interface RunOptions {
   dryRun: boolean;
   verbose: boolean;
   interactive: boolean;
+  report?: boolean;
 }
 
 export interface HookResult {
@@ -26,9 +27,7 @@ export async function runPostInstall(
   }
 
   if (options.dryRun) {
-    if (options.verbose) {
-      process.stdout.write(`  ${color("[dry-run]", "yellow")} would run postinstall: ${hook}\n`);
-    }
+    if (options.report) process.stdout.write(`  ${color("[dry-run]", "yellow")} ${component} postinstall: ${hook}\n`);
     return { ...base, success: true, dryRun: true };
   }
 
@@ -52,6 +51,7 @@ export async function runPostInstall(
     throw e;
   }
 
+  if (options.report) process.stdout.write(`    ${color("✓", "green")} postinstall\n`);
   return { ...base, success: true };
 }
 
@@ -67,9 +67,7 @@ export async function runPostLink(
   }
 
   if (options.dryRun) {
-    if (options.verbose) {
-      process.stdout.write(`  ${color("[dry-run]", "yellow")} would run postlink: ${hook}\n`);
-    }
+    if (options.report) process.stdout.write(`  ${color("[dry-run]", "yellow")} ${component} postlink: ${hook}\n`);
     return { ...base, success: true, dryRun: true };
   }
 
@@ -93,5 +91,6 @@ export async function runPostLink(
     throw e;
   }
 
+  if (options.report) process.stdout.write(`    ${color("✓", "green")} postlink\n`);
   return { ...base, success: true };
 }
