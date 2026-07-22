@@ -153,16 +153,12 @@ describe("parseArgs", () => {
     expect(result.verbose).toBe(true);
   });
 
-  test("--install without value goes interactive", () => {
-    const result = parseArgs(["dot", "--install"]);
-    expect(result.mode).toBe("interactive");
-    expect(result.interactiveAction).toBe("install");
+  test("--install without value throws", () => {
+    expect(() => parseArgs(["dot", "--install"])).toThrow();
   });
 
-  test("-i without value goes interactive", () => {
-    const result = parseArgs(["dot", "-i"]);
-    expect(result.mode).toBe("interactive");
-    expect(result.interactiveAction).toBe("install");
+  test("-i without value throws", () => {
+    expect(() => parseArgs(["dot", "-i"])).toThrow();
   });
 
   test("-u without value goes interactive", () => {

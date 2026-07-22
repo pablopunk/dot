@@ -94,6 +94,38 @@ install.any = "printf 'touch ${marker}' | sh"
     }
   });
 
+  test("named install runs the full component lifecycle", async () => {
+    const installMarker = join(repoDir, "installed");
+    const postInstallMarker = join(repoDir, "postinstalled");
+    const postLinkMarker = join(repoDir, "postlinked");
+    writeFileSync(join(repoDir, "dot.toml"), `
+[zsh]
+install.any = "touch ${installMarker}"
+link."zshrc" = "~/.zshrc"
+postinstall = "touch ${postInstallMarker}"
+postlink = "touch ${postLinkMarker}"
+`);
+    writeFileSync(join(repoDir, "zshrc"), "# zsh config");
+
+    const originalArgv = process.argv;
+    const originalCwd = process.cwd();
+
+    try {
+      process.argv = ["dot", "-i", "zsh"];
+      process.chdir(repoDir);
+
+      await main();
+
+      expect(existsSync(installMarker)).toBe(true);
+      expect(existsSync(join(homeDir, ".zshrc"))).toBe(true);
+      expect(existsSync(postInstallMarker)).toBe(true);
+      expect(existsSync(postLinkMarker)).toBe(true);
+    } finally {
+      process.argv = originalArgv;
+      process.chdir(originalCwd);
+    }
+  });
+
   test("dry run does not create links", async () => {
     const configToml = `
 [zsh]

@@ -23,7 +23,7 @@ function printHelp(): void {
     dot [flags...]
 
   Actions (combinable, repeatable):
-    -i, --install <name>         Install component (fuzzy match)
+    -i, --install <name>         Run a component's full setup (fuzzy match)
     -u, --uninstall <name>       Uninstall component
     -l, --link <name>            Link files for component
     --postinstall <name>         Run postinstall hooks
@@ -140,19 +140,19 @@ export async function main(): Promise<void> {
         }
       }
 
-      if (!action || action === "link") {
+      if (!action || action === "install" || action === "link") {
         if (comp.hasLinks) {
           createLinks(comp.name, comp.link, process.cwd(), options);
         }
       }
 
-      if (!action || action === "postinstall") {
+      if (!action || action === "install" || action === "postinstall") {
         if (comp.postinstall) {
           await runPostInstall(comp.name, comp.postinstall, options);
         }
       }
 
-      if (!action || action === "postlink") {
+      if (!action || action === "install" || action === "postlink") {
         if (comp.postlink) {
           await runPostLink(comp.name, comp.postlink, options);
         }
@@ -226,7 +226,37 @@ export async function main(): Promise<void> {
         const comp = resolved.find((c: { name: string }) => c.name === name)!;
         if (comp.installCommand) {
           const result = await installComponent(name, comp.installCommand, options, comp.availableManager || undefined);
-          if (result.failed && !result.dryRun) failures.push(name);
+          if (result.failed && !result.dryRun) {
+            failures.push(name);
+            continue;
+          }
+        }
+        if (comp.hasDefaults && os === "mac") {
+          const results = await importDefaults(comp.defaults, process.cwd(), options);
+          if (results.some((result) => result.failed && !result.dryRun)) {
+            failures.push(name);
+            continue;
+          }
+        }
+        if (comp.hasLinks) {
+          const results = createLinks(name, comp.link, process.cwd(), options);
+          if (results.some((result) => result.failed && !result.dryRun)) {
+            failures.push(name);
+            continue;
+          }
+        }
+        if (comp.postinstall) {
+          const result = await runPostInstall(name, comp.postinstall, options);
+          if (result.failed && !result.dryRun) {
+            failures.push(name);
+            continue;
+          }
+        }
+        if (comp.postlink) {
+          const result = await runPostLink(name, comp.postlink, options);
+          if (result.failed && !result.dryRun) {
+            failures.push(name);
+          }
         }
       }
     }

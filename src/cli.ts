@@ -81,6 +81,9 @@ export function parseArgs(argv: string[]): ParsedArgs {
       if (VALUE_FLAGS.has(name)) {
         i++;
         if (i >= argv.length || argv[i].startsWith("-")) {
+          if (name === "install") {
+            throw new Error("Flag --install requires a component name");
+          }
           result.interactiveAction = name;
           hasAction = true;
           i--;
@@ -119,6 +122,9 @@ export function parseArgs(argv: string[]): ParsedArgs {
           }
           i++;
           if (i >= argv.length || argv[i].startsWith("-")) {
+            if (resolved === "install") {
+              throw new Error("Flag -i requires a component name");
+            }
             result.interactiveAction = resolved;
             hasAction = true;
             i--;
