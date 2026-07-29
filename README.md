@@ -1,8 +1,9 @@
+
 # dot — all your computers in one repo
 
 > Single binary, zero dependencies, one config file
 
-<img width="751" height="486" alt="image" src="https://github.com/user-attachments/assets/9ae4f98e-5f3d-4389-985c-016a3cd0c08e" />
+<img width="1000" height="619" alt="CleanShot 2026-07-29 at 22 56 43@2x" src="https://github.com/user-attachments/assets/05ff8f9c-3d75-4df0-b409-5bcafa4c38cc" />
 
 
 ## Highlights
