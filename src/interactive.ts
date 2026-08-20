@@ -13,6 +13,7 @@ export interface CheckboxItem {
   hasInstall: boolean;
   allLinksDone: boolean;
   isInstalled: boolean;
+  isDone: boolean;
 }
 
 export function buildChecklist(components: ResolvedComponent[]): CheckboxItem[] {
@@ -27,12 +28,13 @@ export function buildChecklist(components: ResolvedComponent[]): CheckboxItem[] 
     hasInstall: c.hasInstall,
     allLinksDone: c.allLinksDone,
     isInstalled: c.isInstalled,
+    isDone: Boolean(c.check || c.hasLinks)
+      && (!c.check || c.isInstalled)
+      && (!c.hasLinks || c.allLinksDone),
   }));
 
   items.sort((a, b) => {
-    const aDone = a.allLinksDone || a.isInstalled;
-    const bDone = b.allLinksDone || b.isInstalled;
-    if (aDone !== bDone) return aDone ? 1 : -1;
+    if (a.isDone !== b.isDone) return a.isDone ? 1 : -1;
     return a.name.localeCompare(b.name);
   });
 
@@ -58,7 +60,7 @@ export async function runInteractive(
         : "";
       let marker = "";
       if (item.unavailable) marker = " ⚠";
-      else if (item.allLinksDone || item.isInstalled) marker = ` ${color("✓", "green")}`;
+      else if (item.isDone) marker = ` ${color("✓", "green")}`;
       return {
         title: `${item.name}${marker}`,
         value: item.name,

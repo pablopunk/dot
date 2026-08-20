@@ -49,4 +49,45 @@ describe("buildChecklist", () => {
     const items = buildChecklist(comps);
     expect(items[0].unavailable).toBe(false);
   });
+
+  test("requires the check and links when a component has both", () => {
+    const item = buildChecklist([makeComponent({
+      check: "rg",
+      hasLinks: true,
+      allLinksDone: true,
+      isInstalled: false,
+    })])[0];
+    expect(item.isDone).toBe(false);
+  });
+
+  test("sorts a linked component with a missing executable before done components", () => {
+    const items = buildChecklist([
+      makeComponent({ name: "zsh", check: "zsh", isInstalled: true }),
+      makeComponent({
+        name: "ripgrep",
+        check: "rg",
+        hasLinks: true,
+        allLinksDone: true,
+        isInstalled: false,
+      }),
+    ]);
+    expect(items.map((item) => item.name)).toEqual(["ripgrep", "zsh"]);
+  });
+
+  test("marks check-only components done when installed", () => {
+    const item = buildChecklist([makeComponent({ check: "zsh", isInstalled: true })])[0];
+    expect(item.isDone).toBe(true);
+  });
+
+  test("marks link-only components done when all links exist", () => {
+    const item = buildChecklist([makeComponent({
+      install: {},
+      availableManager: null,
+      installCommand: null,
+      hasInstall: false,
+      hasLinks: true,
+      allLinksDone: true,
+    })])[0];
+    expect(item.isDone).toBe(true);
+  });
 });
