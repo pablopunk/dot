@@ -71,6 +71,10 @@ function printComponentStart(name: string): void {
   process.stdout.write(`\n  ${color(name, "bold")}\n`);
 }
 
+function warnNoInstallCommand(name: string): void {
+  process.stdout.write(`  ${color("[warn]", "yellow")} ${name}: no install command available; continuing setup\n`);
+}
+
 export async function main(): Promise<void> {
   const args = parseArgs(process.argv);
 
@@ -135,6 +139,8 @@ export async function main(): Promise<void> {
           if (result.failed) {
             process.stderr.write(`  ${color("[error]", "red")} ${comp.name}: install failed\n`);
           }
+        } else {
+          warnNoInstallCommand(comp.name);
         }
       }
 
@@ -234,6 +240,8 @@ export async function main(): Promise<void> {
             failures.push(name);
             continue;
           }
+        } else {
+          warnNoInstallCommand(name);
         }
         if (comp.hasDefaults && os === "mac") {
           const results = await importDefaults(comp.defaults, process.cwd(), options);

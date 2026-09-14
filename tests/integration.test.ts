@@ -156,6 +156,34 @@ postlink = "true"
     expect(plainOutput).toContain("✓ Done.");
   });
 
+  test("named install warns and continues when no install command is available", async () => {
+    writeFileSync(join(repoDir, "dot.toml"), `
+[neovim]
+install.definitely-unavailable-manager = "false"
+link."init.lua" = "~/.config/nvim/init.lua"
+`);
+    writeFileSync(join(repoDir, "init.lua"), "-- neovim config");
+
+    const child = Bun.spawn([process.execPath, join(import.meta.dir, "../src/index.ts"), "-i", "neovim"], {
+      cwd: repoDir,
+      env: { ...process.env, HOME: homeDir },
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    const [output, errorOutput, exitCode] = await Promise.all([
+      new Response(child.stdout).text(),
+      new Response(child.stderr).text(),
+      child.exited,
+    ]);
+    const plainOutput = output.replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, "");
+
+    expect(exitCode).toBe(0);
+    expect(errorOutput).toBe("");
+    expect(plainOutput).toContain("[warn] neovim: no install command available; continuing setup");
+    expect(plainOutput).toContain("✓ linked");
+    expect(existsSync(join(homeDir, ".config/nvim/init.lua"))).toBe(true);
+  });
+
   test("dry run does not create links", async () => {
     const configToml = `
 [zsh]
