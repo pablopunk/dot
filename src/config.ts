@@ -28,6 +28,10 @@ export interface Config {
   components: Component[];
 }
 
+function normalizeLegacyDollarEscapes(raw: string): string {
+  return raw.replace(/(^|[^\\])((?:\\\\)*)\\\$/g, (_match, prefix, pairs) => `${prefix}${pairs}$`);
+}
+
 export async function parseConfig(path?: string): Promise<Config> {
   const filePath = path || "dot.toml";
   const file = Bun.file(filePath);
@@ -39,7 +43,16 @@ export async function parseConfig(path?: string): Promise<Config> {
   try {
     parsed = Bun.TOML.parse(raw);
   } catch (e: any) {
-    throw new Error(`Invalid TOML in ${filePath}: ${e.message}`);
+    const compatibleRaw = normalizeLegacyDollarEscapes(raw);
+    if (compatibleRaw === raw) {
+      throw new Error(`Invalid TOML in ${filePath}: ${e.message}`);
+    }
+
+    try {
+      parsed = Bun.TOML.parse(compatibleRaw);
+    } catch (compatibleError: any) {
+      throw new Error(`Invalid TOML in ${filePath}: ${compatibleError.message}`);
+    }
   }
 
   if (!parsed || typeof parsed !== "object") return { components: [] };

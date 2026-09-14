@@ -83,6 +83,20 @@ postinstall = "echo done"
     expect(config.components[0].postinstall).toBe("echo done");
   });
 
+  test("accepts legacy escaped dollar signs in shell commands", async () => {
+    writeToml(String.raw`
+[tailscale]
+postinstall = """
+echo "Run: tailscale up --operator=\$USER"
+echo "Literal: \\$HOME"
+"""
+`);
+    const config = await parseConfig(join(tmp, "dot.toml"));
+    expect(config.components[0].postinstall?.trim()).toBe(
+      'echo "Run: tailscale up --operator=$USER"\necho "Literal: \\$HOME"'
+    );
+  });
+
   test("parses postlink hook", async () => {
     writeToml(`
 [ssh]
